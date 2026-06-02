@@ -121,10 +121,10 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 64Mi
+              memory: 128Mi
             limits:
               cpu: 500m
-              memory: 128Mi
+              memory: 256Mi
         # ── qBittorrent ───────────────────────────────────────────────────────
         - name: qbittorrent
           image: lscr.io/linuxserver/qbittorrent:latest
