@@ -91,9 +91,9 @@ spec:
               value: "on"
             - name: VPN_PORT_FORWARDING_PROVIDER
               value: protonvpn
-            # P2P servers support port forwarding; change country if preferred
-            - name: SERVER_CATEGORIES
-              value: p2p
+            # Use Netherlands servers (change to your preferred country)
+            - name: SERVER_COUNTRIES
+              value: Netherlands
             - name: TZ
               value: "Etc/UTC"
             # Disable unused proxy features
