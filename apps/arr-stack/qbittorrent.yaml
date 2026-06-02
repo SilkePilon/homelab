@@ -218,17 +218,17 @@ spec:
                 fi
                 if [ -n "$PORT" ] && [ "$PORT" -gt 0 ] 2>/dev/null && [ "$PORT" != "$LAST_PORT" ]; then
                   echo "[port-updater] new port: ${PORT}, updating qBittorrent"
-                  SID=$(curl -sf -c /tmp/qb-cookies.txt \
+                  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -c /tmp/qb-cookies.txt \
                     --data "username=${QB_USERNAME}&password=${QB_PASSWORD}" \
                     "${QB_URL}/api/v2/auth/login")
-                  if [ "$SID" = "Ok." ]; then
+                  if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
                     curl -sf -b /tmp/qb-cookies.txt \
                       --data "json={\"listen_port\":${PORT},\"random_port\":false}" \
                       "${QB_URL}/api/v2/app/setPreferences" > /dev/null
                     echo "[port-updater] port updated to ${PORT}"
                     LAST_PORT=$PORT
                   else
-                    echo "[port-updater] qBittorrent auth failed (got: ${SID}), will retry"
+                    echo "[port-updater] qBittorrent auth failed (HTTP ${HTTP_CODE}), will retry"
                   fi
                 fi
                 sleep 30
