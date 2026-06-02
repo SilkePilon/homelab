@@ -99,6 +99,8 @@ spec:
             # Disable IPv6 — fixes "adding IPv6 rule: file exists" on Kubernetes
             - name: BLOCK_IPV6
               value: "on"
+            - name: WIREGUARD_ALLOWED_IPS
+              value: "0.0.0.0/0"
             - name: FIREWALL_MARK
               value: "0x40000"
             # Disable unused proxy features
