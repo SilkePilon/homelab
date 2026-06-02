@@ -77,6 +77,13 @@ spec:
             capabilities:
               add:
                 - NET_ADMIN
+          lifecycle:
+            postStart:
+              exec:
+                # Clean up stale IP rules from previous pod exits (Kubernetes shares
+                # IP rules across the pod namespace). Fix from gluetun wiki:
+                # https://github.com/qdm12/gluetun-wiki/blob/main/setup/advanced/kubernetes.md
+                command: ["/bin/sh", "-c", "(ip rule del table 51820; ip -6 rule del table 51820) || true"]
           env:
             - name: VPN_SERVICE_PROVIDER
               value: protonvpn
