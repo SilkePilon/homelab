@@ -47,13 +47,6 @@ spec:
               value: "1"
             - name: TZ
               value: "Etc/UTC"
-          # Provider/tool API keys from the ESO-managed Secret. optional:true means
-          # Hermes still boots if the Secret doesn't exist yet (configure via
-          # `hermes setup` instead, which writes /opt/data/.env on the PVC).
-          envFrom:
-            - secretRef:
-                name: hermes-agent-secrets
-                optional: true
           ports:
             - name: dashboard
               containerPort: 9119

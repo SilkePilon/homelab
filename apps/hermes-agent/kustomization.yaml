@@ -7,7 +7,6 @@ namespace: hermes-agent
 resources:
   - namespace.yaml
   - pvc.yaml
-  - externalsecret.yaml
   - service.yaml
   - deployment.yaml
 
