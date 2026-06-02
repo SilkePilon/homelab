@@ -58,7 +58,7 @@ spec:
       dnsPolicy: None
       dnsConfig:
         nameservers:
-          - 127.0.0.1
+          - ::1
         searches:
           - arr-stack.svc.cluster.local
           - svc.cluster.local
@@ -162,7 +162,7 @@ spec:
               memory: 128Mi
             limits:
               cpu: 500m
-              memory: 256Mi
+              memory: 512Mi
         # ── qBittorrent ───────────────────────────────────────────────────────
         - name: qbittorrent
           image: lscr.io/linuxserver/qbittorrent:latest
