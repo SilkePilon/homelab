@@ -63,14 +63,12 @@ spec:
               cpu: "1"
               memory: 512Mi
           readinessProbe:
-            httpGet:
-              path: /UI/Login
+            tcpSocket:
               port: webui
             initialDelaySeconds: 20
             periodSeconds: 15
           livenessProbe:
-            httpGet:
-              path: /UI/Login
+            tcpSocket:
               port: webui
             initialDelaySeconds: 60
             periodSeconds: 30
