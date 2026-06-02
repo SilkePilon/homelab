@@ -29,6 +29,15 @@ spec:
       labels:
         app.kubernetes.io/name: sonarr
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: arr-downloads
+                    operator: In
+                    values:
+                      - "true"
       securityContext:
         fsGroup: 1000
       containers:
