@@ -1,0 +1,100 @@
+# ── Radarr (Movies) ───────────────────────────────────────────────────────────
+# WebUI: port 7878  (kubectl port-forward -n arr-stack svc/radarr 7878:7878)
+#
+# After first login, configure in Radarr:
+#   Settings → Media Management → Import Mode: Move
+#   Settings → Media Management → Root Folders: /data/media/movies
+#   Settings → Download Clients → Add qBittorrent:
+#     Host: qbittorrent   Port: 8080   Category: radarr
+#   Settings → Indexers → Add Torznab:
+#     URL: http://jackett:9117/api/v2.0/indexers/YOUR_INDEXER/results/torznab/
+#     API Key: (copy from Jackett dashboard)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: radarr
+  namespace: arr-stack
+  labels:
+    app.kubernetes.io/name: radarr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: radarr
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: radarr
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: radarr
+          image: lscr.io/linuxserver/radarr:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: UMASK
+              value: "002"
+            - name: TZ
+              value: "Etc/UTC"
+          ports:
+            - name: webui
+              containerPort: 7878
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: downloads
+              mountPath: /data/torrents
+            - name: media
+              mountPath: /data/media
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: webui
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: webui
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: radarr-config
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: arr-downloads
+        - name: media
+          persistentVolumeClaim:
+            claimName: arr-media
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: radarr
+  namespace: arr-stack
+  labels:
+    app.kubernetes.io/name: radarr
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: radarr
+  ports:
+    - name: webui
+      port: 7878
+      targetPort: webui

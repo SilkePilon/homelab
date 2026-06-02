@@ -1,0 +1,147 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PRE-REQUISITES for the SMB PersistentVolume below:
+#
+#  1. SMB CSI driver must be installed on the cluster (one-time):
+#       helm repo add csi-driver-smb \
+#         https://raw.githubusercontent.com/kubernetes-csi/csi-driver-smb/master/charts
+#       helm install csi-driver-smb csi-driver-smb/csi-driver-smb \
+#         --namespace kube-system
+#
+#  2. cifs-utils must be present on every k3s node:
+#       sudo apt install cifs-utils   # Debian/Ubuntu
+#
+#  3. Edit the PersistentVolume below:
+#       - Set `volumeAttributes.source` to your SMB share, e.g. //192.168.1.50/media
+#
+#  4. Create the smb-creds Secret (see secret.yaml).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Config volumes (one per app, local-path on k3s) ──────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qbittorrent-config
+  namespace: arr-stack
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sonarr-config
+  namespace: arr-stack
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: radarr-config
+  namespace: arr-stack
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lidarr-config
+  namespace: arr-stack
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jackett-config
+  namespace: arr-stack
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+# ── Downloads staging volume (local disk — files live here until imported) ───
+# Sonarr/Radarr/Lidarr use "Move" as import mode. Because the downloads volume
+# and the SMB media volume are on different filesystems, "Move" automatically
+# becomes a copy-to-SMB then delete-local operation. No scripts required.
+# Adjust the storage size to match your fastest local disk capacity.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: arr-downloads
+  namespace: arr-stack
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 500Gi
+---
+# ── SMB media PersistentVolume (cluster-scoped, no namespace) ────────────────
+# !! EDIT: replace //YOUR_NAS_IP/YOUR_SHARE with your actual SMB share path !!
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: arr-stack-media-pv
+spec:
+  capacity:
+    storage: 10Ti        # Nominal — SMB does not enforce this limit.
+  accessModes: [ReadWriteMany]
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - dir_mode=0777
+    - file_mode=0777
+    - uid=1000
+    - gid=1000
+    - noperm
+    - mfsymlinks
+    - cache=strict
+    - noserverino
+  csi:
+    driver: smb.csi.k8s.io
+    readOnly: false
+    # Unique handle — must be unique in the cluster.
+    volumeHandle: arr-stack-media-smb
+    volumeAttributes:
+      # !! EDIT THIS !!
+      source: "//192.168.1.222/Media"
+    nodeStageSecretRef:
+      name: smb-creds
+      namespace: arr-stack
+  claimRef:
+    name: arr-media
+    namespace: arr-stack
+---
+# ── SMB media PersistentVolumeClaim ─────────────────────────────────────────
+# Bound statically to arr-stack-media-pv above via claimRef.
+# Mounted at /data/media in all *arr containers.
+# Sub-directories used:  /data/media/movies  /data/media/tv  /data/media/music
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: arr-media
+  namespace: arr-stack
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: ""   # empty = static binding
+  volumeName: arr-stack-media-pv
+  resources:
+    requests:
+      storage: 10Ti

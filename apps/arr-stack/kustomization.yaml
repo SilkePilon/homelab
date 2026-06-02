@@ -1,0 +1,70 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+# Namespace is set per-resource; the PersistentVolume is cluster-scoped.
+namespace: arr-stack
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BEFORE applying this stack:
+#
+#  1. Install the SMB CSI driver (one-time cluster setup):
+#       helm repo add csi-driver-smb \
+#         https://raw.githubusercontent.com/kubernetes-csi/csi-driver-smb/master/charts
+#       helm install csi-driver-smb csi-driver-smb/csi-driver-smb \
+#         --namespace kube-system
+#     Also install cifs-utils on every k3s node:
+#       sudo apt install cifs-utils
+#
+#  2. Edit pvc.yaml — set the SMB share URL in arr-stack-media-pv:
+#       volumeAttributes.source: "//YOUR_NAS_IP/YOUR_SHARE"
+#
+#  3. Create the SMB credentials secret (NOT committed to git):
+#       kubectl create secret generic smb-creds \
+#         --from-literal username=YOUR_USER \
+#         --from-literal password='YOUR_PASS' \
+#         -n arr-stack
+#     Then delete secret.yaml or replace stringData values with real creds.
+#
+#  4. Adjust pvc.yaml → arr-downloads storage size to your available disk.
+#
+#  5. Set your timezone in each Deployment's TZ env var if needed.
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Copy-then-delete workflow (how it works automatically):
+#   qBittorrent downloads → /data/torrents  (arr-downloads PVC, local disk)
+#   *arr apps import mode = Move            (set in each app's UI after first login)
+#   Because /data/torrents and /data/media are on different filesystems,
+#   "Move" in *arr becomes: copy to SMB share → delete local file.
+#   No custom scripts or sidecars required.
+#
+# Path layout inside all *arr containers:
+#   /data/torrents/movies   ← qBittorrent category: radarr
+#   /data/torrents/tv       ← qBittorrent category: sonarr
+#   /data/torrents/music    ← qBittorrent category: lidarr
+#   /data/media/movies      ← Radarr root folder
+#   /data/media/tv          ← Sonarr root folder
+#   /data/media/music       ← Lidarr root folder
+#
+# Access UIs via port-forward (all services are ClusterIP):
+#   qBittorrent  kubectl port-forward -n arr-stack svc/qbittorrent 8080:8080
+#   Sonarr       kubectl port-forward -n arr-stack svc/sonarr 8989:8989
+#   Radarr       kubectl port-forward -n arr-stack svc/radarr 7878:7878
+#   Lidarr       kubectl port-forward -n arr-stack svc/lidarr 8686:8686
+#   Jackett      kubectl port-forward -n arr-stack svc/jackett 9117:9117
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - secret.yaml
+  - pvc.yaml
+  - qbittorrent.yaml
+  - sonarr.yaml
+  - radarr.yaml
+  - lidarr.yaml
+  - jackett.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: arr-stack
+    includeSelectors: false

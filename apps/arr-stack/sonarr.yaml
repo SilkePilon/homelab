@@ -1,0 +1,103 @@
+# ── Sonarr (TV shows) ─────────────────────────────────────────────────────────
+# WebUI: port 8989  (kubectl port-forward -n arr-stack svc/sonarr 8989:8989)
+#
+# After first login, configure in Sonarr:
+#   Settings → Media Management → Import Mode: Move
+#     (cross-filesystem Move = copy to SMB then delete local — no script needed)
+#   Settings → Media Management → Root Folders: /data/media/tv
+#   Settings → Download Clients → Add qBittorrent:
+#     Host: qbittorrent   Port: 8080   Category: sonarr
+#   Settings → Indexers → Add Torznab:
+#     URL: http://jackett:9117/api/v2.0/indexers/YOUR_INDEXER/results/torznab/
+#     API Key: (copy from Jackett dashboard)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sonarr
+  namespace: arr-stack
+  labels:
+    app.kubernetes.io/name: sonarr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sonarr
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sonarr
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: sonarr
+          image: lscr.io/linuxserver/sonarr:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: UMASK
+              value: "002"
+            - name: TZ
+              value: "Etc/UTC"
+          ports:
+            - name: webui
+              containerPort: 8989
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            # Both volumes must be mounted so Sonarr sees them as one logical
+            # path tree — this is required for the Move import to work correctly.
+            - name: downloads
+              mountPath: /data/torrents
+            - name: media
+              mountPath: /data/media
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: webui
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: webui
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: sonarr-config
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: arr-downloads
+        - name: media
+          persistentVolumeClaim:
+            claimName: arr-media
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonarr
+  namespace: arr-stack
+  labels:
+    app.kubernetes.io/name: sonarr
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: sonarr
+  ports:
+    - name: webui
+      port: 8989
+      targetPort: webui
