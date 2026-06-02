@@ -1,6 +1,22 @@
 # ── qBittorrent ───────────────────────────────────────────────────────────────
 # WebUI: port 8080  (access via: kubectl port-forward -n arr-stack svc/qbittorrent 8080:8080)
-# Default credentials: admin / adminadmin  (change immediately on first login)
+#
+# VPN: gluetun sidecar routes all traffic through ProtonVPN WireGuard.
+# Port forwarding is handled automatically by gluetun + the port-updater sidecar.
+#
+# Required secrets (create out-of-band — NOT in git):
+#
+#   1. ProtonVPN WireGuard private key:
+#      - Go to https://account.proton.me/vpn/wireguard
+#      - Create a new WireGuard key, download a P2P config (e.g. NL#1)
+#      - Extract PrivateKey from the [Interface] section
+#      kubectl create secret generic protonvpn-wg -n arr-stack \
+#        --from-literal=privateKey=<PrivateKey>
+#
+#   2. qBittorrent credentials (for port-updater to call qBittorrent API):
+#      kubectl create secret generic qbittorrent-creds -n arr-stack \
+#        --from-literal=username=admin \
+#        --from-literal=password=<your qbittorrent password>
 #
 # After first login, configure in qBittorrent Settings → Downloads:
 #   Default save path: /data/torrents
@@ -9,9 +25,6 @@
 #   radarr  → /data/torrents/movies
 #   sonarr  → /data/torrents/tv
 #   lidarr  → /data/torrents/music
-#
-# Torrent port 6881 (TCP+UDP) is exposed via hostPort so your router can
-# forward it directly to the node.  Adjust if your k3s node IP differs.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -42,7 +55,63 @@ spec:
                       - "true"
       securityContext:
         fsGroup: 1000
+      initContainers:
+        # Ensure /dev/net/tun exists before gluetun starts
+        - name: init-tun
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /dev/net
+              [ -c /dev/net/tun ] || mknod /dev/net/tun c 10 200
+              chmod 0666 /dev/net/tun
+          securityContext:
+            privileged: true
       containers:
+        # ── gluetun: ProtonVPN WireGuard tunnel ──────────────────────────────
+        - name: gluetun
+          image: ghcr.io/qdm12/gluetun:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          env:
+            - name: VPN_SERVICE_PROVIDER
+              value: protonvpn
+            - name: VPN_TYPE
+              value: wireguard
+            - name: WIREGUARD_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: protonvpn-wg
+                  key: privateKey
+            - name: VPN_PORT_FORWARDING
+              value: "on"
+            - name: VPN_PORT_FORWARDING_PROVIDER
+              value: protonvpn
+            # P2P servers support port forwarding; change country if preferred
+            - name: SERVER_CATEGORIES
+              value: p2p
+            - name: TZ
+              value: "Etc/UTC"
+            # Disable unused proxy features
+            - name: HTTPPROXY
+              value: "off"
+            - name: SHADOWSOCKS
+              value: "off"
+          ports:
+            - name: gluetun-ctrl
+              containerPort: 8000
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+        # ── qBittorrent ───────────────────────────────────────────────────────
         - name: qbittorrent
           image: lscr.io/linuxserver/qbittorrent:latest
           imagePullPolicy: IfNotPresent
@@ -60,16 +129,6 @@ spec:
           ports:
             - name: webui
               containerPort: 8080
-            # hostPort forwards the torrent traffic directly from the node.
-            # Your router should port-forward 6881 TCP+UDP → this node.
-            - name: torrent-tcp
-              containerPort: 6881
-              hostPort: 6881
-              protocol: TCP
-            - name: torrent-udp
-              containerPort: 6881
-              hostPort: 6881
-              protocol: UDP
           volumeMounts:
             - name: config
               mountPath: /config
@@ -86,14 +145,68 @@ spec:
             httpGet:
               path: /
               port: webui
-            initialDelaySeconds: 20
+            initialDelaySeconds: 30
             periodSeconds: 15
           livenessProbe:
             httpGet:
               path: /
               port: webui
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 30
+        # ── port-updater: syncs gluetun forwarded port → qBittorrent ─────────
+        # Polls gluetun's control API every 60s and updates qBittorrent's
+        # listening port so incoming VPN connections actually reach the client.
+        - name: port-updater
+          image: alpine:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: QB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qbittorrent-creds
+                  key: username
+            - name: QB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qbittorrent-creds
+                  key: password
+          command:
+            - /bin/sh
+            - -c
+            - |
+              apk add --no-cache curl jq > /dev/null 2>&1
+              QB_URL="http://localhost:8080"
+              GLUETUN_URL="http://localhost:8000"
+              LAST_PORT=0
+              echo "[port-updater] starting"
+              while true; do
+                # Wait for gluetun to be ready
+                PORT=$(curl -sf "${GLUETUN_URL}/v1/openvpn/portforwarded" | jq -r '.port // 0')
+                if [ -n "$PORT" ] && [ "$PORT" -gt 0 ] && [ "$PORT" != "$LAST_PORT" ]; then
+                  echo "[port-updater] new port: ${PORT}, updating qBittorrent"
+                  # Authenticate
+                  SID=$(curl -sf -c /tmp/qb-cookies.txt \
+                    --data "username=${QB_USERNAME}&password=${QB_PASSWORD}" \
+                    "${QB_URL}/api/v2/auth/login")
+                  if [ "$SID" = "Ok." ]; then
+                    curl -sf -b /tmp/qb-cookies.txt \
+                      --data "json={\"listen_port\":${PORT},\"random_port\":false}" \
+                      "${QB_URL}/api/v2/app/setPreferences" > /dev/null
+                    echo "[port-updater] port updated to ${PORT}"
+                    LAST_PORT=$PORT
+                  else
+                    echo "[port-updater] qBittorrent auth failed, will retry"
+                  fi
+                fi
+                sleep 60
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
       volumes:
         - name: config
           persistentVolumeClaim:
