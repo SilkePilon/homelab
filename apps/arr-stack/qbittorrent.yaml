@@ -189,7 +189,7 @@ spec:
         # Polls gluetun's control API every 60s and updates qBittorrent's
         # listening port so incoming VPN connections actually reach the client.
         - name: port-updater
-          image: alpine:latest
+          image: curlimages/curl:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: QB_USERNAME
@@ -211,7 +211,6 @@ spec:
               LAST_PORT=0
               echo "[port-updater] starting"
               while true; do
-                # Read port directly from gluetun's port file (no curl/jq needed)
                 if [ -f "$PORT_FILE" ]; then
                   PORT=$(cat "$PORT_FILE" | tr -d '[:space:]')
                 else
@@ -219,14 +218,13 @@ spec:
                 fi
                 if [ -n "$PORT" ] && [ "$PORT" -gt 0 ] 2>/dev/null && [ "$PORT" != "$LAST_PORT" ]; then
                   echo "[port-updater] new port: ${PORT}, updating qBittorrent"
-                  # Authenticate using wget (built into busybox/alpine)
-                  SID=$(wget -qO- --post-data "username=${QB_USERNAME}&password=${QB_PASSWORD}" \
-                    --save-cookies /tmp/qb-cookies.txt --keep-session-cookies \
-                    "${QB_URL}/api/v2/auth/login" 2>/dev/null)
+                  SID=$(curl -sf -c /tmp/qb-cookies.txt \
+                    --data "username=${QB_USERNAME}&password=${QB_PASSWORD}" \
+                    "${QB_URL}/api/v2/auth/login")
                   if [ "$SID" = "Ok." ]; then
-                    wget -qO- --post-data "json={\"listen_port\":${PORT},\"random_port\":false}" \
-                      --load-cookies /tmp/qb-cookies.txt \
-                      "${QB_URL}/api/v2/app/setPreferences" > /dev/null 2>&1
+                    curl -sf -b /tmp/qb-cookies.txt \
+                      --data "json={\"listen_port\":${PORT},\"random_port\":false}" \
+                      "${QB_URL}/api/v2/app/setPreferences" > /dev/null
                     echo "[port-updater] port updated to ${PORT}"
                     LAST_PORT=$PORT
                   else
