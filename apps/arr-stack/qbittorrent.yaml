@@ -121,6 +121,10 @@ spec:
             # Use DoH (port 443) instead of DoT (port 853) — ProtonVPN blocks TCP:853 at exit nodes
             - name: DNS_UPSTREAM_RESOLVER_TYPE
               value: "doh"
+            # Use IPs directly — healthcheck uses system /etc/resolv.conf (k8s CoreDNS 10.43.0.10)
+            # which is blocked by gluetun's firewall once VPN is up, causing lookup timeouts
+            - name: HEALTH_TARGET_ADDRESSES
+              value: "1.1.1.1:443,8.8.8.8:443"
             # Disable unused proxy features
             - name: HTTPPROXY
               value: "off"
