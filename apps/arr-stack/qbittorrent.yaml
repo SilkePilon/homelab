@@ -113,6 +113,9 @@ spec:
               value: "on"
             - name: WIREGUARD_ALLOWED_IPS
               value: "0.0.0.0/0"
+            # Use DoH (port 443) instead of DoT (port 853) — ProtonVPN blocks TCP:853 at exit nodes
+            - name: DNS_UPSTREAM_RESOLVER_TYPE
+              value: "doh"
             # Disable unused proxy features
             - name: HTTPPROXY
               value: "off"
