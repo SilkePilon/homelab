@@ -56,7 +56,6 @@ namespace: arr-stack
 
 resources:
   - namespace.yaml
-  - secret.yaml
   - pvc.yaml
   - qbittorrent.yaml
   - sonarr.yaml
