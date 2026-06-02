@@ -53,6 +53,19 @@ spec:
                     operator: In
                     values:
                       - "true"
+      # Route DNS through gluetun's built-in DoH resolver (127.0.0.1:53).
+      # Default k8s CoreDNS (10.43.0.10) is blocked by gluetun's firewall once VPN is up.
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+          - 127.0.0.1
+        searches:
+          - arr-stack.svc.cluster.local
+          - svc.cluster.local
+          - cluster.local
+        options:
+          - name: ndots
+            value: "5"
       securityContext:
         fsGroup: 1000
       initContainers:
