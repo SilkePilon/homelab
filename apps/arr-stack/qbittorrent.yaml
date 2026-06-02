@@ -96,6 +96,9 @@ spec:
                   key: privateKey
             - name: WIREGUARD_ADDRESSES
               value: "10.2.0.2/32"
+            # Lower MTU fixes TCP MSS clamping issues (ICMP works but TCP times out)
+            - name: WIREGUARD_MTU
+              value: "1280"
             - name: VPN_PORT_FORWARDING
               value: "on"
             - name: VPN_PORT_FORWARDING_PROVIDER
