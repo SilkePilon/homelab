@@ -74,6 +74,42 @@ spec:
               port: dashboard
             initialDelaySeconds: 60
             periodSeconds: 30
+
+        # ── Signal sidecar ───────────────────────────────────────────────────
+        # Runs signal-cli as an HTTP REST daemon on localhost:8080.
+        # After the pod starts, link your Signal account once:
+        #   kubectl exec -it deploy/hermes-agent -c signal-cli -- \
+        #     signal-cli link -n "HermesAgent"
+        # Then configure Hermes to use it:
+        #   kubectl exec -it deploy/hermes-agent -- hermes setup
+        #   → Messaging Platforms → Signal → http://localhost:8080
+        - name: signal-cli
+          image: bbernhard/signal-cli-rest-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: signal-http
+              containerPort: 8080
+          env:
+            - name: MODE
+              # "normal" keeps the REST API up; use "native" if you want the
+              # faster native binary variant of the image.
+              value: "normal"
+          volumeMounts:
+            - name: signal-cli-data
+              mountPath: /home/.local/share/signal-cli
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /v1/about
+              port: signal-http
+            initialDelaySeconds: 15
+            periodSeconds: 20
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -83,3 +119,6 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 1Gi
+        - name: signal-cli-data
+          persistentVolumeClaim:
+            claimName: signal-cli-data

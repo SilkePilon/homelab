@@ -13,3 +13,18 @@ spec:
       storage: 5Gi
   # k3s default. Set to a specific class if you use Longhorn/NFS/etc.
   # storageClassName: local-path
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: signal-cli-data
+  namespace: hermes-agent
+  labels:
+    app.kubernetes.io/name: hermes-agent
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+  # storageClassName: local-path
