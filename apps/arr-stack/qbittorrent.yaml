@@ -94,6 +94,8 @@ spec:
                 secretKeyRef:
                   name: protonvpn-wg
                   key: privateKey
+            - name: WIREGUARD_ADDRESSES
+              value: "10.2.0.2/32"
             - name: VPN_PORT_FORWARDING
               value: "on"
             - name: VPN_PORT_FORWARDING_PROVIDER
@@ -108,8 +110,6 @@ spec:
               value: "on"
             - name: WIREGUARD_ALLOWED_IPS
               value: "0.0.0.0/0"
-            - name: FIREWALL_MARK
-              value: "0x40000"
             # Disable unused proxy features
             - name: HTTPPROXY
               value: "off"
