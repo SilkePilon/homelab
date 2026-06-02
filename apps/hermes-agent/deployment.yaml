@@ -94,9 +94,13 @@ spec:
               # "normal" keeps the REST API up; use "native" if you want the
               # faster native binary variant of the image.
               value: "normal"
+            # Poll for incoming messages every minute so Hermes receives them.
+            - name: AUTO_RECEIVE_SCHEDULE
+              value: "* * * * *"
           volumeMounts:
             - name: signal-cli-data
-              mountPath: /home/.local/share/signal-cli
+              # bbernhard runs as user "user" (uid 1000); this is the real config path.
+              mountPath: /home/user/.local/share/signal-cli
           resources:
             requests:
               cpu: 50m
