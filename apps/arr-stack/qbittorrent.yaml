@@ -133,6 +133,9 @@ spec:
           ports:
             - name: gluetun-ctrl
               containerPort: 8000
+          volumeMounts:
+            - name: gluetun-tmp
+              mountPath: /tmp/gluetun
           resources:
             requests:
               cpu: 50m
@@ -203,32 +206,39 @@ spec:
             - /bin/sh
             - -c
             - |
-              apk add --no-cache curl jq > /dev/null 2>&1
               QB_URL="http://localhost:8080"
-              GLUETUN_URL="http://localhost:8000"
+              PORT_FILE="/tmp/gluetun/forwarded_port"
               LAST_PORT=0
               echo "[port-updater] starting"
               while true; do
-                # Wait for gluetun to be ready
-                PORT=$(curl -sf "${GLUETUN_URL}/v1/openvpn/portforwarded" | jq -r '.port // 0')
-                if [ -n "$PORT" ] && [ "$PORT" -gt 0 ] && [ "$PORT" != "$LAST_PORT" ]; then
+                # Read port directly from gluetun's port file (no curl/jq needed)
+                if [ -f "$PORT_FILE" ]; then
+                  PORT=$(cat "$PORT_FILE" | tr -d '[:space:]')
+                else
+                  PORT=0
+                fi
+                if [ -n "$PORT" ] && [ "$PORT" -gt 0 ] 2>/dev/null && [ "$PORT" != "$LAST_PORT" ]; then
                   echo "[port-updater] new port: ${PORT}, updating qBittorrent"
-                  # Authenticate
-                  SID=$(curl -sf -c /tmp/qb-cookies.txt \
-                    --data "username=${QB_USERNAME}&password=${QB_PASSWORD}" \
-                    "${QB_URL}/api/v2/auth/login")
+                  # Authenticate using wget (built into busybox/alpine)
+                  SID=$(wget -qO- --post-data "username=${QB_USERNAME}&password=${QB_PASSWORD}" \
+                    --save-cookies /tmp/qb-cookies.txt --keep-session-cookies \
+                    "${QB_URL}/api/v2/auth/login" 2>/dev/null)
                   if [ "$SID" = "Ok." ]; then
-                    curl -sf -b /tmp/qb-cookies.txt \
-                      --data "json={\"listen_port\":${PORT},\"random_port\":false}" \
-                      "${QB_URL}/api/v2/app/setPreferences" > /dev/null
+                    wget -qO- --post-data "json={\"listen_port\":${PORT},\"random_port\":false}" \
+                      --load-cookies /tmp/qb-cookies.txt \
+                      "${QB_URL}/api/v2/app/setPreferences" > /dev/null 2>&1
                     echo "[port-updater] port updated to ${PORT}"
                     LAST_PORT=$PORT
                   else
-                    echo "[port-updater] qBittorrent auth failed, will retry"
+                    echo "[port-updater] qBittorrent auth failed (got: ${SID}), will retry"
                   fi
                 fi
-                sleep 60
+                sleep 30
               done
+          volumeMounts:
+            - name: gluetun-tmp
+              mountPath: /tmp/gluetun
+              readOnly: true
           resources:
             requests:
               cpu: 10m
@@ -237,6 +247,8 @@ spec:
               cpu: 100m
               memory: 64Mi
       volumes:
+        - name: gluetun-tmp
+          emptyDir: {}
         - name: config
           persistentVolumeClaim:
             claimName: qbittorrent-config
