@@ -88,12 +88,13 @@ spec:
             # the VPN tunnel after it comes up)
             - name: HEALTH_TARGET_ADDRESSES
               value: "1.1.1.1:443,8.8.8.8:443"
+            # Use ProtonVPN's internal WireGuard DNS (10.2.0.1) which is always
+            # reachable inside the tunnel. External DoH providers (1.1.1.1, 9.9.9.9)
+            # get their port 443 reset by some ProtonVPN exit nodes.
             - name: DNS_UPSTREAM_RESOLVER_TYPE
-              value: "doh"
-            # Use multiple DoH providers — Cloudflare can be unreachable through
-            # some ProtonVPN exit nodes, so fall back to Google/Quad9
-            - name: DNS_UPSTREAM_RESOLVERS
-              value: "cloudflare,google,quad9"
+              value: "plain"
+            - name: DNS_UPSTREAM_PLAIN_ADDRESSES
+              value: "10.2.0.1:53"
             - name: TZ
               value: "Etc/UTC"
             - name: BLOCK_IPV6
