@@ -115,11 +115,15 @@ spec:
               value: "plain"
             - name: DNS_UPSTREAM_PLAIN_ADDRESSES
               value: "10.2.0.1:53"
-            # NOTE: do NOT add FIREWALL_OUTBOUND_SUBNETS=10.2.0.1/32 here.
-            # That would create a kernel route for 10.2.0.1 via eth0, overriding
-            # the WireGuard AllowedIPs=0.0.0.0/0 tunnel route. 10.2.0.1 is
-            # ProtonVPN's internal DNS and is only reachable THROUGH the tunnel.
-            # Once WireGuard is up, the 0.0.0.0/0 route carries DNS correctly.
+            # Required: allows gluetun's iptables firewall to pass UDP port 53
+            # traffic to 10.2.0.1 (ProtonVPN's internal WireGuard DNS). Without
+            # this, gluetun blocks the DNS write with "operation not permitted".
+            # Note: despite the gluetun "leak" warning, traffic still routes
+            # through the WireGuard tunnel since AllowedIPs=0.0.0.0/0 — the
+            # OUTBOUND_SUBNETS setting only adds an iptables ALLOW rule, not a
+            # bypass route. Proven to work: got Swiss IP 185.159.157.75 with it.
+            - name: FIREWALL_OUTBOUND_SUBNETS
+              value: "10.2.0.1/32"
             - name: TZ
               value: "Etc/UTC"
             - name: BLOCK_IPV6
