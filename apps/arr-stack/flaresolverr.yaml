@@ -1,10 +1,12 @@
-# ── FlareSolverr (Cloudflare challenge bypass for Jackett) ───────────────────
-# WebUI/API: port 8191  (internal only — Jackett talks to it directly)
+# ── FlareSolverr (Cloudflare challenge bypass for Prowlarr) ──────────────────
+# WebUI/API: port 8191  (internal only — Prowlarr talks to it directly)
 #
-# After deploying, configure in Jackett:
-#   Dashboard → FlareSolverr API URL: http://flaresolverr:8191
-#   Then on any indexer that shows "Challenge detected": set the
-#   "FlareSolverr" proxy tag on that indexer.
+# After deploying, configure in Prowlarr:
+#   Settings → Indexers → + → FlareSolverr proxy
+#     Host: http://flaresolverr:8191
+#     Tag:  flaresolverr   (or any label you prefer)
+#   Then on any indexer behind Cloudflare, assign that tag and Prowlarr
+#   will route requests through FlareSolverr automatically.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,6 +35,15 @@ spec:
               value: "info"
             - name: TZ
               value: "Etc/UTC"
+            # Route FlareSolverr's Chromium browser through the shared VPN proxy
+            # so indexer requests exit via ProtonVPN (rotated every 6 h).
+            - name: HTTP_PROXY
+              value: "http://gluetun-proxy:8888"
+            - name: HTTPS_PROXY
+              value: "http://gluetun-proxy:8888"
+            # Bypass the proxy for internal cluster traffic
+            - name: NO_PROXY
+              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc.cluster.local"
           ports:
             - name: api
               containerPort: 8191

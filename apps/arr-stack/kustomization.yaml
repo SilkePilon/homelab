@@ -63,6 +63,7 @@ resources:
   - lidarr.yaml
   - prowlarr.yaml
   - flaresolverr.yaml
+  - gluetun-proxy.yaml
 
 labels:
   - pairs:
