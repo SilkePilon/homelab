@@ -68,7 +68,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: jackett-config
+  name: prowlarr-config
   namespace: arr-stack
 spec:
   accessModes: [ReadWriteOnce]

@@ -51,7 +51,7 @@ namespace: arr-stack
 #   Sonarr       kubectl port-forward -n arr-stack svc/sonarr 8989:8989
 #   Radarr       kubectl port-forward -n arr-stack svc/radarr 7878:7878
 #   Lidarr       kubectl port-forward -n arr-stack svc/lidarr 8686:8686
-#   Jackett      kubectl port-forward -n arr-stack svc/jackett 9117:9117
+#   Prowlarr     kubectl port-forward -n arr-stack svc/prowlarr 9696:9696
 # ─────────────────────────────────────────────────────────────────────────────
 
 resources:
@@ -61,7 +61,7 @@ resources:
   - sonarr.yaml
   - radarr.yaml
   - lidarr.yaml
-  - jackett.yaml
+  - prowlarr.yaml
   - flaresolverr.yaml
 
 labels:
