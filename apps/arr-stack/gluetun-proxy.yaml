@@ -75,8 +75,8 @@ spec:
                   key: privateKey
             # Restrict to P2P-capable servers in privacy-friendly jurisdictions.
             # Gluetun will randomly pick one on each start.
-            - name: SERVER_CATEGORIES
-              value: "p2p"
+            - name: PORT_FORWARD_ONLY
+              value: "on"
             - name: SERVER_COUNTRIES
               value: "Netherlands,Switzerland,Sweden,Iceland"
             # Expose the HTTP proxy — this is the whole point of this deployment
