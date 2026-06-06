@@ -88,6 +88,12 @@ spec:
             # the VPN tunnel after it comes up)
             - name: HEALTH_TARGET_ADDRESSES
               value: "1.1.1.1:443,8.8.8.8:443"
+            # Give WireGuard 10s to actually route packets before the first health
+            # check. Without this, TLS to 1.1.1.1:443 fails immediately (before
+            # the kernel tunnel is routing) and gluetun rapidly cycles through all
+            # servers before any can stabilise.
+            - name: HEALTH_VPN_DURATION_INITIAL
+              value: "10s"
             # Use ProtonVPN's internal WireGuard DNS (10.2.0.1) which is always
             # reachable inside the tunnel. External DoH providers (1.1.1.1, 9.9.9.9)
             # get their port 443 reset by some ProtonVPN exit nodes.
@@ -95,6 +101,13 @@ spec:
               value: "plain"
             - name: DNS_UPSTREAM_PLAIN_ADDRESSES
               value: "10.2.0.1:53"
+            # Allow gluetun's DNS process to send UDP to 10.2.0.1:53 through the
+            # firewall. Without this, gluetun blocks the UDP write with "operation
+            # not permitted" because 10.2.0.1 is not in the pod's local subnet.
+            # Traffic still routes through the WireGuard tunnel (0.0.0.0/0) once
+            # the tunnel is up; this just permits the iptables rule to allow it.
+            - name: FIREWALL_OUTBOUND_SUBNETS
+              value: "10.2.0.1/32"
             - name: TZ
               value: "Etc/UTC"
             - name: BLOCK_IPV6
