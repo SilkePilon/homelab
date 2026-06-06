@@ -1,5 +1,15 @@
-# ── FlareSolverr (Cloudflare challenge bypass for Prowlarr) ──────────────────
+# ── FlareSolverr + Gluetun VPN sidecar ───────────────────────────────────────
 # WebUI/API: port 8191  (internal only — Prowlarr talks to it directly)
+#
+# Gluetun runs as a sidecar so ALL of FlareSolverr's Chromium traffic exits
+# through ProtonVPN natively (shared network namespace — no HTTP_PROXY needed).
+# Gluetun also exposes an HTTP proxy on :8888, reachable cluster-wide via the
+# gluetun-proxy Service below, so Prowlarr can route its own requests through
+# the same VPN tunnel.
+#
+# IP rotation: the gluetun-rotate CronJob (in gluetun-proxy.yaml) restarts
+# this deployment every 6 hours, causing Gluetun to pick a new random
+# ProtonVPN server — giving a fresh egress IP.
 #
 # After deploying, configure in Prowlarr:
 #   Settings → Indexers → + → FlareSolverr proxy
@@ -26,7 +36,136 @@ spec:
       labels:
         app.kubernetes.io/name: flaresolverr
     spec:
+      # Route DNS through gluetun's built-in resolver on ::1:53.
+      # CoreDNS (10.43.0.10) is blocked by gluetun's firewall once the VPN
+      # tunnel is up. FlareSolverr only resolves external hostnames so the
+      # missing cluster.local search path is not a problem in practice.
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+          - ::1
+        searches:
+          - arr-stack.svc.cluster.local
+          - svc.cluster.local
+          - cluster.local
+        options:
+          - name: ndots
+            value: "5"
+      initContainers:
+        # Ensure /dev/net/tun exists before gluetun starts
+        - name: init-tun
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /dev/net
+              [ -c /dev/net/tun ] || mknod /dev/net/tun c 10 200
+              chmod 0666 /dev/net/tun
+          securityContext:
+            privileged: true
       containers:
+        # ── gluetun: ProtonVPN WireGuard tunnel ──────────────────────────────
+        # Runs in the shared pod network namespace — all traffic from
+        # FlareSolverr automatically exits through the VPN tunnel.
+        # Also exposes an HTTP proxy on :8888 for Prowlarr (via gluetun-proxy Service).
+        - name: gluetun
+          image: ghcr.io/qdm12/gluetun:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          lifecycle:
+            postStart:
+              exec:
+                # Clean up stale IP rules from previous pod exits (Kubernetes
+                # shares IP rules across the pod namespace). Fix from gluetun wiki:
+                # https://github.com/qdm12/gluetun-wiki/blob/main/setup/advanced/kubernetes.md
+                command: ["/bin/sh", "-c", "(ip rule del table 51820; ip -6 rule del table 51820) || true"]
+          env:
+            # Use ProtonVPN native provider — Gluetun picks a random matching
+            # server from ProtonVPN's server list on every start, so each
+            # restart (see gluetun-rotate CronJob) gives a new egress IP.
+            - name: VPN_SERVICE_PROVIDER
+              value: protonvpn
+            - name: VPN_TYPE
+              value: wireguard
+            - name: WIREGUARD_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: protonvpn-wg
+                  key: privateKey
+            # Restrict to P2P-capable servers in privacy-friendly jurisdictions.
+            # Gluetun will randomly pick one on each start.
+            - name: PORT_FORWARD_ONLY
+              value: "on"
+            - name: SERVER_COUNTRIES
+              value: "Netherlands,Switzerland,Sweden,Iceland"
+            # Expose HTTP proxy on :8888 — used by Prowlarr via the gluetun-proxy Service.
+            # FlareSolverr itself does NOT use this (its traffic goes through the tunnel natively).
+            - name: HTTPPROXY
+              value: "on"
+            - name: HTTPPROXY_LISTENING_ADDRESS
+              value: ":8888"
+            # Health check via IPs to avoid DNS dependency at startup
+            - name: HEALTH_TARGET_ADDRESSES
+              value: "1.1.1.1:443,8.8.8.8:443"
+            # Use ProtonVPN's internal WireGuard DNS (10.2.0.1) which is always
+            # reachable inside the tunnel. External DoH providers (1.1.1.1, 9.9.9.9)
+            # get their port 443 reset by some ProtonVPN exit nodes.
+            - name: DNS_UPSTREAM_RESOLVER_TYPE
+              value: "plain"
+            - name: DNS_UPSTREAM_PLAIN_ADDRESSES
+              value: "10.2.0.1:53"
+            # Allow gluetun's firewall to send UDP to 10.2.0.1:53 (not in pod subnet).
+            # Traffic still routes through the WireGuard tunnel once it is up.
+            - name: FIREWALL_OUTBOUND_SUBNETS
+              value: "10.2.0.1/32"
+            - name: TZ
+              value: "Etc/UTC"
+            - name: BLOCK_IPV6
+              value: "on"
+            - name: WIREGUARD_ALLOWED_IPS
+              value: "0.0.0.0/0"
+            - name: WIREGUARD_MTU
+              value: "1280"
+            - name: WIREGUARD_PERSISTENT_KEEPALIVE_INTERVAL
+              value: "25s"
+            - name: VPN_PORT_FORWARDING
+              value: "off"
+            - name: SHADOWSOCKS
+              value: "off"
+            - name: BLOCK_MALICIOUS
+              value: "off"
+            - name: BLOCK_SURVEILLANCE
+              value: "off"
+            - name: BLOCK_ADS
+              value: "off"
+          ports:
+            - name: httpproxy
+              containerPort: 8888
+          volumeMounts:
+            - name: gluetun-tmp
+              mountPath: /tmp/gluetun
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: httpproxy
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            tcpSocket:
+              port: httpproxy
+            initialDelaySeconds: 60
+            periodSeconds: 30
+        # ── FlareSolverr ─────────────────────────────────────────────────────
         - name: flaresolverr
           image: ghcr.io/flaresolverr/flaresolverr:latest
           imagePullPolicy: IfNotPresent
@@ -35,15 +174,9 @@ spec:
               value: "info"
             - name: TZ
               value: "Etc/UTC"
-            # Route FlareSolverr's Chromium browser through the shared VPN proxy
-            # so indexer requests exit via ProtonVPN (rotated every 6 h).
-            - name: HTTP_PROXY
-              value: "http://gluetun-proxy:8888"
-            - name: HTTPS_PROXY
-              value: "http://gluetun-proxy:8888"
-            # Bypass the proxy for internal cluster traffic
-            - name: NO_PROXY
-              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc.cluster.local"
+            # No HTTP_PROXY / HTTPS_PROXY needed — all traffic from this container
+            # exits through the gluetun sidecar's WireGuard tunnel natively
+            # (shared pod network namespace).
           ports:
             - name: api
               containerPort: 8191
@@ -66,7 +199,11 @@ spec:
               port: api
             initialDelaySeconds: 30
             periodSeconds: 30
+      volumes:
+        - name: gluetun-tmp
+          emptyDir: {}
 ---
+# FlareSolverr API — used by Prowlarr to send challenge-solving requests
 apiVersion: v1
 kind: Service
 metadata:
@@ -82,3 +219,22 @@ spec:
     - name: api
       port: 8191
       targetPort: api
+---
+# gluetun-proxy Service — exposes gluetun's HTTP proxy from the FlareSolverr
+# pod. Prowlarr uses HTTP_PROXY=http://gluetun-proxy:8888 to route its own
+# indexer requests through the same ProtonVPN tunnel without any config change.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gluetun-proxy
+  namespace: arr-stack
+  labels:
+    app.kubernetes.io/name: gluetun-proxy
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: flaresolverr
+  ports:
+    - name: httpproxy
+      port: 8888
+      targetPort: httpproxy

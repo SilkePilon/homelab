@@ -1,171 +1,12 @@
-# ── Gluetun HTTP proxy (shared VPN proxy for Prowlarr / FlareSolverr) ────────
+# ── VPN IP rotation RBAC + CronJob ───────────────────────────────────────────
 #
-# This is a DEDICATED Gluetun instance separate from the qBittorrent sidecar.
-# It exposes an HTTP proxy on port 8888 so that FlareSolverr (and Prowlarr if
-# needed) can route outbound requests through ProtonVPN, bypassing indexer IP
-# bans.
+# The gluetun sidecar lives inside the FlareSolverr pod (see flaresolverr.yaml).
+# Restarting that deployment causes gluetun to reconnect to a new randomly
+# selected ProtonVPN server, giving a fresh egress IP.
 #
-# Unlike the qBittorrent sidecar which uses a hardcoded WireGuard endpoint,
-# this deployment uses the native ProtonVPN provider so Gluetun selects a
-# random matching server on every start. Combined with the gluetun-rotate
-# CronJob, this rotates the egress IP automatically.
+# The gluetun-proxy Service (also in flaresolverr.yaml) continues to expose
+# gluetun's HTTP proxy on port 8888 for Prowlarr — no Prowlarr config change needed.
 #
-# Re-uses the existing protonvpn-wg secret (same private key, different
-# server selected by Gluetun from ProtonVPN's server list each restart).
-#
-# Usage from other pods in arr-stack:
-#   HTTP_PROXY=http://gluetun-proxy:8888
-#   HTTPS_PROXY=http://gluetun-proxy:8888
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: gluetun-proxy
-  namespace: arr-stack
-  labels:
-    app.kubernetes.io/name: gluetun-proxy
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: gluetun-proxy
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: gluetun-proxy
-    spec:
-      dnsPolicy: ClusterFirst
-      initContainers:
-        - name: init-tun
-          image: busybox:latest
-          command:
-            - sh
-            - -c
-            - |
-              mkdir -p /dev/net
-              [ -c /dev/net/tun ] || mknod /dev/net/tun c 10 200
-              chmod 0666 /dev/net/tun
-          securityContext:
-            privileged: true
-      containers:
-        - name: gluetun
-          image: ghcr.io/qdm12/gluetun:latest
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            capabilities:
-              add:
-                - NET_ADMIN
-          lifecycle:
-            postStart:
-              exec:
-                command: ["/bin/sh", "-c", "(ip rule del table 51820; ip -6 rule del table 51820) || true"]
-          env:
-            # Use ProtonVPN native provider — Gluetun picks a random matching
-            # server from ProtonVPN's server list on every start, so each
-            # restart (see gluetun-rotate CronJob) gives a new egress IP.
-            - name: VPN_SERVICE_PROVIDER
-              value: protonvpn
-            - name: VPN_TYPE
-              value: wireguard
-            - name: WIREGUARD_PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: protonvpn-wg
-                  key: privateKey
-            # Restrict to P2P-capable servers in privacy-friendly jurisdictions.
-            # Gluetun will randomly pick one on each start.
-            - name: PORT_FORWARD_ONLY
-              value: "on"
-            - name: SERVER_COUNTRIES
-              value: "Netherlands,Switzerland,Sweden,Iceland"
-            # Expose the HTTP proxy — this is the whole point of this deployment
-            - name: HTTPPROXY
-              value: "on"
-            - name: HTTPPROXY_LISTENING_ADDRESS
-              value: ":8888"
-            # Health check via IP rather than DNS (CoreDNS is unreachable through
-            # the VPN tunnel after it comes up)
-            - name: HEALTH_TARGET_ADDRESSES
-              value: "1.1.1.1:443,8.8.8.8:443"
-            # Give WireGuard 10s to actually route packets before the first health
-            # check. Without this, TLS to 1.1.1.1:443 fails immediately (before
-            # the kernel tunnel is routing) and gluetun rapidly cycles through all
-            # servers before any can stabilise.
-            - name: HEALTH_VPN_DURATION_INITIAL
-              value: "10s"
-            # Use ProtonVPN's internal WireGuard DNS (10.2.0.1) which is always
-            # reachable inside the tunnel. External DoH providers (1.1.1.1, 9.9.9.9)
-            # get their port 443 reset by some ProtonVPN exit nodes.
-            - name: DNS_UPSTREAM_RESOLVER_TYPE
-              value: "plain"
-            - name: DNS_UPSTREAM_PLAIN_ADDRESSES
-              value: "10.2.0.1:53"
-            # Allow gluetun's DNS process to send UDP to 10.2.0.1:53 through the
-            # firewall. Without this, gluetun blocks the UDP write with "operation
-            # not permitted" because 10.2.0.1 is not in the pod's local subnet.
-            # Traffic still routes through the WireGuard tunnel (0.0.0.0/0) once
-            # the tunnel is up; this just permits the iptables rule to allow it.
-            - name: FIREWALL_OUTBOUND_SUBNETS
-              value: "10.2.0.1/32"
-            - name: TZ
-              value: "Etc/UTC"
-            - name: BLOCK_IPV6
-              value: "on"
-            - name: WIREGUARD_ALLOWED_IPS
-              value: "0.0.0.0/0"
-            - name: WIREGUARD_MTU
-              value: "1280"
-            - name: WIREGUARD_PERSISTENT_KEEPALIVE_INTERVAL
-              value: "25s"
-            # No port forwarding needed — this is a proxy only, not a torrent client
-            - name: VPN_PORT_FORWARDING
-              value: "off"
-            - name: SHADOWSOCKS
-              value: "off"
-            - name: BLOCK_MALICIOUS
-              value: "off"
-            - name: BLOCK_SURVEILLANCE
-              value: "off"
-            - name: BLOCK_ADS
-              value: "off"
-          ports:
-            - name: httpproxy
-              containerPort: 8888
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: "1"
-              memory: 512Mi
-          readinessProbe:
-            tcpSocket:
-              port: httpproxy
-            initialDelaySeconds: 30
-            periodSeconds: 15
-          livenessProbe:
-            tcpSocket:
-              port: httpproxy
-            initialDelaySeconds: 60
-            periodSeconds: 30
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: gluetun-proxy
-  namespace: arr-stack
-  labels:
-    app.kubernetes.io/name: gluetun-proxy
-spec:
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: gluetun-proxy
-  ports:
-    - name: httpproxy
-      port: 8888
-      targetPort: httpproxy
----
 # ── RBAC for the IP-rotation CronJob ─────────────────────────────────────────
 apiVersion: v1
 kind: ServiceAccount
@@ -181,7 +22,7 @@ metadata:
 rules:
   - apiGroups: ["apps"]
     resources: ["deployments"]
-    resourceNames: ["gluetun-proxy"]
+    resourceNames: ["flaresolverr"]
     verbs: ["patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -199,8 +40,9 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ---
 # ── CronJob: rotate the VPN exit IP every 6 hours ────────────────────────────
-# Triggers a rollout restart of gluetun-proxy, causing Gluetun to reconnect
-# to a randomly selected ProtonVPN server — giving a fresh egress IP.
+# Triggers a rollout restart of the flaresolverr deployment (which contains the
+# gluetun sidecar), causing Gluetun to reconnect to a randomly selected
+# ProtonVPN server — giving a fresh egress IP for both FlareSolverr and Prowlarr.
 # Adjust the schedule to taste (cron syntax, UTC).
 apiVersion: batch/v1
 kind: CronJob
@@ -228,7 +70,7 @@ spec:
                 - kubectl
                 - rollout
                 - restart
-                - deployment/gluetun-proxy
+                - deployment/flaresolverr
                 - -n
                 - arr-stack
               resources:
