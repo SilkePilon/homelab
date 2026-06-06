@@ -90,9 +90,10 @@ spec:
               value: "1.1.1.1:443,8.8.8.8:443"
             - name: DNS_UPSTREAM_RESOLVER_TYPE
               value: "doh"
-            # Quad9 works more reliably through ProtonVPN than Cloudflare DoH
-            - name: DOH_UPSTREAM_RESOLVERS
-              value: "quad9,google"
+            # Use multiple DoH providers — Cloudflare can be unreachable through
+            # some ProtonVPN exit nodes, so fall back to Google/Quad9
+            - name: DNS_UPSTREAM_RESOLVERS
+              value: "cloudflare,google,quad9"
             - name: TZ
               value: "Etc/UTC"
             - name: BLOCK_IPV6
