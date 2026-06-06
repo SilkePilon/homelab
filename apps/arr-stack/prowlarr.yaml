@@ -58,7 +58,7 @@ spec:
               value: "http://gluetun-proxy:8888"
             # Bypass the proxy for internal cluster traffic (Sonarr, Radarr, etc.)
             - name: NO_PROXY
-              value: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc.cluster.local"
+              value: "localhost,127.0.0.1,flaresolverr,sonarr,radarr,lidarr,qbittorrent,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc.cluster.local"
           ports:
             - name: webui
               containerPort: 9696
