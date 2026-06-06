@@ -102,12 +102,9 @@ spec:
               value: "on"
             - name: SERVER_COUNTRIES
               value: "Netherlands,Switzerland,Sweden,Iceland"
-            # Expose HTTP proxy on :8888 — used by Prowlarr via the gluetun-proxy Service.
-            # FlareSolverr itself does NOT use this (its traffic goes through the tunnel natively).
+            # Disable unused proxy features
             - name: HTTPPROXY
-              value: "on"
-            - name: HTTPPROXY_LISTENING_ADDRESS
-              value: ":8888"
+              value: "off"
             # Health check via IPs to avoid DNS dependency at startup
             - name: HEALTH_TARGET_ADDRESSES
               value: "1.1.1.1:443,8.8.8.8:443"
@@ -142,9 +139,6 @@ spec:
               value: "off"
             - name: BLOCK_ADS
               value: "off"
-          ports:
-            - name: httpproxy
-              containerPort: 8888
           volumeMounts:
             - name: gluetun-tmp
               mountPath: /tmp/gluetun
@@ -155,16 +149,6 @@ spec:
             limits:
               cpu: "1"
               memory: 512Mi
-          readinessProbe:
-            tcpSocket:
-              port: httpproxy
-            initialDelaySeconds: 30
-            periodSeconds: 15
-          livenessProbe:
-            tcpSocket:
-              port: httpproxy
-            initialDelaySeconds: 60
-            periodSeconds: 30
         # ── FlareSolverr ─────────────────────────────────────────────────────
         - name: flaresolverr
           image: ghcr.io/flaresolverr/flaresolverr:latest
@@ -219,22 +203,4 @@ spec:
     - name: api
       port: 8191
       targetPort: api
----
-# gluetun-proxy Service — exposes gluetun's HTTP proxy from the FlareSolverr
-# pod. Prowlarr uses HTTP_PROXY=http://gluetun-proxy:8888 to route its own
-# indexer requests through the same ProtonVPN tunnel without any config change.
-apiVersion: v1
-kind: Service
-metadata:
-  name: gluetun-proxy
-  namespace: arr-stack
-  labels:
-    app.kubernetes.io/name: gluetun-proxy
-spec:
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: flaresolverr
-  ports:
-    - name: httpproxy
-      port: 8888
-      targetPort: httpproxy
+
