@@ -2,21 +2,16 @@
 # WebUI: port 8080  (access via: kubectl port-forward -n arr-stack svc/qbittorrent 8080:8080)
 #
 # VPN: gluetun sidecar routes all traffic through ProtonVPN WireGuard.
-# Port forwarding is handled automatically by gluetun + the port-updater sidecar.
+# Port forwarding is handled automatically by gluetun via VPN_PORT_FORWARDING_UP_COMMAND.
 #
 # Required secrets (create out-of-band — NOT in git):
 #
-#   1. ProtonVPN WireGuard private key:
-#      - Go to https://account.proton.me/vpn/wireguard
-#      - Create a new WireGuard key, download a P2P config (e.g. NL#1)
-#      - Extract PrivateKey from the [Interface] section
-#      kubectl create secret generic protonvpn-wg -n arr-stack \
-#        --from-literal=privateKey=<PrivateKey>
+#   kubectl create secret generic protonvpn-wg -n arr-stack \
+#     --from-literal=privateKey=<PrivateKey>
+#   (Get PrivateKey from https://account.proton.me/vpn/wireguard → create WireGuard key → P2P config)
 #
-#   2. qBittorrent credentials (for port-updater to call qBittorrent API):
-#      kubectl create secret generic qbittorrent-creds -n arr-stack \
-#        --from-literal=username=admin \
-#        --from-literal=password=<your qbittorrent password>
+# After first login, enable in qBittorrent → Options → Web UI:
+#   "Bypass authentication for clients on localhost" — required for VPN_PORT_FORWARDING_UP_COMMAND
 #
 # After first login, configure in qBittorrent Settings → Downloads:
 #   Default save path: /data/torrents
@@ -150,6 +145,19 @@ spec:
               value: "off"
             - name: BLOCK_ADS
               value: "off"
+            # Push forwarded port directly into qBittorrent on every port change.
+            # Requires qBittorrent → Options → Web UI → "Bypass auth for localhost" enabled.
+            # {{PORT}} is replaced by gluetun with the forwarded port number.
+            - name: VPN_PORT_FORWARDING_UP_COMMAND
+              value: >-
+                /bin/sh -c 'wget -O- -nv --retry-connrefused
+                --post-data "json={\"listen_port\":{{PORT}},\"current_network_interface\":\"{{VPN_INTERFACE}}\",\"random_port\":false,\"upnp\":false}"
+                http://127.0.0.1:8080/api/v2/app/setPreferences'
+            - name: VPN_PORT_FORWARDING_DOWN_COMMAND
+              value: >-
+                /bin/sh -c 'wget -O- -nv --retry-connrefused
+                --post-data "json={\"listen_port\":0,\"current_network_interface\":\"lo\"}"
+                http://127.0.0.1:8080/api/v2/app/setPreferences'
           ports:
             - name: gluetun-ctrl
               containerPort: 8000
@@ -202,59 +210,6 @@ spec:
               port: webui
             initialDelaySeconds: 90
             periodSeconds: 30
-        # ── port-updater: syncs gluetun forwarded port → qBittorrent ─────────
-        # Polls gluetun's control API every 30s and updates qBittorrent's
-        # listening port so incoming VPN connections actually reach the client.
-        # Gluetun exposes the forwarded port via its HTTP control API —
-        # it does NOT write it to a file.
-        - name: port-updater
-          image: curlimages/curl:latest
-          imagePullPolicy: IfNotPresent
-          env:
-            - name: QB_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: qbittorrent-creds
-                  key: username
-            - name: QB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: qbittorrent-creds
-                  key: password
-          command:
-            - /bin/sh
-            - -c
-            - |
-              QB_URL="http://localhost:8080"
-              GLUETUN_API="http://localhost:8000"
-              LAST_PORT=0
-              echo "[port-updater] starting"
-              while true; do
-                PORT=$(curl -sf "${GLUETUN_API}/v1/portforwarded" | grep -o '"port":[0-9]*' | grep -o '[0-9]*')
-                if [ -n "$PORT" ] && [ "$PORT" -gt 0 ] 2>/dev/null && [ "$PORT" != "$LAST_PORT" ]; then
-                  echo "[port-updater] new port: ${PORT}, updating qBittorrent"
-                  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -c /tmp/qb-cookies.txt \
-                    --data "username=${QB_USERNAME}&password=${QB_PASSWORD}" \
-                    "${QB_URL}/api/v2/auth/login")
-                  if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
-                    curl -sf -b /tmp/qb-cookies.txt \
-                      --data "json={\"listen_port\":${PORT},\"random_port\":false}" \
-                      "${QB_URL}/api/v2/app/setPreferences" > /dev/null
-                    echo "[port-updater] port updated to ${PORT}"
-                    LAST_PORT=$PORT
-                  else
-                    echo "[port-updater] qBittorrent login failed (HTTP ${HTTP_CODE}), will retry"
-                  fi
-                fi
-                sleep 30
-              done
-          resources:
-            requests:
-              cpu: 10m
-              memory: 32Mi
-            limits:
-              cpu: 100m
-              memory: 64Mi
       volumes:
         - name: config
           persistentVolumeClaim:
