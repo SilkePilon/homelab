@@ -32,21 +32,18 @@ spec:
       labels:
         app.kubernetes.io/name: flaresolverr
     spec:
-      # Route DNS through gluetun's built-in resolver on ::1:53.
+      # Route DNS through gluetun's built-in DoH resolver (127.0.0.1:53).
       # CoreDNS (10.43.0.10) is blocked by gluetun's firewall once the VPN
-      # tunnel is up. FlareSolverr only resolves external hostnames so the
-      # missing cluster.local search path is not a problem in practice.
+      # tunnel is up. Use IPv4 loopback — BLOCK_IPV6=on blocks UDP to [::1]:53.
+      # ndots=1: external hostnames go straight to FQDN lookup, no cluster
+      # search domain spam (gluetun can't resolve cluster.local anyway).
       dnsPolicy: None
       dnsConfig:
         nameservers:
-          - ::1
-        searches:
-          - arr-stack.svc.cluster.local
-          - svc.cluster.local
-          - cluster.local
+          - 127.0.0.1
         options:
           - name: ndots
-            value: "5"
+            value: "1"
       initContainers:
         # Ensure /dev/net/tun exists before gluetun starts
         - name: init-tun
@@ -80,8 +77,8 @@ spec:
                 # https://github.com/qdm12/gluetun-wiki/blob/main/setup/advanced/kubernetes.md
                 command: ["/bin/sh", "-c", "(ip rule del table 51820; ip -6 rule del table 51820) || true"]
           env:
-            # Use ProtonVPN native provider — Gluetun picks a random matching
-            # server from ProtonVPN's server list on every start, so each
+            # Use ProtonVPN native provider — gluetun picks a random matching
+            # server from ProtonVPN's full server list on every start, so each
             # restart (see gluetun-rotate CronJob) gives a new egress IP.
             - name: VPN_SERVICE_PROVIDER
               value: protonvpn
@@ -92,10 +89,10 @@ spec:
                 secretKeyRef:
                   name: protonvpn-wg
                   key: privateKey
-            # Restrict to P2P-capable servers in privacy-friendly jurisdictions.
-            # Gluetun will randomly pick one on each start.
-            - name: PORT_FORWARD_ONLY
-              value: "on"
+            # Restrict to privacy-friendly jurisdictions.
+            # Do NOT set PORT_FORWARD_ONLY — flaresolverr doesn't need port
+            # forwarding and restricting to P2P-only servers shrinks the pool
+            # to servers that are often overloaded or unavailable.
             - name: SERVER_COUNTRIES
               value: "Netherlands,Switzerland,Sweden,Iceland"
             # Disable unused proxy features
@@ -104,22 +101,10 @@ spec:
             # Health check via IPs to avoid DNS dependency at startup
             - name: HEALTH_TARGET_ADDRESSES
               value: "1.1.1.1:443,8.8.8.8:443"
-            # Use ProtonVPN's internal WireGuard DNS (10.2.0.1) which is always
-            # reachable inside the tunnel. External DoH providers (1.1.1.1, 9.9.9.9)
-            # get their port 443 reset by some ProtonVPN exit nodes.
+            # Use DoH (same as qbittorrent gluetun) — more reliable than plain
+            # DNS to 10.2.0.1 which only works when the tunnel is already up.
             - name: DNS_UPSTREAM_RESOLVER_TYPE
-              value: "plain"
-            - name: DNS_UPSTREAM_PLAIN_ADDRESSES
-              value: "10.2.0.1:53"
-            # Required: allows gluetun's iptables firewall to pass UDP port 53
-            # traffic to 10.2.0.1 (ProtonVPN's internal WireGuard DNS). Without
-            # this, gluetun blocks the DNS write with "operation not permitted".
-            # Note: despite the gluetun "leak" warning, traffic still routes
-            # through the WireGuard tunnel since AllowedIPs=0.0.0.0/0 — the
-            # OUTBOUND_SUBNETS setting only adds an iptables ALLOW rule, not a
-            # bypass route. Proven to work: got Swiss IP 185.159.157.75 with it.
-            - name: FIREWALL_OUTBOUND_SUBNETS
-              value: "10.2.0.1/32"
+              value: "doh"
             - name: TZ
               value: "Etc/UTC"
             - name: BLOCK_IPV6
@@ -140,9 +125,6 @@ spec:
               value: "off"
             - name: BLOCK_ADS
               value: "off"
-          volumeMounts:
-            - name: gluetun-tmp
-              mountPath: /tmp/gluetun
           resources:
             requests:
               cpu: 50m
@@ -184,9 +166,7 @@ spec:
               port: api
             initialDelaySeconds: 30
             periodSeconds: 30
-      volumes:
-        - name: gluetun-tmp
-          emptyDir: {}
+      volumes: []
 ---
 # FlareSolverr API — used by Prowlarr to send challenge-solving requests
 apiVersion: v1
