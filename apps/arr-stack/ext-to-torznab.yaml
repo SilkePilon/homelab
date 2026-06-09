@@ -37,7 +37,7 @@ spec:
             - name: FLARESOLVERR_URL
               value: "http://flaresolverr:8191"
             - name: EXT_TO_URL
-              value: "https://ext.to"
+              value: "https://search.extto.com"
             - name: API_KEY
               value: ""
             - name: PORT
