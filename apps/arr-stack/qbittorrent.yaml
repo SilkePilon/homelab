@@ -50,10 +50,11 @@ spec:
                       - "true"
       # Route DNS through gluetun's built-in DoH resolver (127.0.0.1:53).
       # Default k8s CoreDNS (10.43.0.10) is blocked by gluetun's firewall once VPN is up.
+      # Use IPv4 loopback — BLOCK_IPV6=on causes EAGAIN on UDP to [::1]:53.
       dnsPolicy: None
       dnsConfig:
         nameservers:
-          - ::1
+          - 127.0.0.1
         searches:
           - arr-stack.svc.cluster.local
           - svc.cluster.local
