@@ -62,16 +62,20 @@ spec:
               memory: 256Mi
           readinessProbe:
             httpGet:
-              path: /api?t=caps
+              path: /healthz
               port: api
             initialDelaySeconds: 10
             periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /api?t=caps
+              path: /healthz
               port: api
             initialDelaySeconds: 30
             periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
