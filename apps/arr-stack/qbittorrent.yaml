@@ -150,14 +150,16 @@ spec:
             # Push forwarded port directly into qBittorrent on every port change.
             # Requires qBittorrent → Options → Web UI → "Bypass auth for localhost" enabled.
             # {{PORT}} is replaced by gluetun with the forwarded port number.
+            # --tries=30 --waitretry=10: retries for up to 5 minutes so that
+            # the command succeeds even when qBittorrent is still starting up.
             - name: VPN_PORT_FORWARDING_UP_COMMAND
               value: >-
-                /bin/sh -c 'wget -O- -nv --retry-connrefused
+                /bin/sh -c 'wget -O- -nv --retry-connrefused --tries=30 --waitretry=10
                 --post-data "json={\"listen_port\":{{PORT}},\"current_network_interface\":\"{{VPN_INTERFACE}}\",\"random_port\":false,\"upnp\":false}"
                 http://127.0.0.1:8080/api/v2/app/setPreferences'
             - name: VPN_PORT_FORWARDING_DOWN_COMMAND
               value: >-
-                /bin/sh -c 'wget -O- -nv --retry-connrefused
+                /bin/sh -c 'wget -O- -nv --retry-connrefused --tries=30 --waitretry=10
                 --post-data "json={\"listen_port\":0,\"current_network_interface\":\"lo\"}"
                 http://127.0.0.1:8080/api/v2/app/setPreferences'
           ports:
