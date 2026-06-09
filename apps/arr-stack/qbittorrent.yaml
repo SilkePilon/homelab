@@ -153,9 +153,6 @@ spec:
           ports:
             - name: gluetun-ctrl
               containerPort: 8000
-          volumeMounts:
-            - name: gluetun-tmp
-              mountPath: /tmp/gluetun
           resources:
             requests:
               cpu: 100m
@@ -206,8 +203,10 @@ spec:
             initialDelaySeconds: 90
             periodSeconds: 30
         # ── port-updater: syncs gluetun forwarded port → qBittorrent ─────────
-        # Polls gluetun's control API every 60s and updates qBittorrent's
+        # Polls gluetun's control API every 30s and updates qBittorrent's
         # listening port so incoming VPN connections actually reach the client.
+        # Gluetun exposes the forwarded port via its HTTP control API —
+        # it does NOT write it to a file.
         - name: port-updater
           image: curlimages/curl:latest
           imagePullPolicy: IfNotPresent
@@ -227,15 +226,11 @@ spec:
             - -c
             - |
               QB_URL="http://localhost:8080"
-              PORT_FILE="/tmp/gluetun/forwarded_port"
+              GLUETUN_API="http://localhost:8000"
               LAST_PORT=0
               echo "[port-updater] starting"
               while true; do
-                if [ -f "$PORT_FILE" ]; then
-                  PORT=$(cat "$PORT_FILE" | tr -d '[:space:]')
-                else
-                  PORT=0
-                fi
+                PORT=$(curl -sf "${GLUETUN_API}/v1/portforwarded" | grep -o '"port":[0-9]*' | grep -o '[0-9]*')
                 if [ -n "$PORT" ] && [ "$PORT" -gt 0 ] 2>/dev/null && [ "$PORT" != "$LAST_PORT" ]; then
                   echo "[port-updater] new port: ${PORT}, updating qBittorrent"
                   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -c /tmp/qb-cookies.txt \
@@ -248,15 +243,11 @@ spec:
                     echo "[port-updater] port updated to ${PORT}"
                     LAST_PORT=$PORT
                   else
-                    echo "[port-updater] qBittorrent auth failed (HTTP ${HTTP_CODE}), will retry"
+                    echo "[port-updater] qBittorrent login failed (HTTP ${HTTP_CODE}), will retry"
                   fi
                 fi
                 sleep 30
               done
-          volumeMounts:
-            - name: gluetun-tmp
-              mountPath: /tmp/gluetun
-              readOnly: true
           resources:
             requests:
               cpu: 10m
@@ -265,8 +256,6 @@ spec:
               cpu: 100m
               memory: 64Mi
       volumes:
-        - name: gluetun-tmp
-          emptyDir: {}
         - name: config
           persistentVolumeClaim:
             claimName: qbittorrent-config
