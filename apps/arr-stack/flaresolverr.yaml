@@ -36,6 +36,11 @@ spec:
       # internet access via cluster DNS. To re-enable gluetun, restore the
       # dnsPolicy/dnsConfig block, initContainers, and gluetun container from git.
       dnsPolicy: ClusterFirst
+      # Pin to x86-64 node — FlareSolverr's Chromium/Xvfb stack needs an x86
+      # CPU (Intel iGPU for WebGL). The Raspberry Pi (aarch64) can't run the
+      # non-headless Chromium session needed for Cloudflare Turnstile.
+      nodeSelector:
+        kubernetes.io/arch: amd64
       containers:
         # ── FlareSolverr ─────────────────────────────────────────────────────
         - name: flaresolverr
