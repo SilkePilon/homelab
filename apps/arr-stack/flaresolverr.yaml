@@ -1,22 +1,18 @@
 # ── FlareSolverr + Gluetun VPN sidecar ───────────────────────────────────────
-# WebUI/API: port 8191  (internal only — Prowlarr talks to it directly)
+# WebUI/API: port 8191  (internal only — ext-to-torznab talks to it directly)
 #
 # Gluetun runs as a sidecar so ALL of FlareSolverr's Chromium traffic exits
 # through ProtonVPN natively (shared network namespace — no HTTP_PROXY needed).
 # Gluetun also exposes an HTTP proxy on :8888, reachable cluster-wide via the
-# gluetun-proxy Service below, so Prowlarr can route its own requests through
+# gluetun-proxy Service below, so other apps can route requests through
 # the same VPN tunnel.
 #
 # IP rotation: the gluetun-rotate CronJob (in gluetun-proxy.yaml) restarts
 # this deployment every 6 hours, causing Gluetun to pick a new random
 # ProtonVPN server — giving a fresh egress IP.
 #
-# After deploying, configure in Prowlarr:
-#   Settings → Indexers → + → FlareSolverr proxy
-#     Host: http://flaresolverr:8191
-#     Tag:  flaresolverr   (or any label you prefer)
-#   Then on any indexer behind Cloudflare, assign that tag and Prowlarr
-#   will route requests through FlareSolverr automatically.
+# ext-to-torznab connects to FlareSolverr at http://flaresolverr:8191
+# (configured via the FLARESOLVERR_URL env var in ext-to-torznab.yaml).
 apiVersion: apps/v1
 kind: Deployment
 metadata:

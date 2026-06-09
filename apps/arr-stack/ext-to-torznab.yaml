@@ -1,0 +1,90 @@
+# ── ext-to-torznab (Torznab API proxy for ext.to) ────────────────────────────
+# WebUI/API: port 5000  (kubectl port-forward -n arr-stack svc/ext-to-torznab 5000:5000)
+#
+# Exposes a standards-compliant Torznab feed by scraping ext.to through the
+# existing FlareSolverr instance (bypasses Cloudflare). Natively supports
+# Sonarr, Radarr, and Lidarr — add it as a Torznab indexer in each app:
+#
+#   Settings → Indexers → Add → Torznab
+#     URL:     http://ext-to-torznab:5000
+#     API Key: leave blank (or set API_KEY below and enter it here)
+#
+# This app is stateless — no PVC required.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ext-to-torznab
+  namespace: arr-stack
+  labels:
+    app.kubernetes.io/name: ext-to-torznab
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ext-to-torznab
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ext-to-torznab
+    spec:
+      containers:
+        - name: ext-to-torznab
+          image: ghcr.io/silkepilon/ext-to-torznab:latest
+          imagePullPolicy: Always
+          env:
+            - name: FLARESOLVERR_URL
+              value: "http://flaresolverr:8191"
+            - name: EXT_TO_URL
+              value: "https://ext.to"
+            - name: API_KEY
+              value: ""
+            - name: PORT
+              value: "5000"
+            - name: HOST
+              value: "0.0.0.0"
+            - name: FLARESOLVERR_TIMEOUT
+              value: "60000"
+            - name: INCLUDE_ADULT
+              value: "true"
+            - name: LOG_LEVEL
+              value: "INFO"
+          ports:
+            - name: api
+              containerPort: 5000
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /api?t=caps
+              port: api
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /api?t=caps
+              port: api
+            initialDelaySeconds: 30
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ext-to-torznab
+  namespace: arr-stack
+  labels:
+    app.kubernetes.io/name: ext-to-torznab
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ext-to-torznab
+  ports:
+    - name: api
+      port: 5000
+      targetPort: api

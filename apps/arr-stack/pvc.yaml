@@ -65,18 +65,6 @@ spec:
     requests:
       storage: 1Gi
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: prowlarr-config
-  namespace: arr-stack
-spec:
-  accessModes: [ReadWriteOnce]
-  storageClassName: local-path
-  resources:
-    requests:
-      storage: 1Gi
----
 # ── Downloads staging volume (local disk — files live here until imported) ───
 # Sonarr/Radarr/Lidarr use "Move" as import mode. Because the downloads volume
 # and the SMB media volume are on different filesystems, "Move" automatically

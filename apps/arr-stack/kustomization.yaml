@@ -50,8 +50,8 @@ namespace: arr-stack
 #   qBittorrent  kubectl port-forward -n arr-stack svc/qbittorrent 8080:8080
 #   Sonarr       kubectl port-forward -n arr-stack svc/sonarr 8989:8989
 #   Radarr       kubectl port-forward -n arr-stack svc/radarr 7878:7878
-#   Lidarr       kubectl port-forward -n arr-stack svc/lidarr 8686:8686
-#   Prowlarr     kubectl port-forward -n arr-stack svc/prowlarr 9696:9696
+#   Lidarr          kubectl port-forward -n arr-stack svc/lidarr 8686:8686
+#   ext-to-torznab  kubectl port-forward -n arr-stack svc/ext-to-torznab 5000:5000
 # ─────────────────────────────────────────────────────────────────────────────
 
 resources:
@@ -61,7 +61,7 @@ resources:
   - sonarr.yaml
   - radarr.yaml
   - lidarr.yaml
-  - prowlarr.yaml
+  - ext-to-torznab.yaml
   - flaresolverr.yaml
   - gluetun-proxy.yaml
 
