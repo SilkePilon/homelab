@@ -98,9 +98,18 @@ spec:
             # Disable unused proxy features
             - name: HTTPPROXY
               value: "off"
-            # Health check via IPs to avoid DNS dependency at startup
+            # Health check via IPs to avoid DNS dependency at startup.
+            # WireGuard says "setup complete" before the first handshake with
+            # the server finishes — give the tunnel 20s to stabilise before
+            # running the startup check, preventing the TLS EOF restart loop.
             - name: HEALTH_TARGET_ADDRESSES
               value: "1.1.1.1:443,8.8.8.8:443"
+            - name: HEALTH_VPN_DURATION_INITIAL
+              value: "20s"
+            # Suppress cosmetic error: GitHub API format changed and gluetun
+            # cannot unmarshal the version check response (no functional impact).
+            - name: VERSION_INFORMATION
+              value: "off"
             # Use DoH (same as qbittorrent gluetun) — more reliable than plain
             # DNS to 10.2.0.1 which only works when the tunnel is already up.
             - name: DNS_UPSTREAM_RESOLVER_TYPE
