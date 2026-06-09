@@ -46,6 +46,12 @@ spec:
               value: "info"
             - name: TZ
               value: "Etc/UTC"
+            # HEADLESS=false: Cloudflare Turnstile now requires WebGL fingerprinting
+            # (June 2026). True headless Chromium has no GPU/WebGL on aarch64.
+            # false = Chromium runs inside the container's Xvfb virtual display,
+            # which exposes WebGL via Mesa software rendering.
+            - name: HEADLESS
+              value: "false"
             # GLUETUN DISABLED: traffic goes direct (no VPN tunnel).
           ports:
             - name: api
