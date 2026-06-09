@@ -109,15 +109,15 @@ spec:
             # DoH (HTTPS) consistently times out with MTU=1280 through this
             # tunnel — large TLS records get silently dropped. Plain DNS over
             # UDP uses small packets and is not affected.
-            # FIREWALL_OUTBOUND_SUBNETS is required so gluetun's iptables rules
-            # allow outbound traffic to 10.2.0.1 (it routes through the tunnel
-            # via AllowedIPs=0.0.0.0/0, but still needs the explicit allow).
+            # Do NOT set FIREWALL_OUTBOUND_SUBNETS for 10.2.0.1: that env var
+            # adds a bypass route via eth0, but 10.2.0.1 is a virtual WireGuard
+            # peer address that only exists inside the tunnel. With
+            # WIREGUARD_ALLOWED_IPs=0.0.0.0/0, it routes naturally via tun0,
+            # and gluetun's iptables already ACCEPTs all tun0 output traffic.
             - name: DNS_UPSTREAM_RESOLVER_TYPE
               value: "plain"
             - name: DNS_UPSTREAM_PLAIN_ADDRESSES
               value: "10.2.0.1:53"
-            - name: FIREWALL_OUTBOUND_SUBNETS
-              value: "10.2.0.1/32"
             - name: TZ
               value: "Etc/UTC"
             - name: BLOCK_IPV6
