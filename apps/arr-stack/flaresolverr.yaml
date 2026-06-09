@@ -99,21 +99,25 @@ spec:
             - name: HTTPPROXY
               value: "off"
             # Health check via IPs to avoid DNS dependency at startup.
-            # WireGuard says "setup complete" before the first handshake with
-            # the server finishes — give the tunnel 20s to stabilise before
-            # running the startup check, preventing the TLS EOF restart loop.
             - name: HEALTH_TARGET_ADDRESSES
               value: "1.1.1.1:443,8.8.8.8:443"
-            - name: HEALTH_VPN_DURATION_INITIAL
-              value: "20s"
             # Suppress cosmetic error: GitHub API format changed and gluetun
             # cannot unmarshal the version check response (no functional impact).
             - name: VERSION_INFORMATION
               value: "off"
-            # Use DoH (same as qbittorrent gluetun) — more reliable than plain
-            # DNS to 10.2.0.1 which only works when the tunnel is already up.
+            # Plain UDP DNS to ProtonVPN's internal peer DNS (10.2.0.1).
+            # DoH (HTTPS) consistently times out with MTU=1280 through this
+            # tunnel — large TLS records get silently dropped. Plain DNS over
+            # UDP uses small packets and is not affected.
+            # FIREWALL_OUTBOUND_SUBNETS is required so gluetun's iptables rules
+            # allow outbound traffic to 10.2.0.1 (it routes through the tunnel
+            # via AllowedIPs=0.0.0.0/0, but still needs the explicit allow).
             - name: DNS_UPSTREAM_RESOLVER_TYPE
-              value: "doh"
+              value: "plain"
+            - name: DNS_UPSTREAM_PLAIN_ADDRESSES
+              value: "10.2.0.1:53"
+            - name: FIREWALL_OUTBOUND_SUBNETS
+              value: "10.2.0.1/32"
             - name: TZ
               value: "Etc/UTC"
             - name: BLOCK_IPV6
