@@ -51,17 +51,18 @@ spec:
       # Route DNS through gluetun's built-in DoH resolver (127.0.0.1:53).
       # Default k8s CoreDNS (10.43.0.10) is blocked by gluetun's firewall once VPN is up.
       # Use IPv4 loopback — BLOCK_IPV6=on causes EAGAIN on UDP to [::1]:53.
+      # ndots=1: any name with a dot (e.g. tracker.opentrackr.org) is tried as FQDN
+      # immediately, skipping cluster search domain lookups. This prevents hundreds of
+      # failing *.svc.cluster.local queries from flooding gluetun's DNS server per
+      # tracker announce cycle. Cluster search domains omitted — gluetun cannot
+      # resolve cluster.local names and qBittorrent does not call cluster-internal services.
       dnsPolicy: None
       dnsConfig:
         nameservers:
           - 127.0.0.1
-        searches:
-          - arr-stack.svc.cluster.local
-          - svc.cluster.local
-          - cluster.local
         options:
           - name: ndots
-            value: "5"
+            value: "1"
       securityContext:
         fsGroup: 1000
       initContainers:
