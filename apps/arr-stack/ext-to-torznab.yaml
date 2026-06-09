@@ -50,6 +50,8 @@ spec:
               value: "true"
             - name: LOG_LEVEL
               value: "INFO"
+            - name: FLARESOLVERR_TABS_TILL_VERIFY
+              value: "3"
           ports:
             - name: api
               containerPort: 5000
