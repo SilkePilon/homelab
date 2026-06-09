@@ -32,119 +32,11 @@ spec:
       labels:
         app.kubernetes.io/name: flaresolverr
     spec:
-      # Route DNS through gluetun's built-in DoH resolver (127.0.0.1:53).
-      # CoreDNS (10.43.0.10) is blocked by gluetun's firewall once the VPN
-      # tunnel is up. Use IPv4 loopback — BLOCK_IPV6=on blocks UDP to [::1]:53.
-      # ndots=1: external hostnames go straight to FQDN lookup, no cluster
-      # search domain spam (gluetun can't resolve cluster.local anyway).
-      dnsPolicy: None
-      dnsConfig:
-        nameservers:
-          - 127.0.0.1
-        options:
-          - name: ndots
-            value: "1"
-      initContainers:
-        # Ensure /dev/net/tun exists before gluetun starts
-        - name: init-tun
-          image: busybox:latest
-          command:
-            - sh
-            - -c
-            - |
-              mkdir -p /dev/net
-              [ -c /dev/net/tun ] || mknod /dev/net/tun c 10 200
-              chmod 0666 /dev/net/tun
-          securityContext:
-            privileged: true
+      # GLUETUN DISABLED FOR TESTING — FlareSolverr runs without VPN, direct
+      # internet access via cluster DNS. To re-enable gluetun, restore the
+      # dnsPolicy/dnsConfig block, initContainers, and gluetun container from git.
+      dnsPolicy: ClusterFirst
       containers:
-        # ── gluetun: ProtonVPN WireGuard tunnel ──────────────────────────────
-        # Runs in the shared pod network namespace — all traffic from
-        # FlareSolverr automatically exits through the VPN tunnel.
-        # Also exposes an HTTP proxy on :8888 for Prowlarr (via gluetun-proxy Service).
-        - name: gluetun
-          image: ghcr.io/qdm12/gluetun:latest
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            capabilities:
-              add:
-                - NET_ADMIN
-          lifecycle:
-            postStart:
-              exec:
-                # Clean up stale IP rules from previous pod exits (Kubernetes
-                # shares IP rules across the pod namespace). Fix from gluetun wiki:
-                # https://github.com/qdm12/gluetun-wiki/blob/main/setup/advanced/kubernetes.md
-                command: ["/bin/sh", "-c", "(ip rule del table 51820; ip -6 rule del table 51820) || true"]
-          env:
-            # Use ProtonVPN native provider — gluetun picks a random matching
-            # server from ProtonVPN's full server list on every start, so each
-            # restart (see gluetun-rotate CronJob) gives a new egress IP.
-            - name: VPN_SERVICE_PROVIDER
-              value: protonvpn
-            - name: VPN_TYPE
-              value: wireguard
-            - name: WIREGUARD_PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: protonvpn-wg
-                  key: privateKey
-            # Restrict to privacy-friendly jurisdictions.
-            # Do NOT set PORT_FORWARD_ONLY — flaresolverr doesn't need port
-            # forwarding and restricting to P2P-only servers shrinks the pool
-            # to servers that are often overloaded or unavailable.
-            - name: SERVER_COUNTRIES
-              value: "Netherlands,Switzerland,Sweden,Iceland"
-            # Disable unused proxy features
-            - name: HTTPPROXY
-              value: "off"
-            # Health check via IPs to avoid DNS dependency at startup.
-            - name: HEALTH_TARGET_ADDRESSES
-              value: "1.1.1.1:443,8.8.8.8:443"
-            # Suppress cosmetic error: GitHub API format changed and gluetun
-            # cannot unmarshal the version check response (no functional impact).
-            - name: VERSION_INFORMATION
-              value: "off"
-            # Plain UDP DNS to ProtonVPN's internal peer DNS (10.2.0.1).
-            # DoH (HTTPS) consistently times out with MTU=1280 through this
-            # tunnel — large TLS records get silently dropped. Plain DNS over
-            # UDP uses small packets and is not affected.
-            # Do NOT set FIREWALL_OUTBOUND_SUBNETS for 10.2.0.1: that env var
-            # adds a bypass route via eth0, but 10.2.0.1 is a virtual WireGuard
-            # peer address that only exists inside the tunnel. With
-            # WIREGUARD_ALLOWED_IPs=0.0.0.0/0, it routes naturally via tun0,
-            # and gluetun's iptables already ACCEPTs all tun0 output traffic.
-            - name: DNS_UPSTREAM_RESOLVER_TYPE
-              value: "plain"
-            - name: DNS_UPSTREAM_PLAIN_ADDRESSES
-              value: "10.2.0.1:53"
-            - name: TZ
-              value: "Etc/UTC"
-            - name: BLOCK_IPV6
-              value: "on"
-            - name: WIREGUARD_ALLOWED_IPS
-              value: "0.0.0.0/0"
-            - name: WIREGUARD_MTU
-              value: "1280"
-            - name: WIREGUARD_PERSISTENT_KEEPALIVE_INTERVAL
-              value: "25s"
-            - name: VPN_PORT_FORWARDING
-              value: "off"
-            - name: SHADOWSOCKS
-              value: "off"
-            - name: BLOCK_MALICIOUS
-              value: "off"
-            - name: BLOCK_SURVEILLANCE
-              value: "off"
-            - name: BLOCK_ADS
-              value: "off"
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: "1"
-              memory: 512Mi
         # ── FlareSolverr ─────────────────────────────────────────────────────
         - name: flaresolverr
           image: ghcr.io/flaresolverr/flaresolverr:latest
@@ -154,9 +46,7 @@ spec:
               value: "info"
             - name: TZ
               value: "Etc/UTC"
-            # No HTTP_PROXY / HTTPS_PROXY needed — all traffic from this container
-            # exits through the gluetun sidecar's WireGuard tunnel natively
-            # (shared pod network namespace).
+            # GLUETUN DISABLED: traffic goes direct (no VPN tunnel).
           ports:
             - name: api
               containerPort: 8191
