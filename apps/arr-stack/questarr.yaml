@@ -1,0 +1,100 @@
+# ── Questarr (Video Games Manager) ────────────────────────────────────────────
+# WebUI: port 5000  (kubectl port-forward -n arr-stack svc/questarr 5000:5000)
+# https://github.com/Doezer/Questarr
+#
+# After first login, configure in Questarr:
+#   Settings → General → IGDB credentials (Twitch client ID + secret)
+#   Settings → Indexers → Add Torznab/Prowlarr indexer
+#   Settings → Downloaders → Add qBittorrent:
+#     Host: qbittorrent   Port: 8080   Category: questarr
+#   Settings → Media Management → Import Mode: Move
+#   Settings → Media Management → Root Folders: /data/media/games
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: questarr
+  namespace: arr-stack
+  labels:
+    app.kubernetes.io/name: questarr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: questarr
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: questarr
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: questarr
+          image: ghcr.io/doezer/questarr:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: NODE_ENV
+              value: "production"
+            - name: SQLITE_DB_PATH
+              value: "/app/data/sqlite.db"
+            - name: TZ
+              value: "Etc/UTC"
+          ports:
+            - name: webui
+              containerPort: 5000
+          volumeMounts:
+            - name: config
+              mountPath: /app/data
+            - name: downloads
+              mountPath: /data/torrents
+            - name: media
+              mountPath: /data/media
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: webui
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: webui
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: questarr-config
+        - name: downloads
+          persistentVolumeClaim:
+            claimName: arr-downloads
+        - name: media
+          persistentVolumeClaim:
+            claimName: arr-media
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: questarr
+  namespace: arr-stack
+  labels:
+    app.kubernetes.io/name: questarr
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: questarr
+  ports:
+    - name: webui
+      port: 5000
+      targetPort: webui
