@@ -17,9 +17,10 @@
 #   Default save path: /data/torrents
 #
 # Add categories to keep *arr downloads organised:
-#   radarr  → /data/torrents/movies
-#   sonarr  → /data/torrents/tv
-#   lidarr  → /data/torrents/music
+#   radarr    → /data/torrents/movies
+#   sonarr    → /data/torrents/tv
+#   lidarr    → /data/torrents/music
+#   questarr  → /data/media/games   (saves directly to SMB share)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -195,6 +196,8 @@ spec:
               mountPath: /config
             - name: downloads
               mountPath: /data/torrents
+            - name: media
+              mountPath: /data/media
           resources:
             requests:
               cpu: 100m
@@ -221,6 +224,9 @@ spec:
         - name: downloads
           persistentVolumeClaim:
             claimName: arr-downloads
+        - name: media
+          persistentVolumeClaim:
+            claimName: arr-media
 ---
 apiVersion: v1
 kind: Service

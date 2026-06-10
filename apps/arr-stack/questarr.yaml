@@ -3,12 +3,15 @@
 # https://github.com/Doezer/Questarr
 #
 # After first login, configure in Questarr:
-#   Settings → General → IGDB credentials (Twitch client ID + secret)
-#   Settings → Indexers → Add Torznab/Prowlarr indexer
+#   Settings → Services   → IGDB credentials (Twitch client ID + secret)
+#   Settings → Indexers   → Add Torznab indexer (or Sync from Prowlarr)
 #   Settings → Downloaders → Add qBittorrent:
 #     Host: qbittorrent   Port: 8080   Category: questarr
-#   Settings → Media Management → Import Mode: Move
-#   Settings → Media Management → Root Folders: /data/media/games
+#
+# NOTE: Questarr has no import/move feature. It sends downloads to qBittorrent
+# and qBittorrent decides where to save them. To land games on the SMB share,
+# set the 'questarr' category save path in qBittorrent to /data/media/games
+# (qBittorrent has arr-media mounted for this purpose).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -49,10 +52,6 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /app/data
-            - name: downloads
-              mountPath: /data/torrents
-            - name: media
-              mountPath: /data/media
           resources:
             requests:
               cpu: 100m
@@ -76,12 +75,6 @@ spec:
         - name: config
           persistentVolumeClaim:
             claimName: questarr-config
-        - name: downloads
-          persistentVolumeClaim:
-            claimName: arr-downloads
-        - name: media
-          persistentVolumeClaim:
-            claimName: arr-media
 ---
 apiVersion: v1
 kind: Service
