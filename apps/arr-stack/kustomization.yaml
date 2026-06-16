@@ -66,6 +66,7 @@ resources:
   - flaresolverr.yaml
   - gluetun-proxy.yaml
   - questarr.yaml
+  - scraparr.yaml
 
 labels:
   - pairs:

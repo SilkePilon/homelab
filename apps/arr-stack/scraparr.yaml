@@ -1,0 +1,98 @@
+# ── Scraparr — Prometheus exporter for the *arr suite ────────────────────────
+#
+# Scraparr reads each app's API and exposes Prometheus metrics on port 7100.
+# Dashboard: https://grafana.com/grafana/dashboards/22934
+#
+# BEFORE deploying, create the API keys secret (NOT committed to git).
+# Find each app's API key under Settings → General → Security:
+#
+#   kubectl create secret generic scraparr-api-keys \
+#     --from-literal=SONARR_API_KEY=<your-sonarr-api-key> \
+#     --from-literal=RADARR_API_KEY=<your-radarr-api-key> \
+#     --from-literal=LIDARR_API_KEY=<your-lidarr-api-key> \
+#     -n arr-stack
+#
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scraparr
+  namespace: arr-stack
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: scraparr
+  template:
+    metadata:
+      labels:
+        app: scraparr
+      annotations:
+        # Prometheus will auto-discover this pod via the kubernetes-pods scrape job
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7100"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: scraparr
+          image: ghcr.io/thecfu/scraparr:latest
+          env:
+            # ── Sonarr ───────────────────────────────────────────────────────
+            - name: SONARR_URL
+              value: "http://sonarr.arr-stack.svc.cluster.local:8989"
+            - name: SONARR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scraparr-api-keys
+                  key: SONARR_API_KEY
+            # ── Radarr ───────────────────────────────────────────────────────
+            - name: RADARR_URL
+              value: "http://radarr.arr-stack.svc.cluster.local:7878"
+            - name: RADARR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scraparr-api-keys
+                  key: RADARR_API_KEY
+            # ── Lidarr ───────────────────────────────────────────────────────
+            - name: LIDARR_URL
+              value: "http://lidarr.arr-stack.svc.cluster.local:8686"
+            - name: LIDARR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: scraparr-api-keys
+                  key: LIDARR_API_KEY
+          ports:
+            - containerPort: 7100
+              name: metrics
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 15
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scraparr
+  namespace: arr-stack
+  labels:
+    app: scraparr
+spec:
+  selector:
+    app: scraparr
+  ports:
+    - name: metrics
+      port: 7100
+      targetPort: metrics
