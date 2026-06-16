@@ -40,16 +40,16 @@ data:
           - source_labels: [__meta_kubernetes_pod_node_name]
             target_label: node
           # Build the host filesystem path to the container log file.
-          # k3s / containerd path: /var/log/pods/<ns>_<pod>_<uid>/<container>/*.log
-          # Use namespace + pod name prefix so the glob is reliable without needing UID.
+          # k3s / containerd path: /var/log/pods/<ns>_<name>_<uid>/<container>/<n>.log
+          # Anchor on pod UID — it always appears at the end of the directory name,
+          # so *<uid>*/<container>/*.log reliably matches across all namespaces.
           - source_labels:
-              - __meta_kubernetes_namespace
-              - __meta_kubernetes_pod_name
+              - __meta_kubernetes_pod_uid
               - __meta_kubernetes_pod_container_name
             separator: /
-            regex: (.+)/(.+)/(.+)
+            regex: (.+)/(.+)
             target_label: __path__
-            replacement: /var/log/pods/$1_$2*/$3/*.log
+            replacement: /var/log/pods/*$1*/$2/*.log
 ---
 apiVersion: apps/v1
 kind: DaemonSet

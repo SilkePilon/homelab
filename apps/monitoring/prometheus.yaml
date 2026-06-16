@@ -16,6 +16,9 @@ data:
       - job_name: prometheus
         static_configs:
           - targets: ['localhost:9090']
+        metric_relabel_configs:
+          - target_label: cluster
+            replacement: homelab
 
       # ── Node Exporter (CPU, RAM, disk, network, hardware temps) ────────────
       # Each DaemonSet pod is discovered via the headless Service endpoints.
@@ -32,6 +35,9 @@ data:
             target_label: node
           - source_labels: [__meta_kubernetes_namespace]
             target_label: namespace
+        metric_relabel_configs:
+          - target_label: cluster
+            replacement: homelab
 
       # ── kube-state-metrics (Kubernetes object state) ────────────────────────
       - job_name: kube-state-metrics
@@ -43,6 +49,9 @@ data:
           - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_name]
             regex: kube-state-metrics
             action: keep
+        metric_relabel_configs:
+          - target_label: cluster
+            replacement: homelab
 
       # ── Kubernetes API server ───────────────────────────────────────────────
       - job_name: kubernetes-apiservers
@@ -59,6 +68,9 @@ data:
               - __meta_kubernetes_endpoint_port_name
             action: keep
             regex: default;kubernetes;https
+        metric_relabel_configs:
+          - target_label: cluster
+            replacement: homelab
 
       # ── cAdvisor via kubelet — container-level CPU & RAM per pod ───────────
       # Routes through the k8s API proxy so TLS + auth is handled automatically.
@@ -79,6 +91,9 @@ data:
             regex: (.+)
             target_label: __metrics_path__
             replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+        metric_relabel_configs:
+          - target_label: cluster
+            replacement: homelab
 
       # ── Kubelet node metrics ────────────────────────────────────────────────
       - job_name: kubernetes-nodes
@@ -98,6 +113,9 @@ data:
             regex: (.+)
             target_label: __metrics_path__
             replacement: /api/v1/nodes/$1/proxy/metrics
+        metric_relabel_configs:
+          - target_label: cluster
+            replacement: homelab
 
       # ── Auto-discover pods annotated with prometheus.io/scrape: "true" ─────
       - job_name: kubernetes-pods
@@ -133,6 +151,9 @@ data:
           - source_labels: [__meta_kubernetes_pod_node_name]
             action: replace
             target_label: node
+        metric_relabel_configs:
+          - target_label: cluster
+            replacement: homelab
 
       # ── Auto-discover services annotated with prometheus.io/scrape: "true" ─
       - job_name: kubernetes-services
@@ -165,6 +186,9 @@ data:
           - source_labels: [__meta_kubernetes_service_name]
             action: replace
             target_label: service
+        metric_relabel_configs:
+          - target_label: cluster
+            replacement: homelab
 ---
 apiVersion: apps/v1
 kind: Deployment
