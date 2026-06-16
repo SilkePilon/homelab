@@ -1,0 +1,46 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: monitoring
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BEFORE applying this stack:
+#
+#  1. Create the Grafana admin password secret (NOT committed to git):
+#       kubectl create secret generic grafana-admin-creds \
+#         --from-literal=admin-user=admin \
+#         --from-literal=admin-password='YOUR_SECURE_PASSWORD' \
+#         -n monitoring
+#
+#  2. Update grafana.yaml → Ingress spec.rules[0].host to your domain.
+#     Add the following to /etc/hosts on each client machine:
+#       <k3s-node-ip>  grafana.local
+#
+#  3. (Optional) Enable hardware temperature sensors on each k3s node:
+#       sudo apt install lm-sensors && sudo sensors-detect --auto
+#     Temperature metrics will then appear under node_hwmon_temp_celsius{}
+#     and node_thermal_zone_temp{} in Prometheus / Grafana.
+#
+#  4. After the stack is running, import community dashboards in Grafana:
+#     Dashboards → Import → enter ID → set datasource → Import
+#
+#     Recommended dashboard IDs:
+#       1860   – Node Exporter Full          (per-node CPU, RAM, temps, disk, net)
+#       15661  – Kubernetes Cluster Overview (pods, deployments, namespaces)
+#       13639  – Loki Logs Explorer          (search all container logs)
+#       17346  – k3s Cluster Overview
+#       3662   – Prometheus 2.0 Overview     (Prometheus self-stats)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - pvc.yaml
+  - prometheus.yaml
+  - grafana.yaml
+  - loki.yaml
+  - promtail.yaml
+  - node-exporter.yaml
+  - kube-state-metrics.yaml
