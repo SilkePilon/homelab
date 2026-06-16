@@ -23,6 +23,11 @@ data:
         pipeline_stages:
           # CRI format used by containerd (default in k3s)
           - cri: {}
+          # Silently drop entries older than Loki's retention window (168h)
+          # to avoid 400 errors when Promtail first reads pre-existing log files.
+          - drop:
+              older_than: 168h
+              drop_counter_reason: too_old
         relabel_configs:
           # Drop pods that are not running
           - source_labels: [__meta_kubernetes_pod_phase]
