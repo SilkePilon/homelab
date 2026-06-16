@@ -10,7 +10,8 @@ data:
       grpc_listen_port: 0
 
     positions:
-      filename: /tmp/positions.yaml
+      # /run/promtail is a writable hostPath volume (readOnlyRootFilesystem: true blocks /tmp)
+      filename: /run/promtail/positions.yaml
 
     clients:
       - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
@@ -39,13 +40,16 @@ data:
           - source_labels: [__meta_kubernetes_pod_node_name]
             target_label: node
           # Build the host filesystem path to the container log file.
-          # k3s / containerd path: /var/log/pods/<ns>_<name>_<uid>/<container>/*.log
+          # k3s / containerd path: /var/log/pods/<ns>_<pod>_<uid>/<container>/*.log
+          # Use namespace + pod name prefix so the glob is reliable without needing UID.
           - source_labels:
-              - __meta_kubernetes_pod_uid
+              - __meta_kubernetes_namespace
+              - __meta_kubernetes_pod_name
               - __meta_kubernetes_pod_container_name
             separator: /
+            regex: (.+)/(.+)/(.+)
             target_label: __path__
-            replacement: /var/log/pods/*$1*/$2/*.log
+            replacement: /var/log/pods/$1_$2*/$3/*.log
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -111,6 +115,8 @@ spec:
             - name: containers
               mountPath: /var/lib/docker/containers
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: config
           configMap:
@@ -124,3 +130,5 @@ spec:
         - name: containers
           hostPath:
             path: /var/lib/docker/containers
+        - name: tmp
+          emptyDir: {}
