@@ -1,0 +1,126 @@
+---
+# Penpot backend — Clojure API server
+# Handles auth, storage, DB access, and WebSocket connections.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: penpot-backend
+  namespace: penpot
+  labels:
+    app.kubernetes.io/name: penpot-backend
+    app.kubernetes.io/part-of: penpot
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: penpot-backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: penpot-backend
+        app.kubernetes.io/part-of: penpot
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15
+          command:
+            - sh
+            - -c
+            - "until pg_isready -h penpot-postgres -U penpot; do echo 'waiting for db…'; sleep 2; done"
+      containers:
+        - name: backend
+          image: penpotapp/backend:2.16
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 6060
+          env:
+            # ── Flags ────────────────────────────────────────────────────────
+            # disable-email-verification: skip email confirmation on self-hosted
+            # enable-smtp / disable-secure-session-cookies for LAN use.
+            # Remove disable-* flags when exposing to the internet.
+            - name: PENPOT_FLAGS
+              value: >-
+                enable-registration
+                enable-login-with-password
+                disable-email-verification
+                disable-secure-session-cookies
+                enable-prepl-server
+            # ── Secret key ───────────────────────────────────────────────────
+            - name: PENPOT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: penpot-secret
+                  key: PENPOT_SECRET_KEY
+            # ── Database ─────────────────────────────────────────────────────
+            - name: PENPOT_DATABASE_URI
+              value: "postgresql://penpot-postgres/penpot"
+            - name: PENPOT_DATABASE_USERNAME
+              value: "penpot"
+            - name: PENPOT_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: penpot-secret
+                  key: POSTGRES_PASSWORD
+            # ── Redis/Valkey ──────────────────────────────────────────────────
+            - name: PENPOT_REDIS_URI
+              value: "redis://penpot-valkey/0"
+            # ── Assets storage (filesystem, shared PVC) ───────────────────────
+            - name: PENPOT_OBJECTS_STORAGE_BACKEND
+              value: "fs"
+            - name: PENPOT_OBJECTS_STORAGE_FS_DIRECTORY
+              value: "/opt/data/assets"
+            # ── Public URI — update to your cluster hostname/IP ───────────────
+            # Example: http://penpot.local or http://192.168.1.x:9001
+            - name: PENPOT_PUBLIC_URI
+              value: "http://penpot.local:9001"
+            # ── Telemetry ─────────────────────────────────────────────────────
+            - name: PENPOT_TELEMETRY_ENABLED
+              value: "true"
+            - name: PENPOT_TELEMETRY_REFERER
+              value: "k8s-homelab"
+            # ── Max upload body size (~350 MB) ────────────────────────────────
+            - name: PENPOT_HTTP_SERVER_MAX_BODY_SIZE
+              value: "367001600"
+            - name: PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE
+              value: "367001600"
+          volumeMounts:
+            - name: assets
+              mountPath: /opt/data/assets
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /api/rpc/command/get-profile
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 12
+      volumes:
+        - name: assets
+          persistentVolumeClaim:
+            claimName: penpot-assets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: penpot-backend
+  namespace: penpot
+  labels:
+    app.kubernetes.io/name: penpot-backend
+    app.kubernetes.io/part-of: penpot
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: penpot-backend
+  ports:
+    - name: http
+      port: 6060
+      targetPort: http

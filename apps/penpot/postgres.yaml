@@ -1,0 +1,82 @@
+---
+# PostgreSQL 15 for Penpot
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: penpot-postgres
+  namespace: penpot
+  labels:
+    app.kubernetes.io/name: penpot-postgres
+    app.kubernetes.io/part-of: penpot
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: penpot-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: penpot-postgres
+        app.kubernetes.io/part-of: penpot
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:15
+          imagePullPolicy: IfNotPresent
+          args: ["--data-checksums"]
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "penpot"
+            - name: POSTGRES_USER
+              value: "penpot"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: penpot-secret
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "penpot"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: penpot-postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: penpot-postgres
+  namespace: penpot
+  labels:
+    app.kubernetes.io/name: penpot-postgres
+    app.kubernetes.io/part-of: penpot
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: penpot-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

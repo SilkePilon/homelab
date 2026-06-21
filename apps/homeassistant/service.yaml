@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: homeassistant
+  namespace: homeassistant
+  labels:
+    app.kubernetes.io/name: homeassistant
+spec:
+  # ClusterIP only — access via hostPort 8123 or port-forward.
+  # Because the pod uses hostNetwork, you can also reach it on the node IP
+  # directly at port 8123 without this Service.
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: homeassistant
+  ports:
+    - name: http
+      port: 8123
+      targetPort: http

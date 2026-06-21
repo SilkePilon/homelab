@@ -1,0 +1,91 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# n8n Deployment
+# Image: docker.n8n.io/n8nio/n8n
+# Port:  5678
+# Data:  /home/node/.n8n  (PVC n8n-data)
+#
+# BEFORE applying:
+#   1. Create the namespace first:
+#        kubectl create namespace n8n
+#   2. Then create the encryption-key secret (NOT committed to git):
+#        kubectl create secret generic n8n-secret \
+#       --from-literal=N8N_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+#       -n n8n
+#
+# The encryption key protects stored credentials. If it changes, previously
+# saved credentials can no longer be decrypted — back it up safely.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: n8n
+  labels:
+    app.kubernetes.io/name: n8n
+spec:
+  replicas: 1
+  # Recreate: PVC is ReadWriteOnce; only one pod may write at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: n8n
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: n8n
+    spec:
+      # n8n runs as the built-in "node" user (UID 1000).
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsNonRoot: true
+      containers:
+        - name: n8n
+          image: docker.n8n.io/n8nio/n8n:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5678
+          env:
+            - name: TZ
+              value: "Etc/UTC"
+            - name: GENERIC_TIMEZONE
+              value: "Etc/UTC"
+            # Encryption key is loaded from the secret you created above.
+            - name: N8N_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: n8n-secret
+                  key: N8N_ENCRYPTION_KEY
+            # Set this to your cluster's hostname/IP so webhooks resolve correctly.
+            # Example: http://n8n.local or http://192.168.1.x:5678
+            - name: WEBHOOK_URL
+              value: "http://n8n.local:5678"
+          volumeMounts:
+            - name: data
+              mountPath: /home/node/.n8n
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: n8n-data

@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: n8n
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BEFORE applying this stack:
+#
+#  1. Create the namespace and the encryption-key secret (NOT committed to git):
+#       kubectl create namespace n8n
+#       kubectl create secret generic n8n-secret \
+#         --from-literal=N8N_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+#         -n n8n
+#
+#     The encryption key protects stored credentials. Back it up — if it
+#     changes, all saved credentials become unreadable.
+#
+#  2. Edit deployment.yaml → WEBHOOK_URL to point at your cluster's IP or
+#     hostname so external webhooks can reach n8n.
+#
+#  3. (Optional) Increase resources.limits.memory if you run large workflows.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - service.yaml
+  - deployment.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false

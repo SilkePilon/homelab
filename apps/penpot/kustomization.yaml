@@ -1,0 +1,55 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: penpot
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BEFORE applying this stack:
+#
+#  1. Create the namespace and Penpot secret (NOT committed to git):
+#       kubectl create namespace penpot
+#       kubectl create secret generic penpot-secret \
+#         --from-literal=PENPOT_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')" \
+#         --from-literal=POSTGRES_PASSWORD="$(openssl rand -base64 24)" \
+#         -n penpot
+#
+#     Back up PENPOT_SECRET_KEY — it derives all session tokens.
+#
+#  2. Edit backend.yaml and frontend.yaml → PENPOT_PUBLIC_URI to your cluster
+#     hostname/IP:port.  Example: http://192.168.1.x:9001
+#     The frontend is exposed on port 9001 via the penpot-frontend Service.
+#
+#  3. Access the app at http://<node-ip>:9001 after first boot.
+#     The first user to register becomes the instance admin.
+#
+#  4. PENPOT_FLAGS includes 'disable-email-verification' and
+#     'disable-secure-session-cookies' — safe for trusted LAN only.
+#     Remove those flags if you expose Penpot to the internet.
+#
+#  5. Image versions are pinned to 2.16. To upgrade, change the tag in each
+#     *yaml file and run: kubectl rollout restart deploy -n penpot
+#
+#  Services:
+#    penpot-frontend  → port 9001  (UI access)
+#    penpot-backend   → port 6060  (internal)
+#    penpot-exporter  → port 7070  (internal)
+#    penpot-mcp       → port 7979  (internal)
+#    penpot-postgres  → port 5432  (internal)
+#    penpot-valkey    → port 6379  (internal)
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - postgres.yaml
+  - valkey.yaml
+  - backend.yaml
+  - exporter.yaml
+  - mcp.yaml
+  - frontend.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false

@@ -1,0 +1,60 @@
+---
+# Valkey (Redis-compatible) for Penpot WebSocket notifications
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: penpot-valkey
+  namespace: penpot
+  labels:
+    app.kubernetes.io/name: penpot-valkey
+    app.kubernetes.io/part-of: penpot
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: penpot-valkey
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: penpot-valkey
+        app.kubernetes.io/part-of: penpot
+    spec:
+      containers:
+        - name: valkey
+          image: valkey/valkey:8.1
+          imagePullPolicy: IfNotPresent
+          args: ["--maxmemory", "128mb", "--maxmemory-policy", "volatile-lfu"]
+          ports:
+            - name: redis
+              containerPort: 6379
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: "500m"
+              memory: 192Mi
+          readinessProbe:
+            exec:
+              command: ["valkey-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: penpot-valkey
+  namespace: penpot
+  labels:
+    app.kubernetes.io/name: penpot-valkey
+    app.kubernetes.io/part-of: penpot
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: penpot-valkey
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis

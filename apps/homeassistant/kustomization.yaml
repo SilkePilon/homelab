@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: homeassistant
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BEFORE applying this stack:
+#
+#  1. Edit deployment.yaml → TZ to your local timezone (e.g. Europe/Amsterdam).
+#
+#  2. hostNetwork: true is required for local device discovery (mDNS, SSDP).
+#     This means the pod binds port 8123 directly on the k3s node's IP.
+#     Access Home Assistant at http://<node-ip>:8123 after first boot.
+#
+#  3. (Optional) USB device passthrough for Zigbee/Z-Wave dongles:
+#     Add to deployment.yaml under spec.template.spec.containers[0]:
+#       volumeMounts:
+#         - name: zigbee
+#           mountPath: /dev/ttyUSB0
+#     And under spec.template.spec.volumes:
+#       - name: zigbee
+#         hostPath:
+#           path: /dev/ttyUSB0
+#     Also add securityContext.privileged: true to the container.
+#
+#  4. Home Assistant Container does NOT support HA Add-ons.
+#     Use integrations for Matter, Zigbee2MQTT, Z-Wave JS, etc.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - service.yaml
+  - deployment.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false

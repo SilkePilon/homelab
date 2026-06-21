@@ -1,0 +1,41 @@
+---
+# Twenty CRM requires three secrets — create them before applying:
+#
+#   kubectl create namespace twenty
+#
+#   kubectl create secret generic twenty-app-secret \
+#     --from-literal=APP_SECRET="$(openssl rand -base64 32)" \
+#     --from-literal=ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+#     -n twenty
+#
+#   kubectl create secret generic twenty-db-secret \
+#     --from-literal=POSTGRES_PASSWORD="$(openssl rand -base64 24)" \
+#     --from-literal=POSTGRES_USER="twenty" \
+#     -n twenty
+#
+# NOTE: ENCRYPTION_KEY is used to encrypt sensitive workspace data.
+#       FALLBACK_ENCRYPTION_KEY can be set to the OLD key during key rotation.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: twenty-db-data
+  namespace: twenty
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: twenty-server-storage
+  namespace: twenty
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi

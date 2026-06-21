@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: twenty
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BEFORE applying this stack:
+#
+#  1. Create the namespace and app secrets (NOT committed to git):
+#       kubectl create namespace twenty
+#       kubectl create secret generic twenty-app-secret \
+#         --from-literal=APP_SECRET="$(openssl rand -base64 32)" \
+#         --from-literal=ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+#         -n twenty
+#
+#     Back up ENCRYPTION_KEY — losing it makes workspace data unrecoverable.
+#     FALLBACK_ENCRYPTION_KEY can be added later when rotating the key.
+#
+#  2. Create the DB secret (namespace already exists from step 1):
+#       kubectl create secret generic twenty-db-secret \
+#         --from-literal=POSTGRES_USER="twenty" \
+#         --from-literal=POSTGRES_PASSWORD="$(openssl rand -base64 24)" \
+#         -n twenty
+#
+#  3. Edit server.yaml and worker.yaml → SERVER_URL to your cluster hostname.
+#     Example: http://192.168.1.x:3000 or http://twenty.local:3000
+#
+#  4. On first run the server auto-runs DB migrations. Check logs with:
+#       kubectl logs -n twenty deploy/twenty-server -f
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - postgres.yaml
+  - redis.yaml
+  - server.yaml
+  - worker.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false

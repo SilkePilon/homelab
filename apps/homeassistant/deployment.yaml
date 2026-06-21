@@ -1,0 +1,89 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Home Assistant Deployment
+# Image: ghcr.io/home-assistant/home-assistant:stable
+# Port:  8123
+# Data:  /config  (PVC homeassistant-config)
+#
+# hostNetwork: true is intentional — Home Assistant relies on mDNS/Bonjour,
+# SSDP (UPnP), and direct layer-2 broadcasts for auto-discovery of Zigbee
+# bridges, Chromecast, DLNA, etc.  Without host networking these broadcasts
+# never reach the container.
+#
+# NOTE: Home Assistant Container (this approach) does NOT support Add-ons
+# (e.g., the official Z-Wave or Zigbee add-ons). Use USB passthrough via
+# the node's /dev/tty* device path and the appropriate integration instead.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homeassistant
+  namespace: homeassistant
+  labels:
+    app.kubernetes.io/name: homeassistant
+spec:
+  replicas: 1
+  # Recreate: PVC is ReadWriteOnce.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: homeassistant
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: homeassistant
+    spec:
+      # hostNetwork exposes the pod on the node's network interface, required
+      # for local device discovery (mDNS, SSDP, etc.).
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      # Home Assistant runs as root inside the container (standard for the
+      # official image). Do not set runAsNonRoot here.
+      containers:
+        - name: homeassistant
+          image: ghcr.io/home-assistant/home-assistant:stable
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8123
+              hostPort: 8123
+          env:
+            - name: TZ
+              value: "Etc/UTC"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            # Mount /etc/localtime from the host so timestamps match the node.
+            - name: localtime
+              mountPath: /etc/localtime
+              readOnly: true
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 6
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: homeassistant-config
+        - name: localtime
+          hostPath:
+            path: /etc/localtime
+            type: File

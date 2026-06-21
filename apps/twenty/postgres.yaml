@@ -1,0 +1,84 @@
+---
+# PostgreSQL 16 for Twenty CRM
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twenty-db
+  namespace: twenty
+  labels:
+    app.kubernetes.io/name: twenty-db
+    app.kubernetes.io/part-of: twenty
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: twenty-db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: twenty-db
+        app.kubernetes.io/part-of: twenty
+    spec:
+      securityContext:
+        fsGroup: 999   # postgres GID
+      containers:
+        - name: postgres
+          image: postgres:16
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "default"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: twenty-db-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: twenty-db-secret
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "twenty", "-d", "default"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: twenty-db-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: twenty-db
+  namespace: twenty
+  labels:
+    app.kubernetes.io/name: twenty-db
+    app.kubernetes.io/part-of: twenty
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: twenty-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

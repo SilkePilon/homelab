@@ -1,0 +1,81 @@
+---
+# Penpot frontend — Nginx serving the ClojureScript SPA
+# Exposed on port 8080 inside the cluster; port 9001 via the Service below.
+# Also serves as the reverse proxy to the backend and exporter.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: penpot-frontend
+  namespace: penpot
+  labels:
+    app.kubernetes.io/name: penpot-frontend
+    app.kubernetes.io/part-of: penpot
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: penpot-frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: penpot-frontend
+        app.kubernetes.io/part-of: penpot
+    spec:
+      containers:
+        - name: frontend
+          image: penpotapp/frontend:2.16
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PENPOT_FLAGS
+              value: >-
+                enable-registration
+                enable-login-with-password
+                disable-email-verification
+                disable-secure-session-cookies
+                enable-prepl-server
+            - name: PENPOT_HTTP_SERVER_MAX_BODY_SIZE
+              value: "367001600"
+            - name: PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE
+              value: "367001600"
+          volumeMounts:
+            - name: assets
+              mountPath: /opt/data/assets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+      volumes:
+        - name: assets
+          persistentVolumeClaim:
+            claimName: penpot-assets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: penpot-frontend
+  namespace: penpot
+  labels:
+    app.kubernetes.io/name: penpot-frontend
+    app.kubernetes.io/part-of: penpot
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: penpot-frontend
+  ports:
+    - name: http
+      port: 9001
+      targetPort: http
