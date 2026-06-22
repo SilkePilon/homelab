@@ -20,8 +20,11 @@ namespace: twenty
 #  2. Create the DB secret (namespace already exists from step 1):
 #       kubectl create secret generic twenty-db-secret \
 #         --from-literal=POSTGRES_USER="twenty" \
-#         --from-literal=POSTGRES_PASSWORD="$(openssl rand -base64 24)" \
+#         --from-literal=POSTGRES_PASSWORD="$(openssl rand -hex 24)" \
 #         -n twenty
+#
+#     IMPORTANT: use 'hex 24', NOT 'base64'. Base64 output contains '/', '+'
+#     and '=' which break PostgreSQL connection URL parsing.
 #
 #  3. Edit server.yaml and worker.yaml → SERVER_URL to your cluster hostname.
 #     Example: http://192.168.1.x:3000 or http://twenty.local:3000

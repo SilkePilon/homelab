@@ -27,7 +27,6 @@ spec:
         - name: postgres
           image: postgres:15
           imagePullPolicy: IfNotPresent
-          args: ["--data-checksums"]
           ports:
             - name: postgres
               containerPort: 5432
@@ -41,6 +40,9 @@ spec:
                 secretKeyRef:
                   name: penpot-secret
                   key: POSTGRES_PASSWORD
+            # Passed to initdb on first run only; ignored on subsequent starts.
+            - name: POSTGRES_INITDB_ARGS
+              value: "--data-checksums"
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
           volumeMounts:
