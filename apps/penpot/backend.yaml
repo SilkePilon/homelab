@@ -56,7 +56,7 @@ spec:
                   key: PENPOT_SECRET_KEY
             # ── Database ─────────────────────────────────────────────────────
             - name: PENPOT_DATABASE_URI
-              value: "postgresql://penpot-postgres/penpot"
+              value: "postgresql://penpot-postgres/penpot?sslmode=disable"
             - name: PENPOT_DATABASE_USERNAME
               value: "penpot"
             - name: PENPOT_DATABASE_PASSWORD
