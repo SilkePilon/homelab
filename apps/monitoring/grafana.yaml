@@ -90,6 +90,10 @@ spec:
               value: "false"
             - name: GF_SERVER_ROOT_URL
               value: "%(protocol)s://%(domain)s/"
+            # SQLite WAL mode — prevents SQLITE_BUSY lock contention when
+            # Grafana's internal concurrent job drivers write simultaneously.
+            - name: GF_DATABASE_WAL
+              value: "true"
           ports:
             - containerPort: 3000
               name: web
