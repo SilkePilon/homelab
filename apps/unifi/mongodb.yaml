@@ -16,16 +16,16 @@ data:
   # NOTE: MongoDB 4.4 uses the legacy `mongo` shell, NOT `mongosh`.
   init-mongo.sh: |
     #!/bin/bash
-    mongo --eval "
-    db.getSiblingDB('${MONGO_DBNAME}').createUser({
-      user: '${MONGO_USER}',
-      pwd: '${MONGO_PASS}',
+    mongo admin <<EOF
+    db.createUser({
+      user: "$MONGO_USER",
+      pwd: "$MONGO_PASS",
       roles: [
-        { role: 'dbOwner', db: '${MONGO_DBNAME}' },
-        { role: 'dbOwner', db: '${MONGO_DBNAME}_stat' }
+        { role: "dbOwner", db: "$MONGO_DBNAME" },
+        { role: "dbOwner", db: "${MONGO_DBNAME}_stat" }
       ]
     })
-    "
+    EOF
 ---
 apiVersion: apps/v1
 kind: Deployment
