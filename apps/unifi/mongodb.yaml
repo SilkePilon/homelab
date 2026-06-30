@@ -13,18 +13,19 @@ metadata:
 data:
   # Shell init scripts in /docker-entrypoint-initdb.d/ have access to the
   # container's environment variables, so MONGO_PASS is substituted at runtime.
+  # NOTE: MongoDB 4.4 uses the legacy `mongo` shell, NOT `mongosh`.
   init-mongo.sh: |
     #!/bin/bash
-    mongosh <<EOF
-    db.getSiblingDB("${MONGO_DBNAME}").createUser({
-      user: "${MONGO_USER}",
-      pwd: "${MONGO_PASS}",
+    mongo --eval "
+    db.getSiblingDB('${MONGO_DBNAME}').createUser({
+      user: '${MONGO_USER}',
+      pwd: '${MONGO_PASS}',
       roles: [
-        { role: "dbOwner", db: "${MONGO_DBNAME}" },
-        { role: "dbOwner", db: "${MONGO_DBNAME}_stat" }
+        { role: 'dbOwner', db: '${MONGO_DBNAME}' },
+        { role: 'dbOwner', db: '${MONGO_DBNAME}_stat' }
       ]
     })
-    EOF
+    "
 ---
 apiVersion: apps/v1
 kind: Deployment
