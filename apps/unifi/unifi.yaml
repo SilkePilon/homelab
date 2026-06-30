@@ -1,0 +1,122 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# UniFi Network Application
+# Image: lscr.io/linuxserver/unifi-network-application
+#
+# Web UI  : https://<node-ip>:8443  (accept the self-signed cert on first visit)
+# Inform  : http://<node-ip>:8080/inform  (devices use this to phone home)
+#
+# BEFORE applying this stack:
+#   1. Create the namespace and the credentials secret (NOT committed to git):
+#        kubectl create namespace unifi
+#        kubectl create secret generic unifi-secret \
+#          --from-literal=MONGO_PASS="$(openssl rand -hex 32)" \
+#          -n unifi
+#
+#   2. The MongoDB init script only runs on a fresh /data/db directory.
+#      If you need to re-initialize, delete the mongodb-data PVC first.
+#
+#   3. After the pods are up, open https://<node-ip>:8443 in your browser
+#      and complete the first-run wizard.
+#
+#   4. To adopt your UniFi switch, SSH into the switch and run:
+#        set-inform http://<node-ip>:8080/inform
+#      (Replace <node-ip> with the IP shown in the LoadBalancer EXTERNAL-IP:
+#        kubectl get svc unifi -n unifi)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unifi
+  namespace: unifi
+  labels:
+    app.kubernetes.io/name: unifi
+spec:
+  replicas: 1
+  # Recreate: PVC is ReadWriteOnce; only one pod may write at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: unifi
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: unifi
+    spec:
+      containers:
+        - name: unifi
+          image: lscr.io/linuxserver/unifi-network-application:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: https-web,   containerPort: 8443,  protocol: TCP }
+            - { name: http-inform, containerPort: 8080,  protocol: TCP }
+            - { name: stun,        containerPort: 3478,  protocol: UDP }
+            - { name: discovery,   containerPort: 10001, protocol: UDP }
+            - { name: guest-https, containerPort: 8843,  protocol: TCP }
+            - { name: guest-http,  containerPort: 8880,  protocol: TCP }
+            - { name: speedtest,   containerPort: 6789,  protocol: TCP }
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: "Etc/UTC"
+            # MongoDB connection — password injected from the secret.
+            - name: MONGO_USER
+              value: "unifi"
+            - name: MONGO_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: unifi-secret
+                  key: MONGO_PASS
+            - name: MONGO_HOST
+              value: "mongodb"
+            - name: MONGO_PORT
+              value: "27017"
+            - name: MONGO_DBNAME
+              value: "unifi"
+            - name: MONGO_AUTHSOURCE
+              value: "admin"
+            # Java heap — 1 GB is comfortable for a homelab with a handful of devices.
+            - name: MEM_LIMIT
+              value: "1024"
+            - name: MEM_STARTUP
+              value: "1024"
+          volumeMounts:
+            - name: data
+              mountPath: /config
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 100m
+            limits:
+              memory: 1.5Gi
+              cpu: 500m
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: unifi-data
+---
+# LoadBalancer so both the web UI (8443) and device inform port (8080)
+# are reachable from your LAN. k3s's built-in Klipper LB handles this.
+apiVersion: v1
+kind: Service
+metadata:
+  name: unifi
+  namespace: unifi
+  labels:
+    app.kubernetes.io/name: unifi
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: unifi
+  ports:
+    - { name: https-web,   port: 8443,  targetPort: https-web,   protocol: TCP }
+    - { name: http-inform, port: 8080,  targetPort: http-inform, protocol: TCP }
+    - { name: stun,        port: 3478,  targetPort: stun,        protocol: UDP }
+    - { name: discovery,   port: 10001, targetPort: discovery,   protocol: UDP }
+    - { name: guest-https, port: 8843,  targetPort: guest-https, protocol: TCP }
+    - { name: guest-http,  port: 8880,  targetPort: guest-http,  protocol: TCP }
+    - { name: speedtest,   port: 6789,  targetPort: speedtest,   protocol: TCP }

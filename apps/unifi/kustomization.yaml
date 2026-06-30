@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: unifi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BEFORE applying this stack:
+#
+#  1. Create the namespace and credentials secret (NOT committed to git):
+#       kubectl create namespace unifi
+#       kubectl create secret generic unifi-secret \
+#         --from-literal=MONGO_PASS="$(openssl rand -hex 32)" \
+#         -n unifi
+#
+#  2. After pods are Ready, open https://<EXTERNAL-IP>:8443 to finish setup.
+#     Get the IP with: kubectl get svc unifi -n unifi
+#
+#  3. To adopt your UniFi switch, SSH in and run:
+#       set-inform http://<EXTERNAL-IP>:8080/inform
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - mongodb.yaml
+  - unifi.yaml
