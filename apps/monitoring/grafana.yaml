@@ -94,6 +94,12 @@ spec:
             # Grafana's internal concurrent job drivers write simultaneously.
             - name: GF_DATABASE_WAL
               value: "true"
+            # Disable the background plugin installer. In a container the
+            # bundled plugin path (/usr/share/grafana/data/plugins-bundled/)
+            # is owned by root and not writable by the grafana user (472),
+            # so the installer always fails with "permission denied".
+            - name: GF_PLUGINS_PLUGIN_ADMIN_ENABLED
+              value: "false"
           ports:
             - containerPort: 3000
               name: web
