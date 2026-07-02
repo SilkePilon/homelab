@@ -44,3 +44,4 @@ resources:
   - promtail.yaml
   - node-exporter.yaml
   - kube-state-metrics.yaml
+  - nut-exporter.yaml
