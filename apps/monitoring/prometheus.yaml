@@ -190,16 +190,21 @@ data:
           - target_label: cluster
             replacement: homelab
 
-      # ── NUT UPS exporter (APC Back-UPS on 192.168.1.172, outside cluster) ──
-      # Scrapes the in-cluster nut_exporter, which in turn reads the NUT server.
+      # ── NUT UPS exporter (HON95, multi-target model) ──────────────────────
+      # Prometheus scrapes the in-cluster exporter but passes the out-of-cluster
+      # NUT server (192.168.1.172:3493) as the ?target= param via relabeling.
+      # The exporter auto-discovers the UPS ("apc") and labels series ups="apc".
       - job_name: nut
-        metrics_path: /ups_metrics
-        params:
-          ups: [apc]
+        metrics_path: /nut
         static_configs:
-          - targets: ['nut-exporter.monitoring.svc.cluster.local:9199']
-            labels:
-              ups: apc
+          - targets: ['192.168.1.172:3493']
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: nut-exporter.monitoring.svc.cluster.local:9995
         metric_relabel_configs:
           - target_label: cluster
             replacement: homelab

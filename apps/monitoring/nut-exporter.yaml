@@ -1,15 +1,12 @@
-# ── NUT (Network UPS Tools) Prometheus exporter ───────────────────────────────
-# Scrapes the APC Back-UPS BX1600MI exposed by the NUT server running on the
-# out-of-cluster tasks node (192.168.1.172:3493). NUT allows anonymous reads by
-# default, so no credentials are required here.
+# ── NUT (Network UPS Tools) Prometheus exporter — HON95 ───────────────────────
+# Exposes the APC Back-UPS BX1600MI from the NUT server on the out-of-cluster
+# tasks node (192.168.1.172:3493). NUT allows anonymous reads, so no creds here.
 #
-# Metrics are published under the `network_ups_tools_` namespace, e.g.
-#   network_ups_tools_battery_charge
-#   network_ups_tools_battery_runtime      (seconds)
-#   network_ups_tools_input_voltage
-#   network_ups_tools_ups_load
-#   network_ups_tools_battery_voltage
-#   network_ups_tools_ups_status{flag="OL"}  (1/0 per status flag)
+# This is HON95's exporter (multi-target model): it does NOT hold a fixed NUT
+# server. Prometheus passes the NUT server as a ?target= query param on each
+# scrape (see the `nut` job in prometheus.yaml). Metrics use the `nut_` prefix:
+#   nut_battery_charge, nut_load, nut_status, nut_input_voltage_volts,
+#   nut_battery_runtime_seconds, nut_battery_voltage_volts, nut_ups_info, ...
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -35,14 +32,15 @@ spec:
         fsGroup: 65534
       containers:
         - name: nut-exporter
-          image: ghcr.io/druggeri/nut_exporter:3.3.0
-          args:
-            - --nut.server=192.168.1.172
-            - --nut.serverport=3493
-            # Include battery.runtime (not in the exporter's default var set).
-            - --nut.vars_enable=battery.charge,battery.runtime,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load,ups.status
+          image: hon95/prometheus-nut-exporter:1
+          env:
+            # Defaults shown; metrics path stays /nut (matches the scrape job).
+            - name: HTTP_PORT
+              value: "9995"
+            - name: RUST_LOG
+              value: info
           ports:
-            - containerPort: 9199
+            - containerPort: 9995
               name: metrics
           resources:
             requests:
@@ -52,14 +50,12 @@ spec:
               cpu: 100m
               memory: 64Mi
           readinessProbe:
-            httpGet:
-              path: /metrics
+            tcpSocket:
               port: metrics
             initialDelaySeconds: 5
             periodSeconds: 15
           livenessProbe:
-            httpGet:
-              path: /metrics
+            tcpSocket:
               port: metrics
             initialDelaySeconds: 15
             periodSeconds: 30
@@ -81,5 +77,5 @@ spec:
     app: nut-exporter
   ports:
     - name: metrics
-      port: 9199
+      port: 9995
       targetPort: metrics
