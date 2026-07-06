@@ -77,7 +77,7 @@ spec:
       containers:
         # ── API + front-end + migrations + cron registration ─────────────────
         - name: server
-          image: twentycrm/twenty:v2.18.0
+          image: twentycrm/twenty:v2.18.5
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -135,7 +135,7 @@ spec:
             failureThreshold: 6
         # ── Background worker (job queue: sync, workflows, email, etc.) ───────
         - name: worker
-          image: twentycrm/twenty:v2.18.0
+          image: twentycrm/twenty:v2.18.5
           imagePullPolicy: IfNotPresent
           command: ["yarn", "worker:prod"]
           env:
