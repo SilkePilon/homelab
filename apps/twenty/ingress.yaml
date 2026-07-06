@@ -1,0 +1,29 @@
+# ── Traefik Ingress ──────────────────────────────────────────────────────────
+# Exposes Twenty at http://twenty.local via the k3s built-in Traefik.
+# Add to /etc/hosts on any machine you browse from:
+#   <k3s-node-ip>  twenty.local
+#
+# IMPORTANT: whatever host you use here MUST equal SERVER_URL in deployment.yaml.
+# For real use, put TLS in front (Traefik + cert-manager or a wildcard cert)
+# and switch both this host and SERVER_URL to https:// — Twenty relies on a
+# secure context for some browser features (e.g. clipboard/copy buttons).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: twenty
+  namespace: twenty
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: twenty.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: twenty
+                port:
+                  name: http

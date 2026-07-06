@@ -1,0 +1,51 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: twenty
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Twenty CRM — self-hosted, open-source CRM.
+#   Docs: https://docs.twenty.com/developers/self-host
+#
+# Topology:
+#   twenty        Deployment  server + worker (one pod, shared local storage)
+#   twenty-db     Deployment  PostgreSQL 16   (records / source of truth)
+#   twenty-redis  Deployment  Redis 7         (BullMQ job queue + cache)
+#
+# BEFORE applying this stack — create the namespace + secret (NOT in git):
+#
+#   kubectl create namespace twenty
+#
+#   PG_PASS="$(openssl rand -hex 24)"
+#   kubectl create secret generic twenty-secret -n twenty \
+#     --from-literal=APP_SECRET="$(openssl rand -base64 32)" \
+#     --from-literal=ENCRYPTION_KEY="$(openssl rand -base64 32)" \
+#     --from-literal=PG_DATABASE_PASSWORD="$PG_PASS" \
+#     --from-literal=PG_DATABASE_URL="postgres://postgres:${PG_PASS}@twenty-db:5432/default"
+#
+#   Back up ENCRYPTION_KEY + APP_SECRET. Losing ENCRYPTION_KEY makes every
+#   secret stored in the database permanently unreadable.
+#
+# THEN:
+#   1. Edit deployment.yaml SERVER_URL + ingress.yaml host to your hostname.
+#   2. Add `<k3s-node-ip>  twenty.local` to /etc/hosts where you browse from.
+#   3. Open http://twenty.local — the FIRST account you create becomes the
+#      workspace admin (single-workspace mode; new signups then close).
+#   4. Further config (SMTP, Google/Microsoft OAuth, S3) is done in-app under
+#      Settings -> Admin Panel -> Configuration Variables.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - postgres.yaml
+  - redis.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false

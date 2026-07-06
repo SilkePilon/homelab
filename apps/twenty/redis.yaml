@@ -1,0 +1,79 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Redis — used by Twenty for the BullMQ job queue and caching.
+# Service DNS (in-namespace): twenty-redis  ->  REDIS_URL=redis://twenty-redis:6379
+#
+# maxmemory-policy=noeviction matches Twenty's official compose: queued jobs
+# must never be evicted under memory pressure (Redis returns errors instead,
+# which is the safe behaviour for a job queue).
+#
+# The queue is transient working state, so an emptyDir is used — a pod restart
+# clears in-flight jobs, which Twenty tolerates. Give it a PVC if you want
+# stronger durability.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twenty-redis
+  namespace: twenty
+  labels:
+    app.kubernetes.io/name: twenty-redis
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: twenty-redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: twenty-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          args: ["--maxmemory-policy", "noeviction"]
+          ports:
+            - name: redis
+              containerPort: 6379
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 30
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: twenty-redis
+  namespace: twenty
+  labels:
+    app.kubernetes.io/name: twenty-redis
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: twenty-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis

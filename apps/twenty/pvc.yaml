@@ -1,0 +1,29 @@
+---
+# PostgreSQL data (records live here — this is the CRM's source of truth).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: twenty-postgres-data
+  namespace: twenty
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Twenty server local file storage (uploaded attachments, avatars, etc.).
+# Shared by the server + worker containers of the same pod.
+# NOTE: for production/multi-node scale, switch STORAGE_TYPE to S_3 (see
+# deployment.yaml) so files no longer depend on this node-local volume.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: twenty-server-data
+  namespace: twenty
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
