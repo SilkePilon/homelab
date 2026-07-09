@@ -1,0 +1,86 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# MariaDB 11 — InvoiceNinja's primary datastore.
+# Service DNS: invoiceninja-mariadb.invoiceninja.svc.cluster.local
+#              (referenced as `invoiceninja-mariadb` inside the namespace)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: invoiceninja-mariadb
+  namespace: invoiceninja
+  labels:
+    app.kubernetes.io/name: invoiceninja-mariadb
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: invoiceninja-mariadb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: invoiceninja-mariadb
+    spec:
+      containers:
+        - name: mariadb
+          image: mariadb:11
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: mysql
+              containerPort: 3306
+          env:
+            - name: MARIADB_DATABASE
+              value: invoiceninja
+            - name: MARIADB_USER
+              value: invoiceninja
+            - name: MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: invoiceninja-secret
+                  key: DB_PASSWORD
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: invoiceninja-secret
+                  key: MARIADB_ROOT_PASSWORD
+          volumeMounts:
+            - name: mariadb-data
+              mountPath: /var/lib/mysql
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mariadb-admin ping -u invoiceninja -p"$MARIADB_PASSWORD" --silent
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 6
+      volumes:
+        - name: mariadb-data
+          persistentVolumeClaim:
+            claimName: invoiceninja-mariadb-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: invoiceninja-mariadb
+  namespace: invoiceninja
+  labels:
+    app.kubernetes.io/name: invoiceninja-mariadb
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: invoiceninja-mariadb
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql

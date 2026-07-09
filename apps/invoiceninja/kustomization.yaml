@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: invoiceninja
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BEFORE applying this stack:
+#
+#  1. Create the namespace and the secret (NOT committed to git):
+#       kubectl create namespace invoiceninja
+#       kubectl create secret generic invoiceninja-secret \
+#         --from-literal=APP_KEY="base64:$(openssl rand -base64 32)" \
+#         --from-literal=DB_PASSWORD="$(openssl rand -hex 16)" \
+#         --from-literal=MARIADB_ROOT_PASSWORD="$(openssl rand -hex 16)" \
+#         -n invoiceninja
+#
+#     APP_KEY is the Laravel encryption key. Back it up — changing it will
+#     break all encrypted data (client credentials, tokens, etc.).
+#
+#  2. In CF Zero Trust → Tunnel → Public Hostnames, add:
+#       Subdomain: invoice   Domain: aethero.studio
+#       Service:   HTTP  http://traefik.kube-system.svc.cluster.local:80
+#
+#  3. Navigate to https://invoice.aethero.studio to complete first-time setup
+#     (create your admin account and first company).
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - mariadb.yaml
+  - nginx-config.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
