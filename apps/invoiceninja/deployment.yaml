@@ -51,7 +51,7 @@ spec:
         # the nginx sidecar can serve static assets from the correct root.
         - name: init-public
           image: invoiceninja/invoiceninja-debian:5
-          command: ["/bin/sh", "-c", "cp -r /var/www/app/public/. /init-public/"]
+          command: ["/bin/sh", "-c", "cp -r /var/www/html/public/. /init-public/"]
           volumeMounts:
             - name: app-public
               mountPath: /init-public
@@ -105,7 +105,7 @@ spec:
                   key: IN_PASSWORD
           volumeMounts:
             - name: invoiceninja-storage
-              mountPath: /var/www/app/storage
+              mountPath: /var/www/html/storage
           resources:
             requests:
               cpu: 200m
@@ -123,9 +123,9 @@ spec:
               containerPort: 80
           volumeMounts:
             - name: app-public
-              mountPath: /var/www/app/public
+              mountPath: /var/www/html/public
             - name: invoiceninja-storage
-              mountPath: /var/www/app/storage
+              mountPath: /var/www/html/storage
               readOnly: true
             - name: nginx-config
               mountPath: /etc/nginx/conf.d/default.conf

@@ -8,7 +8,7 @@ data:
     server {
         listen 80;
         server_name _;
-        root /var/www/app/public;
+        root /var/www/html/public;
         index index.php index.html;
 
         charset utf-8;
@@ -25,7 +25,7 @@ data:
         location ~ \.php$ {
             fastcgi_pass 127.0.0.1:9000;
             fastcgi_index index.php;
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            fastcgi_param SCRIPT_FILENAME /var/www/html/public$fastcgi_script_name;
             include fastcgi_params;
             fastcgi_read_timeout 300;
             fastcgi_buffer_size 128k;
