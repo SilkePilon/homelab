@@ -1,12 +1,17 @@
 # ── Traefik Ingress ──────────────────────────────────────────────────────────
-# Exposes Twenty at http://twenty.local via the k3s built-in Traefik.
-# Add to /etc/hosts on any machine you browse from:
-#   <k3s-node-ip>  twenty.local
+# Exposes Twenty via Cloudflare Tunnel → Traefik → this Service.
 #
-# IMPORTANT: whatever host you use here MUST equal SERVER_URL in deployment.yaml.
-# For real use, put TLS in front (Traefik + cert-manager or a wildcard cert)
-# and switch both this host and SERVER_URL to https:// — Twenty relies on a
-# secure context for some browser features (e.g. clipboard/copy buttons).
+# Cloudflare Tunnel terminates TLS at the edge (HTTPS to the world, HTTP
+# inside the cluster). The tunnel's public hostname must match `host:` below
+# AND SERVER_URL in deployment.yaml.
+#
+# To switch from .local → real domain:
+#   1. Set host below to e.g. twenty.yourdomain.com
+#   2. Update SERVER_URL in deployment.yaml to https://twenty.yourdomain.com
+#   3. In CF Zero Trust → Tunnel → Public Hostnames, point twenty.yourdomain.com
+#      at HTTP http://traefik.kube-system.svc.cluster.local:80
+#
+# For LAN-only access you can still add twenty.yourdomain.com to /etc/hosts.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -17,7 +22,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: twenty.local
+    - host: twenty.aethero.studio  # <-- replace with your real hostname
       http:
         paths:
           - path: /

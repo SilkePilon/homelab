@@ -1,0 +1,74 @@
+# ── cloudflared Deployment ────────────────────────────────────────────────────
+# Runs Cloudflare Tunnel daemon. Connects OUTBOUND to Cloudflare's edge —
+# no open ports or firewall rules required on your router.
+#
+# Prerequisites (one-time, done outside this repo):
+#   1. Cloudflare Zero Trust dashboard → Networks → Tunnels → Create a tunnel
+#      Name it e.g. "homelab". Choose "Docker" install method.
+#   2. Copy the tunnel token shown in the install command.
+#   3. On your cluster, create the Secret (NOT committed to git):
+#
+#        kubectl create secret generic cloudflared-token \
+#          --namespace cloudflared \
+#          --from-literal=token=<PASTE_TOKEN_HERE>
+#
+#   4. In the tunnel's "Public Hostnames" tab, add one entry per app:
+#        Subdomain: twenty   Domain: yourdomain.com
+#        Service:   HTTP     URL: traefik.kube-system.svc.cluster.local:80
+#        (repeat for each app — they all point at Traefik)
+#
+#   5. Update each app's Ingress `host:` field from *.local to the real hostname
+#      (see apps/twenty/ingress.yaml for an example).
+#
+# Scaling: 2 replicas for HA — each connects independently to CF edge.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: cloudflared
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      containers:
+        - name: cloudflared
+          image: cloudflare/cloudflared:latest
+          args:
+            - tunnel
+            - --no-autoupdate
+            - run
+            - --token
+            - $(TUNNEL_TOKEN)
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflared-token
+                  key: token
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      restartPolicy: Always

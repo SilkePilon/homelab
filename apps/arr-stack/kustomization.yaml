@@ -67,6 +67,7 @@ resources:
   - gluetun-proxy.yaml
   - questarr.yaml
   - scraparr.yaml
+  - ingress.yaml
 
 labels:
   - pairs:

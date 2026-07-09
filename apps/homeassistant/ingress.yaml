@@ -1,0 +1,34 @@
+# ── Traefik Ingress ──────────────────────────────────────────────────────────
+# Exposes Home Assistant via Cloudflare Tunnel → Traefik → homeassistant Service.
+#
+# NOTE: The HA pod uses hostNetwork: true for local device discovery (mDNS,
+# SSDP). Traefik still routes via the ClusterIP Service, which selects the pod
+# by label regardless of hostNetwork.
+#
+# In CF Zero Trust → Tunnel → Public Hostnames, add:
+#   Subdomain: ha   Domain: yourdomain.com
+#   Service:   HTTP http://traefik.kube-system.svc.cluster.local:80
+#
+# SECURITY: Consider protecting HA behind Cloudflare Access (ZT → Access →
+# Applications) — it has no built-in SSO and is a high-value target.
+# Replace yourdomain.com with your actual domain.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: homeassistant
+  namespace: homeassistant
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: ha.silkepilon.dev  # <-- replace with your real hostname
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: homeassistant
+                port:
+                  name: http

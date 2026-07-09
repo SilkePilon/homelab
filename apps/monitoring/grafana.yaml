@@ -160,9 +160,10 @@ spec:
       targetPort: web
 ---
 # ── Traefik Ingress ────────────────────────────────────────────────────────────
-# Update spec.rules[0].host to your homelab domain / hostname.
-# Add to /etc/hosts on any machine you want to access it from:
-#   <k3s-node-ip>  grafana.local
+# Exposes Grafana via Cloudflare Tunnel → Traefik → this Service.
+# In CF Zero Trust → Tunnel → Public Hostnames, point grafana.yourdomain.com
+# at HTTP http://traefik.kube-system.svc.cluster.local:80
+# Replace yourdomain.com with your actual domain.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -173,7 +174,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: grafana.local
+    - host: grafana.silkepilon.dev  # <-- replace with your real hostname
       http:
         paths:
           - path: /

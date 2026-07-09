@@ -1,0 +1,32 @@
+# ── Traefik Ingress ──────────────────────────────────────────────────────────
+# Exposes n8n via Cloudflare Tunnel → Traefik → n8n Service.
+#
+# IMPORTANT: After updating the host here, also update WEBHOOK_URL and
+# N8N_EDITOR_BASE_URL in deployment.yaml to https://<host> so that webhooks
+# and the editor work correctly over the tunnel.
+#
+# In CF Zero Trust → Tunnel → Public Hostnames, add:
+#   Subdomain: n8n   Domain: yourdomain.com
+#   Service:   HTTP  http://traefik.kube-system.svc.cluster.local:80
+#
+# Replace yourdomain.com with your actual domain.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: n8n
+  namespace: n8n
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: n8n.silkepilon.dev  # <-- replace with your real hostname
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: n8n
+                port:
+                  name: http

@@ -1,0 +1,119 @@
+# ── Traefik Ingresses — arr-stack ────────────────────────────────────────────
+# Exposes each arr-stack app via Cloudflare Tunnel → Traefik → Service.
+#
+# In CF Zero Trust → Tunnel → Public Hostnames, add one entry per app:
+#   sonarr.yourdomain.com    → HTTP traefik.kube-system.svc.cluster.local:80
+#   radarr.yourdomain.com    → HTTP traefik.kube-system.svc.cluster.local:80
+#   lidarr.yourdomain.com    → HTTP traefik.kube-system.svc.cluster.local:80
+#   qbit.yourdomain.com      → HTTP traefik.kube-system.svc.cluster.local:80
+#   questarr.yourdomain.com  → HTTP traefik.kube-system.svc.cluster.local:80
+#
+# SECURITY: These apps have no built-in auth or have weak auth by default.
+# Strongly recommended to protect them with Cloudflare Access (ZT → Access →
+# Applications) before exposing publicly.
+# Replace yourdomain.com with your actual domain throughout.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sonarr
+  namespace: arr-stack
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: sonarr.silkepilon.dev  # <-- replace with your real hostname
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sonarr
+                port:
+                  name: webui
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: radarr
+  namespace: arr-stack
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: radarr.silkepilon.dev  # <-- replace with your real hostname
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: radarr
+                port:
+                  name: webui
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lidarr
+  namespace: arr-stack
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: lidarr.silkepilon.dev  # <-- replace with your real hostname
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lidarr
+                port:
+                  name: webui
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qbittorrent
+  namespace: arr-stack
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: qbit.silkepilon.dev  # <-- replace with your real hostname
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: qbittorrent
+                port:
+                  name: webui
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: questarr
+  namespace: arr-stack
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: questarr.silkepilon.dev  # <-- replace with your real hostname
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: questarr
+                port:
+                  name: webui
