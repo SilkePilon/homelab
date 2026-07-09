@@ -36,6 +36,7 @@ resources:
   - namespace.yaml
   - pvc.yaml
   - mariadb.yaml
+  - nginx-config.yaml
   - deployment.yaml
   - service.yaml
   - ingress.yaml

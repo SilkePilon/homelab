@@ -2,14 +2,17 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # InvoiceNinja v5 Deployment
 #
-# Image: invoiceninja/invoiceninja-debian
-#   The current (non-deprecated) image. Nginx, PHP-FPM and Chrome are all
-#   bundled — no sidecar or initContainer required.
+# Image: invoiceninja/invoiceninja-debian (PHP-FPM on port 9000)
+#   The debian image runs PHP-FPM only — an nginx sidecar serves HTTP on 80
+#   and proxies PHP requests to FPM on 127.0.0.1:9000.
+#
+# An initContainer seeds the shared `app-public` emptyDir from the image so
+# nginx has access to the document root (public/).
 #
 # First-run account seeding:
 #   IN_USER_EMAIL / IN_PASSWORD are read on first startup to auto-create the
-#   admin account. After the pod has started once, these env vars are safe
-#   to remove (the account is stored in the DB).
+#   admin account. After the pod has started once these env vars are safe to
+#   remove (the account is stored in the DB).
 #
 # BEFORE applying:
 #   1. kubectl create namespace invoiceninja
@@ -21,9 +24,6 @@
 #          --from-literal=IN_USER_EMAIL="devsilkepilon@gmail.com" \
 #          --from-literal=IN_PASSWORD="<your-password>" \
 #          -n invoiceninja
-#
-# APP_KEY is the Laravel encryption key — back it up; changing it breaks
-# all encrypted data (client data, tokens, etc.).
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -34,7 +34,6 @@ metadata:
     app.kubernetes.io/name: invoiceninja
 spec:
   replicas: 1
-  # ReadWriteOnce PVC — only one writer at a time.
   strategy:
     type: Recreate
   selector:
@@ -46,21 +45,26 @@ spec:
         app.kubernetes.io/name: invoiceninja
     spec:
       securityContext:
-        fsGroup: 33  # www-data — ensures PVC is writable by the app
+        fsGroup: 33  # www-data
+      initContainers:
+        # Copy the public/ directory from the image into a shared emptyDir so
+        # the nginx sidecar can serve static assets from the correct root.
+        - name: init-public
+          image: invoiceninja/invoiceninja-debian:5
+          command: ["/bin/sh", "-c", "cp -r /var/www/app/public/. /init-public/"]
+          volumeMounts:
+            - name: app-public
+              mountPath: /init-public
       containers:
+        # ── PHP-FPM app (port 9000) ───────────────────────────────────────────
         - name: app
-          # invoiceninja-debian bundles nginx + PHP-FPM + Chrome in one image.
           image: invoiceninja/invoiceninja-debian:5
           imagePullPolicy: IfNotPresent
-          ports:
-            - name: http
-              containerPort: 80
           env:
             - name: APP_ENV
               value: production
             - name: APP_DEBUG
               value: "false"
-            # Must match the public hostname used by Cloudflare Tunnel.
             - name: APP_URL
               value: "https://invoice.aethero.studio"
             - name: APP_KEY
@@ -81,19 +85,14 @@ spec:
                 secretKeyRef:
                   name: invoiceninja-secret
                   key: DB_PASSWORD
-            # CF Tunnel terminates TLS; internal traffic is plain HTTP.
             - name: REQUIRE_HTTPS
               value: "false"
-            # Trust all upstream proxies (Traefik + CF Tunnel).
             - name: TRUSTED_PROXIES
               value: "*"
             - name: LOG_CHANNEL
               value: stderr
-            # sync: no separate queue worker needed for a homelab.
             - name: QUEUE_CONNECTION
               value: sync
-            # Auto-seed the initial admin account on first startup.
-            # Safe to remove after first successful boot.
             - name: IN_USER_EMAIL
               valueFrom:
                 secretKeyRef:
@@ -114,15 +113,44 @@ spec:
             limits:
               cpu: "2"
               memory: 1Gi
+
+        # ── Nginx sidecar (port 80) ─────────────────────────────────────────────
+        - name: nginx
+          image: nginx:1.27-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+            - name: app-public
+              mountPath: /var/www/app/public
+            - name: invoiceninja-storage
+              mountPath: /var/www/app/storage
+              readOnly: true
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 128Mi
           readinessProbe:
             httpGet:
               path: /
               port: http
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 15
-            failureThreshold: 6
+            failureThreshold: 8
 
       volumes:
+        - name: app-public
+          emptyDir: {}
         - name: invoiceninja-storage
           persistentVolumeClaim:
             claimName: invoiceninja-storage
+        - name: nginx-config
+          configMap:
+            name: invoiceninja-nginx-config
