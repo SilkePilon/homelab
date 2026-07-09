@@ -85,11 +85,10 @@ spec:
           env:
             - name: NODE_PORT
               value: "3000"
-            # External URL users hit in the browser. MUST match how Twenty is
-            # reached (see ingress.yaml). Use https:// once you add TLS —
-            # some browser features (clipboard) require a secure context.
+            # External URL users hit in the browser. MUST match the public
+            # hostname configured in the Cloudflare Tunnel and ingress.yaml.
             - name: SERVER_URL
-              value: "http://twenty.local"
+              value: "https://twenty.aethero.studio"
             - name: REDIS_URL
               value: "redis://twenty-redis:6379"
             - name: STORAGE_TYPE
@@ -140,7 +139,7 @@ spec:
           command: ["yarn", "worker:prod"]
           env:
             - name: SERVER_URL
-              value: "http://twenty.local"
+              value: "https://twenty.aethero.studio"
             - name: REDIS_URL
               value: "redis://twenty-redis:6379"
             - name: STORAGE_TYPE
