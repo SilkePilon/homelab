@@ -13,10 +13,15 @@ namespace: invoiceninja
 #         --from-literal=APP_KEY="base64:$(openssl rand -base64 32)" \
 #         --from-literal=DB_PASSWORD="$(openssl rand -hex 16)" \
 #         --from-literal=MARIADB_ROOT_PASSWORD="$(openssl rand -hex 16)" \
+#         --from-literal=ADMIN_EMAIL="devsilkepilon@gmail.com" \
+#         --from-literal=ADMIN_PASSWORD="<your-password-here>" \
 #         -n invoiceninja
 #
 #     APP_KEY is the Laravel encryption key. Back it up — changing it will
 #     break all encrypted data (client credentials, tokens, etc.).
+#
+#     Use ADMIN_EMAIL + ADMIN_PASSWORD when the setup wizard asks you to
+#     create the first admin account at https://invoice.aethero.studio/setup.
 #
 #  2. In CF Zero Trust → Tunnel → Public Hostnames, add:
 #       Subdomain: invoice   Domain: aethero.studio

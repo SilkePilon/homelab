@@ -96,6 +96,14 @@ spec:
               value: sync
             - name: PDF_GENERATOR
               value: snappdf
+            # Admin account credentials — used during the first-run setup
+            # wizard at /setup. Not read by the app automatically; keep here
+            # as a reference so the values are stored in the secret.
+            - name: ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: invoiceninja-secret
+                  key: ADMIN_EMAIL
           volumeMounts:
             - name: invoiceninja-storage
               mountPath: /var/www/app/storage
