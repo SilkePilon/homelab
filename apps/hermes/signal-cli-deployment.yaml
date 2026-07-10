@@ -11,7 +11,9 @@
 # Architecture:
 #   initContainer  — downloads signal-cli v0.14.5 JVM tarball from GitHub if not
 #                    already present in the PVC (cached by a version marker file).
-#   main container — eclipse-temurin:25-jre runs the signal-cli daemon.
+#   main container — eclipse-temurin:25-jre runs a startup script that checks
+#                    whether the account is registered; if not, sleeps so you can
+#                    exec in to link/register. If registered, starts the daemon.
 #
 # ── ONE-TIME DEVICE LINKING ──────────────────────────────────────────────────
 # Before the daemon can run, signal-cli must be linked as a secondary device
@@ -108,8 +110,14 @@ spec:
 
       containers:
         # ── signal-cli HTTP daemon ─────────────────────────────────────────────
-        # Requires the account to be linked first (see ONE-TIME DEVICE LINKING
-        # above). If not linked yet, the pod crashes — that is expected.
+        # The startup script checks whether the account has already been linked.
+        # • NOT linked → prints setup instructions and sleeps indefinitely.
+        #   The pod stays Running so you can exec in to complete registration.
+        # • Already linked → starts the HTTP daemon normally.
+        #
+        # No liveness probe: we never want Kubernetes to restart the pod during
+        # the interactive setup phase. The readiness probe marks the pod as
+        # not-ready until the daemon is actually up.
         - name: signal-cli
           image: eclipse-temurin:25-jre
           imagePullPolicy: IfNotPresent
@@ -117,12 +125,41 @@ spec:
             - sh
             - -c
             - |
-              exec /data/dist/bin/signal-cli \
-                --config /data/.local/share/signal-cli \
-                --account "$(SIGNAL_ACCOUNT)" \
-                daemon \
-                --http 0.0.0.0:8080 \
-                --no-receive-stdout
+              CONFIG_DIR="/data/.local/share/signal-cli"
+              ACCOUNT_FILE="${CONFIG_DIR}/data/${SIGNAL_ACCOUNT}/account.db"
+
+              if [ -f "$ACCOUNT_FILE" ]; then
+                echo "Account ${SIGNAL_ACCOUNT} found — starting daemon..."
+                exec /data/dist/bin/signal-cli \
+                  --config "$CONFIG_DIR" \
+                  --account "$SIGNAL_ACCOUNT" \
+                  daemon \
+                  --http 0.0.0.0:8080 \
+                  --no-receive-stdout
+              else
+                echo "================================================================"
+                echo "signal-cli: account ${SIGNAL_ACCOUNT} is NOT registered yet."
+                echo ""
+                echo "Exec into this pod and run ONE of the following:"
+                echo ""
+                echo "  kubectl exec -n hermes -it deployment/signal-cli -- sh"
+                echo ""
+                echo "  # Option A — link as secondary device (you already use Signal"
+                echo "  # on another phone/desktop and want to add HermesBot there):"
+                echo "  /data/dist/bin/signal-cli --config $CONFIG_DIR link -n HermesBot"
+                echo "  # → scan the printed tsdevice:// URI in your Signal app"
+                echo "  # → Settings → Linked Devices → tap + → paste/scan URI"
+                echo ""
+                echo "  # Option B — register +E.164 as a brand-new Signal account"
+                echo "  # (the number must NOT already be a Signal account elsewhere):"
+                echo "  /data/dist/bin/signal-cli --config $CONFIG_DIR -a $SIGNAL_ACCOUNT register"
+                echo "  /data/dist/bin/signal-cli --config $CONFIG_DIR -a $SIGNAL_ACCOUNT verify <SMS_CODE>"
+                echo ""
+                echo "After completing either option, restart the deployment:"
+                echo "  kubectl rollout restart deployment/signal-cli -n hermes"
+                echo "================================================================"
+                sleep infinity
+              fi
           env:
             - name: SIGNAL_ACCOUNT
               valueFrom:
@@ -142,6 +179,7 @@ spec:
             limits:
               cpu: "1"
               memory: 512Mi
+          # No liveness probe — must not restart the pod during interactive setup.
           readinessProbe:
             httpGet:
               path: /api/v1/check
@@ -149,13 +187,6 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 15
             failureThreshold: 5
-          livenessProbe:
-            httpGet:
-              path: /api/v1/check
-              port: http
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            failureThreshold: 4
 
       volumes:
         - name: data
