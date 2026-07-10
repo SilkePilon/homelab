@@ -3,18 +3,22 @@
 # Hermes Agent Deployment
 # Image: nousresearch/hermes-agent  (Docker Hub)
 #
-# Two containers share the hermes-data PVC (/opt/data = ~/.hermes):
+# The image uses s6-overlay (/init) as its process supervisor. A single
+# container runs both the gateway and dashboard as s6-managed services.
+# Do NOT override the entrypoint — /init handles everything.
 #
-#   gateway    — the core AI agent process. Reads inbound Signal messages from
-#                signal-cli via SSE, calls the configured LLM, sends replies.
-#   dashboard  — optional web UI on port 9119 to manage profiles, keys, and
-#                view conversations.  Bind address changed to 0.0.0.0 so the
-#                K8s Service can reach it (upstream default is 127.0.0.1).
+# CMD = ["gateway", "run"] is passed through main-wrapper.sh as
+# `hermes gateway run`, which runs the messaging gateway in the foreground
+# (the correct mode for Docker / Kubernetes).
 #
-# ⚠️  Security: the dashboard stores LLM API keys and has no built-in auth.
-#     Protect it with Cloudflare Access or keep it off the public internet.
-#     The Traefik ingress routes to it via the Cloudflare Tunnel — make sure
-#     you enable Cloudflare Access (Zero Trust) on hermes.yourdomain.com.
+# The dashboard s6 service starts automatically when HERMES_DASHBOARD=1
+# and requires basic-auth credentials via:
+#   HERMES_DASHBOARD_BASIC_AUTH_USERNAME + HERMES_DASHBOARD_BASIC_AUTH_PASSWORD
+# (HERMES_DASHBOARD_INSECURE was removed in June 2026 — it no longer works)
+#
+# The image manages its own UID remapping via HERMES_UID/HERMES_GID.
+# Do NOT set runAsNonRoot — the container starts as root and drops privileges
+# itself via s6 cont-init scripts.
 #
 # ── PREREQUISITE SECRET ──────────────────────────────────────────────────────
 # Create this before applying (see kustomization.yaml for the full command):
@@ -22,16 +26,15 @@
 #   kubectl create secret generic hermes-secret -n hermes \
 #     --from-literal=SIGNAL_ACCOUNT="+1234567890" \
 #     --from-literal=SIGNAL_ALLOWED_USERS="+1234567890" \
+#     --from-literal=HERMES_DASHBOARD_BASIC_AUTH_USERNAME="admin" \
+#     --from-literal=HERMES_DASHBOARD_BASIC_AUTH_PASSWORD="changeme" \
 #     --from-literal=OPENROUTER_API_KEY="sk-or-..."
 #
-# ── LLM PROVIDER ─────────────────────────────────────────────────────────────
-# The secret env vars below follow Hermes' own naming conventions.
-# Add whichever provider key you use:
-#   OPENROUTER_API_KEY   → openrouter.ai
-#   ANTHROPIC_API_KEY    → api.anthropic.com
-#   OPENAI_API_KEY       → api.openai.com
-#   GEMINI_API_KEY       → Google AI Studio
-# The model is configured in ~/.hermes/config.yaml on first run.
+# ── FIRST-RUN SETUP ──────────────────────────────────────────────────────────
+# After the pod is running, run the Signal gateway setup wizard once:
+#
+#   kubectl exec -n hermes -it deployment/hermes -- hermes gateway setup
+#
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -42,8 +45,6 @@ metadata:
     app.kubernetes.io/name: hermes
 spec:
   replicas: 1
-  # Recreate: hermes-data PVC is ReadWriteOnce; both containers in this pod
-  # mount it, so there can only ever be one pod at a time.
   strategy:
     type: Recreate
   selector:
@@ -54,15 +55,9 @@ spec:
       labels:
         app.kubernetes.io/name: hermes
     spec:
-      # Hermes runs as UID 10000 (HERMES_UID default in docker-compose).
-      # fsGroup ensures the PVC is writable by that UID on first mount.
-      securityContext:
-        fsGroup: 10000
-
+      # No securityContext — image starts as root and remaps UID internally.
       initContainers:
         # Wait for signal-cli to be ready before starting the gateway.
-        # Avoids a race where the gateway tries to connect before signal-cli
-        # has finished loading its account data on first boot.
         - name: wait-for-signal-cli
           image: alpine:3.20
           imagePullPolicy: IfNotPresent
@@ -84,16 +79,36 @@ spec:
               memory: 32Mi
 
       containers:
-        # ── Gateway — core agent process ──────────────────────────────────────
-        - name: gateway
+        - name: hermes
           image: nousresearch/hermes-agent:latest
           imagePullPolicy: Always
+          # main-wrapper.sh routes unknown first args to `hermes <args>`,
+          # so ["gateway", "run"] becomes `hermes gateway run` — the correct
+          # foreground mode for containers.
           command: ["gateway", "run"]
           env:
             - name: HERMES_UID
-              value: "10000"
+              value: "1000"
             - name: HERMES_GID
-              value: "10000"
+              value: "1000"
+            # Enable the s6-supervised dashboard service
+            - name: HERMES_DASHBOARD
+              value: "1"
+            - name: HERMES_DASHBOARD_HOST
+              value: "0.0.0.0"
+            - name: HERMES_DASHBOARD_PORT
+              value: "9119"
+            # Dashboard basic-auth (required since June 2026 — insecure mode removed)
+            - name: HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secret
+                  key: HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+            - name: HERMES_DASHBOARD_BASIC_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secret
+                  key: HERMES_DASHBOARD_BASIC_AUTH_PASSWORD
             # Signal integration
             - name: SIGNAL_HTTP_URL
               value: "http://signal-cli:8080"
@@ -133,6 +148,9 @@ spec:
                   name: hermes-secret
                   key: GEMINI_API_KEY
                   optional: true
+          ports:
+            - name: dashboard
+              containerPort: 9119
           volumeMounts:
             - name: hermes-data
               mountPath: /opt/data
@@ -143,44 +161,18 @@ spec:
             limits:
               cpu: "2"
               memory: 2Gi
-
-        # ── Dashboard — web UI on port 9119 ───────────────────────────────────
-        # ⚠️  See security warning in header — protect with Cloudflare Access.
-        - name: dashboard
-          image: nousresearch/hermes-agent:latest
-          imagePullPolicy: Always
-          # 0.0.0.0 instead of 127.0.0.1 so the K8s Service can reach it.
-          command: ["dashboard", "--host", "0.0.0.0", "--no-open"]
-          env:
-            - name: HERMES_UID
-              value: "10000"
-            - name: HERMES_GID
-              value: "10000"
-          ports:
-            - name: dashboard
-              containerPort: 9119
-          volumeMounts:
-            - name: hermes-data
-              mountPath: /opt/data
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: "1"
-              memory: 512Mi
           readinessProbe:
             httpGet:
               path: /
               port: dashboard
-            initialDelaySeconds: 20
+            initialDelaySeconds: 30
             periodSeconds: 15
             failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /
               port: dashboard
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 30
             failureThreshold: 4
 
