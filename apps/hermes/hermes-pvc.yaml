@@ -1,0 +1,20 @@
+# ── Hermes data PVC ───────────────────────────────────────────────────────────
+# Mounted at /opt/data inside the hermes containers (gateway + dashboard).
+# Equivalent to ~/.hermes in the upstream docker-compose setup.
+#
+# Contains: agent profiles, config.yaml, .env (LLM keys after first run),
+# session history, tool outputs, and Playwright browser cache.
+#
+# BACK UP THIS PVC. Losing it means losing all agent configuration,
+# conversation history, and any locally cached data.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hermes-data
+  namespace: hermes
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

@@ -1,0 +1,19 @@
+# ── signal-cli Service ────────────────────────────────────────────────────────
+# ClusterIP on port 8080 — reachable as http://signal-cli:8080 by Hermes.
+# Not exposed outside the cluster (no ingress needed; this is backend only).
+apiVersion: v1
+kind: Service
+metadata:
+  name: signal-cli
+  namespace: hermes
+  labels:
+    app.kubernetes.io/name: signal-cli
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: signal-cli
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP

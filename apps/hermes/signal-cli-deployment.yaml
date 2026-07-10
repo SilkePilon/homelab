@@ -1,0 +1,163 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# signal-cli Deployment
+#
+# Runs signal-cli in HTTP daemon mode so Hermes Agent can connect to it.
+# signal-cli listens on 0.0.0.0:8080 and exposes:
+#   GET  /api/v1/check              — health check
+#   GET  /api/v1/events?account=... — SSE stream of inbound messages
+#   POST /api/v1/rpc                — JSON-RPC 2.0 for sending messages
+#
+# Architecture:
+#   initContainer  — downloads signal-cli v0.14.5 JVM tarball from GitHub if not
+#                    already present in the PVC (cached by a version marker file).
+#   main container — eclipse-temurin:21-jre runs the signal-cli daemon.
+#
+# ── ONE-TIME DEVICE LINKING ──────────────────────────────────────────────────
+# Before the daemon can run, signal-cli must be linked as a secondary device
+# on your Signal account (like Signal Web / Signal Desktop).
+#
+# 1. Apply this stack first (pod will crash-loop until linked — that is expected).
+#
+# 2. Once the initContainer has downloaded signal-cli (check logs), exec in:
+#
+#      kubectl exec -n hermes -it deployment/signal-cli -- sh
+#
+# 3. Inside the pod, run the linking command:
+#
+#      /data/dist/bin/signal-cli \
+#        --config /data/.local/share/signal-cli \
+#        link -n "HermesBot"
+#
+#    signal-cli prints a tsdevice:// URI.  Open Signal on your phone →
+#    Settings → Linked Devices → tap + → paste the URI or scan the QR code.
+#
+# 4. After linking succeeds, restart the deployment:
+#
+#      kubectl rollout restart deployment/signal-cli -n hermes
+#
+#    The pod now starts the HTTP daemon successfully and Hermes can connect.
+#
+# ── PREREQUISITE SECRET ──────────────────────────────────────────────────────
+#   kubectl create secret generic hermes-secret -n hermes \
+#     --from-literal=SIGNAL_ACCOUNT="+1234567890"
+#   (the full hermes-secret also contains LLM keys — see kustomization.yaml)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signal-cli
+  namespace: hermes
+  labels:
+    app.kubernetes.io/name: signal-cli
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: signal-cli
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: signal-cli
+    spec:
+      initContainers:
+        # ── Download signal-cli if not already present ────────────────────────
+        # Uses a version-marker file so the 102 MB tarball is only downloaded
+        # once and re-downloaded only when SIGNAL_CLI_VERSION changes.
+        - name: download-signal-cli
+          image: alpine:3.20
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              SIGNAL_CLI_VERSION="0.14.5"
+              DIST_DIR="/data/dist"
+              MARKER="${DIST_DIR}/.version-${SIGNAL_CLI_VERSION}"
+
+              if [ -f "$MARKER" ]; then
+                echo "signal-cli ${SIGNAL_CLI_VERSION} already present, skipping download."
+                exit 0
+              fi
+
+              echo "Downloading signal-cli ${SIGNAL_CLI_VERSION} (this takes ~30 s on first boot)..."
+              mkdir -p "$DIST_DIR"
+              wget -q \
+                "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}.tar.gz" \
+                -O /tmp/signal-cli.tar.gz
+
+              echo "Extracting..."
+              rm -rf "${DIST_DIR:?}"/*
+              tar xzf /tmp/signal-cli.tar.gz -C "$DIST_DIR" --strip-components=1
+              chmod +x "$DIST_DIR/bin/signal-cli"
+              touch "$MARKER"
+              echo "Done. signal-cli $SIGNAL_CLI_VERSION installed at $DIST_DIR/bin/signal-cli"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+      containers:
+        # ── signal-cli HTTP daemon ─────────────────────────────────────────────
+        # Requires the account to be linked first (see ONE-TIME DEVICE LINKING
+        # above). If not linked yet, the pod crashes — that is expected.
+        - name: signal-cli
+          image: eclipse-temurin:21-jre
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              exec /data/dist/bin/signal-cli \
+                --config /data/.local/share/signal-cli \
+                --account "$(SIGNAL_ACCOUNT)" \
+                daemon \
+                --http 0.0.0.0:8080 \
+                --no-receive-stdout
+          env:
+            - name: SIGNAL_ACCOUNT
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secret
+                  key: SIGNAL_ACCOUNT
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /api/v1/check
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /api/v1/check
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 4
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: signal-cli-data
