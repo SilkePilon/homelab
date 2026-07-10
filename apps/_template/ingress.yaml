@@ -1,0 +1,32 @@
+# ── <APP_NAME> Ingress ─────────────────────────────────────────────────────────
+# Traefik IngressRoute (the ingress controller shipped with k3s).
+# Traffic flow: Cloudflare Tunnel → Traefik → Service → Pod
+#
+# In the Cloudflare Zero Trust dashboard add:
+#   Public Hostname → Subdomain: <APP_NAME>   Domain: <YOUR_DOMAIN>
+#   Service         → HTTP      http://traefik.kube-system.svc.cluster.local:80
+#
+# Remove this file (and its reference in kustomization.yaml) for
+# internal-only services that should never be exposed externally.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: <APP_NAME>
+  namespace: <APP_NAME>
+  annotations:
+    # Tell Traefik which entrypoint to use. "web" = HTTP (port 80).
+    # Use "websecure" if you want Traefik to handle TLS directly.
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: <APP_NAME>.<YOUR_DOMAIN>   # ← replace, e.g. myapp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: <APP_NAME>
+                port:
+                  name: http
