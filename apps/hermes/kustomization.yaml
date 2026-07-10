@@ -22,12 +22,14 @@ namespace: hermes
 #
 # STEP 2 — Create the secret (NOT committed to git)
 #   Provide your Signal phone number in E.164 format (e.g. +1234567890).
-#   Add ONE of the LLM provider keys below (the ones you do not use are
-#   optional and can be omitted entirely from the secret).
+#   Dashboard basic-auth is required (insecure mode was removed June 2026).
+#   Add ONE of the LLM provider keys below.
 #
 #   kubectl create secret generic hermes-secret -n hermes \
 #     --from-literal=SIGNAL_ACCOUNT="+1234567890" \
 #     --from-literal=SIGNAL_ALLOWED_USERS="+1234567890" \
+#     --from-literal=HERMES_DASHBOARD_BASIC_AUTH_USERNAME="admin" \
+#     --from-literal=HERMES_DASHBOARD_BASIC_AUTH_PASSWORD="changeme" \
 #     --from-literal=OPENROUTER_API_KEY="sk-or-..."
 #     # OR: --from-literal=ANTHROPIC_API_KEY="sk-ant-..."
 #     # OR: --from-literal=OPENAI_API_KEY="sk-..."
@@ -61,7 +63,7 @@ namespace: hermes
 #   kubectl logs -n hermes -l app.kubernetes.io/name=signal-cli -f
 #
 #   # Hermes gateway connected to Signal:
-#   kubectl logs -n hermes -l app.kubernetes.io/name=hermes -c gateway -f
+#   kubectl logs -n hermes -l app.kubernetes.io/name=hermes -f
 #
 #   # Send yourself a test message in Signal and Hermes should respond.
 #
