@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: <APP_NAME>
+
+# ─────────────────────────────────────────────────────────────────────────────
+# <APP_NAME> — one-line description of what this app does.
+#
+# BEFORE applying this stack:
+#
+#  1. Create the namespace:
+#       kubectl create namespace <APP_NAME>
+#
+#  2. Create the secret (NOT committed to git):
+#       kubectl create secret generic <APP_NAME>-secret -n <APP_NAME> \
+#         --from-literal=SOME_KEY="value"
+#
+#  3. Edit deployment.yaml and ingress.yaml — replace every <PLACEHOLDER>.
+#
+#  4. Add a Cloudflare Tunnel public hostname entry:
+#       Subdomain: <APP_NAME>   Domain: yourdomain.com
+#       Service:   HTTP         http://traefik.kube-system.svc.cluster.local:80
+#
+#  5. Apply:
+#       kubectl apply -k apps/<APP_NAME>/
+#     or let Argo CD sync automatically after merging to main.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml        # remove if the app is stateless
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml    # remove if the app should not be exposed externally
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false

@@ -1,0 +1,18 @@
+# ── <APP_NAME> PVC ─────────────────────────────────────────────────────────────
+# Persistent storage for <APP_NAME>.
+# Remove this file (and the reference in kustomization.yaml) for stateless apps.
+#
+# Change the storage size to match the app's needs:
+#   - Databases / media stores: 10Gi – 100Gi
+#   - Config / light data:       1Gi –   5Gi
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: <APP_NAME>-data
+  namespace: <APP_NAME>
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

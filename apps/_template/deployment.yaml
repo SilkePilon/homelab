@@ -1,0 +1,90 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# <APP_NAME> Deployment
+# Image: <IMAGE>:<TAG>          ← pin to a specific release tag, not :latest
+# Port:  <PORT>
+# Data:  <MOUNT_PATH>           ← where the app stores state (PVC mount)
+#
+# BEFORE applying:
+#   1. Create the namespace and secret (see kustomization.yaml).
+#   2. Replace every <PLACEHOLDER> below.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: <APP_NAME>
+  namespace: <APP_NAME>
+  labels:
+    app.kubernetes.io/name: <APP_NAME>
+spec:
+  replicas: 1
+  # Recreate is required when the PVC is ReadWriteOnce (local-path default).
+  # Change to RollingUpdate only if the app supports multiple concurrent writers
+  # OR if you are using a ReadWriteMany storage class.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: <APP_NAME>
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: <APP_NAME>
+    spec:
+      # Set fsGroup to the UID the app runs as so the PVC is writable on first mount.
+      # Remove securityContext if the app runs as root (not recommended).
+      securityContext:
+        fsGroup: <APP_UID>      # ← replace, e.g. 1000
+        runAsUser: <APP_UID>    # ← replace, e.g. 1000
+        runAsNonRoot: true
+      containers:
+        - name: <APP_NAME>
+          image: <IMAGE>:<TAG>
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: <PORT>
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+            # Plain (non-secret) config values go here as literal env vars.
+            # - name: SOME_CONFIG
+            #   value: "some-value"
+
+            # Secret values — pulled from the <APP_NAME>-secret Secret.
+            # Create the secret first (see kustomization.yaml).
+            # - name: SOME_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: <APP_NAME>-secret
+            #       key: SOME_KEY
+          volumeMounts:
+            - name: data
+              mountPath: <MOUNT_PATH>   # ← replace, e.g. /data or /config
+          resources:
+            # Tune these to the app's actual usage. Start conservative and
+            # raise limits if you see OOMKills or CPU throttling.
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /          # ← replace with a real health endpoint if available
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /          # ← replace with a real health endpoint if available
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 4
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: <APP_NAME>-data

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: <APP_NAME>
+  namespace: <APP_NAME>
+  labels:
+    app.kubernetes.io/name: <APP_NAME>
+spec:
+  # ClusterIP — only reachable inside the cluster (via Ingress / port-forward).
+  # Change to NodePort or LoadBalancer if you need direct external access,
+  # but prefer Ingress + Cloudflare Tunnel instead.
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: <APP_NAME>
+  ports:
+    - name: http
+      port: 80
+      targetPort: http    # matches the containerPort name in deployment.yaml
