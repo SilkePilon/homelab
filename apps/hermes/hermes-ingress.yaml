@@ -1,0 +1,33 @@
+# ── Traefik Ingress ──────────────────────────────────────────────────────────
+# Exposes the Hermes dashboard via Cloudflare Tunnel → Traefik → Service.
+#
+# ⚠️  SECURITY: The dashboard has no built-in authentication and stores
+#     your LLM API keys. You MUST protect it with Cloudflare Access:
+#       Zero Trust → Access → Applications → Add an application
+#       Set policy: Allow → Emails matching your domain
+#
+# In CF Zero Trust → Tunnel → Public Hostnames, add:
+#   Subdomain: hermes   Domain: yourdomain.com
+#   Service:   HTTP     http://traefik.kube-system.svc.cluster.local:80
+#
+# Replace hermes.aethero.studio below with your actual hostname.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hermes
+  namespace: hermes
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: hermes.silkepilon.dev # <-- replace with your real hostname
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hermes
+                port:
+                  name: dashboard

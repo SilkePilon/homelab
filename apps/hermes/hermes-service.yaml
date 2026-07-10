@@ -1,0 +1,19 @@
+# ── Hermes dashboard Service ───────────────────────────────────────────────────
+# ClusterIP on port 9119 — routes to the dashboard container.
+# Traefik picks this up via hermes-ingress.yaml.
+apiVersion: v1
+kind: Service
+metadata:
+  name: hermes
+  namespace: hermes
+  labels:
+    app.kubernetes.io/name: hermes
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: hermes
+  ports:
+    - name: dashboard
+      port: 9119
+      targetPort: dashboard
+      protocol: TCP

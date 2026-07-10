@@ -1,0 +1,100 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: hermes
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Hermes Agent + Signal CLI
+#   Docs:   https://github.com/NousResearch/hermes-agent
+#   Signal: https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/messaging/signal.md
+#
+# Topology:
+#   signal-cli   Deployment   signal-cli v0.14.5 HTTP daemon on :8080
+#                             (Java-based Signal client, acts as a linked device)
+#   hermes       Deployment   gateway (AI agent) + dashboard (web UI) in one pod
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# BEFORE applying this stack — follow these steps in order:
+#
+# STEP 1 — Create the namespace
+#   kubectl create namespace hermes
+#
+# STEP 2 — Create the secret (NOT committed to git)
+#   Provide your Signal phone number in E.164 format (e.g. +1234567890).
+#   Add ONE of the LLM provider keys below (the ones you do not use are
+#   optional and can be omitted entirely from the secret).
+#
+#   kubectl create secret generic hermes-secret -n hermes \
+#     --from-literal=SIGNAL_ACCOUNT="+1234567890" \
+#     --from-literal=SIGNAL_ALLOWED_USERS="+1234567890" \
+#     --from-literal=OPENROUTER_API_KEY="sk-or-..."
+#     # OR: --from-literal=ANTHROPIC_API_KEY="sk-ant-..."
+#     # OR: --from-literal=OPENAI_API_KEY="sk-..."
+#     # OR: --from-literal=GEMINI_API_KEY="AI..."
+#
+#   Back this up.  SIGNAL_ACCOUNT is also used by signal-cli to start the daemon.
+#
+# STEP 3 — Apply the manifests
+#   kubectl apply -k apps/hermes/
+#
+# STEP 4 — Wait for signal-cli to download its binary (first boot only, ~30 s)
+#   kubectl logs -n hermes -l app.kubernetes.io/name=signal-cli -c download-signal-cli -f
+#
+# STEP 5 — Link signal-cli as a secondary Signal device (ONE TIME)
+#   The signal-cli pod will be in CrashLoopBackOff until linked — this is normal.
+#   Watch the pod come up after the initContainer finishes, then exec in:
+#
+#   kubectl exec -n hermes -it deployment/signal-cli -- \
+#     sh -c '/data/dist/bin/signal-cli \
+#       --config /data/.local/share/signal-cli \
+#       link -n "HermesBot"'
+#
+#   signal-cli prints a tsdevice:// URI.
+#   Open Signal on your phone → Settings → Linked Devices → tap + → paste URI.
+#
+# STEP 6 — Restart signal-cli so the daemon starts
+#   kubectl rollout restart deployment/signal-cli -n hermes
+#
+# STEP 7 — Verify everything is connected
+#   # signal-cli daemon is up:
+#   kubectl logs -n hermes -l app.kubernetes.io/name=signal-cli -f
+#
+#   # Hermes gateway connected to Signal:
+#   kubectl logs -n hermes -l app.kubernetes.io/name=hermes -c gateway -f
+#
+#   # Send yourself a test message in Signal and Hermes should respond.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# DASHBOARD ACCESS
+#   The Hermes dashboard is exposed at https://hermes.aethero.studio (update
+#   hermes-ingress.yaml with your real domain).
+#
+#   ⚠️  Enable Cloudflare Access on this hostname BEFORE pointing your tunnel
+#   at it — the dashboard stores LLM API keys and has no built-in auth.
+#   Zero Trust → Access → Applications → Add → Self-hosted
+#   Set policy: Allow emails matching your domain.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# CONFIGURE HERMES MODEL (after first login to dashboard)
+#   hermes model                           # interactive model selector
+#   # or edit ~/.hermes/config.yaml directly via:
+#   kubectl exec -n hermes -it deployment/hermes -c gateway -- \
+#     sh -c 'cat /opt/data/config.yaml'
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - signal-cli-pvc.yaml
+  - signal-cli-deployment.yaml
+  - signal-cli-service.yaml
+  - hermes-pvc.yaml
+  - hermes-deployment.yaml
+  - hermes-service.yaml
+  - hermes-ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false

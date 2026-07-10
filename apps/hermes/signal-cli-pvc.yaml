@@ -1,0 +1,18 @@
+# ── signal-cli data PVC ────────────────────────────────────────────────────────
+# Stores two things:
+#   /data/dist/     — signal-cli JVM distribution (downloaded by initContainer)
+#   /data/.local/   — signal-cli account credentials + message database
+#
+# The credentials are sensitive: treat this PVC like a password store.
+# Back up /data/.local/share/signal-cli/ before re-provisioning.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: signal-cli-data
+  namespace: hermes
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
