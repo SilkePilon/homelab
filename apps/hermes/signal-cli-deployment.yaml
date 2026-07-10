@@ -11,7 +11,7 @@
 # Architecture:
 #   initContainer  — downloads signal-cli v0.14.5 JVM tarball from GitHub if not
 #                    already present in the PVC (cached by a version marker file).
-#   main container — eclipse-temurin:21-jre runs the signal-cli daemon.
+#   main container — eclipse-temurin:25-jre runs the signal-cli daemon.
 #
 # ── ONE-TIME DEVICE LINKING ──────────────────────────────────────────────────
 # Before the daemon can run, signal-cli must be linked as a secondary device
@@ -111,7 +111,7 @@ spec:
         # Requires the account to be linked first (see ONE-TIME DEVICE LINKING
         # above). If not linked yet, the pod crashes — that is expected.
         - name: signal-cli
-          image: eclipse-temurin:21-jre
+          image: eclipse-temurin:25-jre
           imagePullPolicy: IfNotPresent
           command:
             - sh
