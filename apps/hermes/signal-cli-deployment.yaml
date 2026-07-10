@@ -126,9 +126,12 @@ spec:
             - -c
             - |
               CONFIG_DIR="/data/.local/share/signal-cli"
-              ACCOUNT_FILE="${CONFIG_DIR}/data/${SIGNAL_ACCOUNT}/account.db"
 
-              if [ -f "$ACCOUNT_FILE" ]; then
+              # Account data lives at a numeric path (e.g. 951476.d/), NOT at the
+              # phone number. Check accounts.json which always exists once registered.
+              ACCOUNTS_JSON="${CONFIG_DIR}/data/accounts.json"
+
+              if [ -f "$ACCOUNTS_JSON" ]; then
                 echo "Account ${SIGNAL_ACCOUNT} found — starting daemon..."
                 exec /data/dist/bin/signal-cli \
                   --config "$CONFIG_DIR" \
@@ -138,24 +141,25 @@ spec:
                   --no-receive-stdout
               else
                 echo "================================================================"
-                echo "signal-cli: account ${SIGNAL_ACCOUNT} is NOT registered yet."
+                echo "signal-cli: no accounts.json found — account not yet registered."
+                echo "Expected: $ACCOUNTS_JSON"
                 echo ""
                 echo "Exec into this pod and run ONE of the following:"
                 echo ""
                 echo "  kubectl exec -n hermes -it deployment/signal-cli -- sh"
                 echo ""
-                echo "  # Option A — link as secondary device (you already use Signal"
-                echo "  # on another phone/desktop and want to add HermesBot there):"
+                echo "  # Option A — link as secondary device (you already have Signal"
+                echo "  # on a phone and just want to add HermesBot as a linked device):"
                 echo "  /data/dist/bin/signal-cli --config $CONFIG_DIR link -n HermesBot"
-                echo "  # → scan the printed tsdevice:// URI in your Signal app"
-                echo "  # → Settings → Linked Devices → tap + → paste/scan URI"
+                echo "  # → scan the printed URI with Signal app:"
+                echo "  # → Settings → Linked Devices → tap + → paste URI"
                 echo ""
-                echo "  # Option B — register +E.164 as a brand-new Signal account"
-                echo "  # (the number must NOT already be a Signal account elsewhere):"
+                echo "  # Option B — register a brand-new Signal account on this number"
+                echo "  # (only if +31... is NOT already used as a Signal account elsewhere):"
                 echo "  /data/dist/bin/signal-cli --config $CONFIG_DIR -a $SIGNAL_ACCOUNT register"
                 echo "  /data/dist/bin/signal-cli --config $CONFIG_DIR -a $SIGNAL_ACCOUNT verify <SMS_CODE>"
                 echo ""
-                echo "After completing either option, restart the deployment:"
+                echo "After finishing, restart:"
                 echo "  kubectl rollout restart deployment/signal-cli -n hermes"
                 echo "================================================================"
                 sleep infinity
