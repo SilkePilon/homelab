@@ -44,7 +44,7 @@ spec:
       containers:
         - name: n8n
           image: docker.n8n.io/n8nio/n8n:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 5678
@@ -68,11 +68,11 @@ spec:
               mountPath: /home/node/.n8n
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 500m
+              memory: 1Gi
             limits:
-              cpu: "1"
-              memory: 512Mi
+              cpu: "4"
+              memory: 4Gi
           readinessProbe:
             httpGet:
               path: /healthz
