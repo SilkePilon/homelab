@@ -62,7 +62,7 @@ spec:
             # Set this to your cluster's hostname/IP so webhooks resolve correctly.
             # Example: http://n8n.local or http://192.168.1.x:5678
             - name: WEBHOOK_URL
-              value: "http://n8n.local:5678"
+              value: "https://n8n.silkepilon.dev/"
           volumeMounts:
             - name: data
               mountPath: /home/node/.n8n
