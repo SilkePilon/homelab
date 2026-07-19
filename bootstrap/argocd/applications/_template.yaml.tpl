@@ -1,5 +1,7 @@
 # ── Argo CD Application — <APP_NAME> ──────────────────────────────────────────
 # Copy this file to bootstrap/argocd/applications/<APP_NAME>.yaml and replace
+# (the .tpl suffix keeps the root app-of-apps from trying to apply the
+# placeholders as a real Application — the copy must end in .yaml)
 # every <PLACEHOLDER>. Then commit and push — Argo CD will pick it up
 # automatically (it watches this directory via the app-of-apps root.yaml).
 #

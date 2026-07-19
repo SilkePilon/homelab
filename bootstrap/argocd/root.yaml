@@ -15,6 +15,9 @@ spec:
     path: bootstrap/argocd/applications
     directory:
       recurse: true
+      # Belt and braces: the template carries <PLACEHOLDER> names that are not
+      # valid RFC 1123 subdomains, so it must never reach the API server.
+      exclude: "_template.*"
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
