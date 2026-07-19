@@ -114,10 +114,10 @@ spec:
           resources:
             requests:
               cpu: 250m
-              memory: 768Mi
+              memory: 1Gi
             limits:
               cpu: "2"
-              memory: 2Gi
+              memory: 4Gi
           readinessProbe:
             httpGet:
               path: /healthz
@@ -170,10 +170,10 @@ spec:
           resources:
             requests:
               cpu: 200m
-              memory: 512Mi
+              memory: 768Mi
             limits:
               cpu: "1"
-              memory: 1536Mi
+              memory: 3Gi
       volumes:
         - name: server-local-data
           persistentVolumeClaim:
