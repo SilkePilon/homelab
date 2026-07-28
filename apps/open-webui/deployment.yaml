@@ -95,17 +95,30 @@ spec:
             limits:
               cpu: "2"
               memory: 4Gi
+          # First boot runs the full Alembic migration chain and downloads the
+          # all-MiniLM-L6-v2 embedding model from HuggingFace (~40s on a good
+          # connection, much longer on a bad one). Uvicorn does not accept
+          # connections until that finishes, so /health refuses connections
+          # for the whole window. The startupProbe absorbs it and holds the
+          # other two probes off until the app answers — without it, liveness
+          # would kill the pod mid-download and restart the loop.
+          # 60 × 10s = 10 minutes of grace. The model cache lands on the PVC,
+          # so later restarts pass on the first try.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
           readinessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 20
             periodSeconds: 15
           livenessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 60
             periodSeconds: 30
       volumes:
         - name: data

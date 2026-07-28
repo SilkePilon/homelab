@@ -39,9 +39,12 @@ bootstrap/argocd/applications/open-webui.yaml
 
 - Image `ghcr.io/open-webui/open-webui:v0.11.0`, container port 8080.
 - One replica, `strategy: Recreate` — the PVC is ReadWriteOnce, so two pods cannot both write.
-- Probes hit `/health`: readiness 20s initial / 15s period, liveness 60s / 30s. Matches n8n's
-  cadence; the app is slow to become ready on first boot because it initialises its SQLite
-  schema.
+- Probes all hit `/health`. A `startupProbe` (10s period, 60 failures = 10 minutes of grace)
+  gates readiness and liveness. First boot runs the whole Alembic migration chain and downloads
+  the embedding model from HuggingFace, and uvicorn refuses connections until that completes —
+  measured at roughly 45 seconds. Without the startupProbe, liveness would begin at 60s and
+  could kill the pod mid-download, restarting the download from scratch each time. Readiness
+  polls every 15s, liveness every 30s, both only after startup succeeds.
 - `runAsUser: 0`, `fsGroup: 0`. The upstream image ships as root and its `start.sh` writes to
   `/app/backend/data` and to the chroma cache under `$HOME`. Running non-root needs a rebuild
   with different UID/GID build args, which is out of scope.
