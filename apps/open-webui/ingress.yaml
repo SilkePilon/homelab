@@ -1,0 +1,29 @@
+# ── Traefik Ingress ──────────────────────────────────────────────────────────
+# Exposes Open WebUI via Cloudflare Tunnel → Traefik → open-webui Service.
+#
+# IMPORTANT: After changing the host here, also update WEBUI_URL in
+# deployment.yaml to https://<host>.
+#
+# In CF Zero Trust → Tunnel → Public Hostnames, add:
+#   Subdomain: webui   Domain: silkepilon.dev
+#   Service:   HTTP    http://traefik.kube-system.svc.cluster.local:80
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: open-webui
+  namespace: open-webui
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: webui.silkepilon.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: open-webui
+                port:
+                  name: http

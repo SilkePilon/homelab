@@ -1,0 +1,120 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Open WebUI Deployment
+# Image: ghcr.io/open-webui/open-webui
+# Port:  8080
+# Data:  /app/backend/data  (PVC open-webui-data)
+#
+# BEFORE applying:
+#   1. Create the namespace first:
+#        kubectl create namespace open-webui
+#   2. Then create the secret (NOT committed to git):
+#        kubectl create secret generic open-webui-secret -n open-webui \
+#          --from-literal=WEBUI_SECRET_KEY="$(openssl rand -hex 32)" \
+#          --from-literal=OPENAI_API_BASE_URL="https://openrouter.ai/api/v1" \
+#          --from-literal=OPENAI_API_KEY="sk-or-..."
+#
+# WEBUI_SECRET_KEY signs session tokens. If it is missing, the app generates a
+# fresh one on every container start and everyone is logged out on each
+# restart. Back it up.
+#
+# OPENAI_API_BASE_URL works with any OpenAI-compatible provider — OpenAI
+# itself (https://api.openai.com/v1), OpenRouter, a local vLLM, etc. Extra
+# connections can also be added later in the admin UI.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: open-webui
+  namespace: open-webui
+  labels:
+    app.kubernetes.io/name: open-webui
+spec:
+  replicas: 1
+  # Recreate: PVC is ReadWriteOnce; only one pod may write at a time.
+  # Scaling past 1 replica also needs external Postgres (DATABASE_URL) —
+  # the bundled SQLite database does not support multiple writers.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: open-webui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: open-webui
+    spec:
+      # The upstream image ships as root (UID 0) and its start.sh writes to
+      # /app/backend/data and to the chroma cache under $HOME. Running as a
+      # non-root user requires rebuilding the image with UID/GID build args.
+      securityContext:
+        fsGroup: 0
+        runAsUser: 0
+      containers:
+        - name: open-webui
+          image: ghcr.io/open-webui/open-webui:v0.11.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: TZ
+              value: "Etc/UTC"
+            # Public URL — used for links in share/notification flows.
+            - name: WEBUI_URL
+              value: "https://webui.silkepilon.dev"
+            # No Ollama in this cluster; stops the backend from repeatedly
+            # probing a non-existent endpoint and flooding the logs.
+            - name: ENABLE_OLLAMA_API
+              value: "false"
+            # Public hostname — keep registration closed.
+            # To create the FIRST (admin) account, temporarily flip this:
+            #   kubectl set env deploy/open-webui ENABLE_SIGNUP=true -n open-webui
+            # register at https://webui.silkepilon.dev, then let Argo CD's
+            # selfHeal revert it (or run: argocd app sync open-webui).
+            # The first account created automatically becomes the admin.
+            - name: ENABLE_SIGNUP
+              value: "false"
+            - name: WEBUI_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: open-webui-secret
+                  key: WEBUI_SECRET_KEY
+            - name: OPENAI_API_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: open-webui-secret
+                  key: OPENAI_API_BASE_URL
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: open-webui-secret
+                  key: OPENAI_API_KEY
+          volumeMounts:
+            - name: data
+              mountPath: /app/backend/data
+          resources:
+            requests:
+              cpu: 500m
+              # The bundled all-MiniLM-L6-v2 embedding model is loaded into
+              # memory the first time RAG is used.
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: open-webui-data

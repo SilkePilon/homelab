@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: open-webui
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BEFORE applying this stack:
+#
+#  1. Create the namespace and the secret (NOT committed to git):
+#       kubectl create namespace open-webui
+#       kubectl create secret generic open-webui-secret -n open-webui \
+#         --from-literal=WEBUI_SECRET_KEY="$(openssl rand -hex 32)" \
+#         --from-literal=OPENAI_API_BASE_URL="https://openrouter.ai/api/v1" \
+#         --from-literal=OPENAI_API_KEY="sk-or-..."
+#
+#     WEBUI_SECRET_KEY signs session tokens — back it up. If it changes,
+#     everyone is logged out.
+#
+#  2. Add the public hostname in Cloudflare Zero Trust (see ingress.yaml).
+#
+#  3. Create the admin account: signup is disabled by default, so flip it on
+#     once (see the ENABLE_SIGNUP comment in deployment.yaml), register, and
+#     let Argo CD's selfHeal turn it back off.
+#
+#  4. Upgrades: bump the image tag in deployment.yaml and commit. The tag is
+#     pinned on purpose so a pod restart never silently pulls a new major
+#     version on top of an existing database.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - service.yaml
+  - deployment.yaml
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
