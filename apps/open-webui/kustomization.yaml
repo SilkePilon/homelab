@@ -10,12 +10,10 @@ namespace: open-webui
 #  1. Create the namespace and the secret (NOT committed to git):
 #       kubectl create namespace open-webui
 #       kubectl create secret generic open-webui-secret -n open-webui \
-#         --from-literal=WEBUI_SECRET_KEY="$(openssl rand -hex 32)" \
-#         --from-literal=OPENAI_API_BASE_URL="https://openrouter.ai/api/v1" \
-#         --from-literal=OPENAI_API_KEY="sk-or-..."
+#         --from-literal=WEBUI_SECRET_KEY="$(openssl rand -hex 32)"
 #
 #     WEBUI_SECRET_KEY signs session tokens — back it up. If it changes,
-#     everyone is logged out.
+#     everyone is logged out. It is the only key this stack reads.
 #
 #  2. Add the public hostname in Cloudflare Zero Trust (see ingress.yaml).
 #
@@ -23,7 +21,10 @@ namespace: open-webui
 #     once (see the ENABLE_SIGNUP comment in deployment.yaml), register, and
 #     let Argo CD's selfHeal turn it back off.
 #
-#  4. Upgrades: bump the image tag in deployment.yaml and commit. The tag is
+#  4. Add model providers in the admin UI (Settings → Connections), not here.
+#     They live in the database on the PVC.
+#
+#  5. Upgrades: bump the image tag in deployment.yaml and commit. The tag is
 #     pinned on purpose so a pod restart never silently pulls a new major
 #     version on top of an existing database.
 # ─────────────────────────────────────────────────────────────────────────────

@@ -10,17 +10,20 @@
 #        kubectl create namespace open-webui
 #   2. Then create the secret (NOT committed to git):
 #        kubectl create secret generic open-webui-secret -n open-webui \
-#          --from-literal=WEBUI_SECRET_KEY="$(openssl rand -hex 32)" \
-#          --from-literal=OPENAI_API_BASE_URL="https://openrouter.ai/api/v1" \
-#          --from-literal=OPENAI_API_KEY="sk-or-..."
+#          --from-literal=WEBUI_SECRET_KEY="$(openssl rand -hex 32)"
 #
 # WEBUI_SECRET_KEY signs session tokens. If it is missing, the app generates a
 # fresh one on every container start and everyone is logged out on each
 # restart. Back it up.
 #
-# OPENAI_API_BASE_URL works with any OpenAI-compatible provider — OpenAI
-# itself (https://api.openai.com/v1), OpenRouter, a local vLLM, etc. Extra
-# connections can also be added later in the admin UI.
+# MODEL PROVIDERS are configured in the admin UI, not here — Admin Panel →
+# Settings → Connections. They are stored in the database on the PVC, so they
+# survive restarts. For Gemini, add an OpenAI-compatible connection:
+#   URL: https://generativelanguage.googleapis.com/v1beta/openai
+#   Key: <your Google AI Studio API key>
+# Deliberately no OPENAI_* env vars: those seed the same settings on first
+# boot and then take precedence over what the UI shows, which makes the UI
+# confusing to reason about.
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -80,16 +83,6 @@ spec:
                 secretKeyRef:
                   name: open-webui-secret
                   key: WEBUI_SECRET_KEY
-            - name: OPENAI_API_BASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: open-webui-secret
-                  key: OPENAI_API_BASE_URL
-            - name: OPENAI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: open-webui-secret
-                  key: OPENAI_API_KEY
           volumeMounts:
             - name: data
               mountPath: /app/backend/data

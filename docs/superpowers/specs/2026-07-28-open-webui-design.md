@@ -12,7 +12,7 @@ Argo CD like every other app in this repo.
 
 | Question | Decision |
 | --- | --- |
-| Model backend | External API only (`OPENAI_API_BASE_URL` + `OPENAI_API_KEY`). No Ollama in cluster. |
+| Model backend | Configured in the admin UI, not in the manifests. Gemini via its OpenAI-compatible endpoint. No Ollama in cluster. |
 | Signup | `ENABLE_SIGNUP=false`. Flipped on manually once to create the admin account. |
 | Storage | 5Gi PVC, `local-path`, ReadWriteOnce. |
 | Packaging | Plain Kustomize base, matching `apps/n8n`. Not Helm. |
@@ -57,8 +57,6 @@ bootstrap/argocd/applications/open-webui.yaml
 | --- | --- | --- |
 | `WEBUI_URL` | `https://webui.silkepilon.dev` | inline |
 | `WEBUI_SECRET_KEY` | random 32 bytes | secret `open-webui-secret` |
-| `OPENAI_API_BASE_URL` | e.g. `https://openrouter.ai/api/v1` | secret `open-webui-secret` |
-| `OPENAI_API_KEY` | provider key | secret `open-webui-secret` |
 | `ENABLE_SIGNUP` | `"false"` | inline |
 | `ENABLE_OLLAMA_API` | `"false"` | inline |
 | `TZ` | `Etc/UTC` | inline |
@@ -74,10 +72,25 @@ The secret is created out of band and never committed, the same convention as `n
 
 ```sh
 kubectl create secret generic open-webui-secret -n open-webui \
-  --from-literal=WEBUI_SECRET_KEY="$(openssl rand -hex 32)" \
-  --from-literal=OPENAI_API_BASE_URL="https://openrouter.ai/api/v1" \
-  --from-literal=OPENAI_API_KEY="sk-or-..."
+  --from-literal=WEBUI_SECRET_KEY="$(openssl rand -hex 32)"
 ```
+
+## Model providers
+
+No provider credentials live in the manifests. Connections are added in the running app —
+Admin Panel → Settings → Connections — and stored in the database on the PVC, so they survive
+restarts and Argo CD syncs.
+
+For Gemini, add an OpenAI-compatible connection:
+
+- URL: `https://generativelanguage.googleapis.com/v1beta/openai`
+- Key: a Google AI Studio API key
+
+`OPENAI_API_BASE_URL` / `OPENAI_API_KEY` are deliberately absent. Those env vars seed the same
+settings on first boot and then override the UI, which makes the visible configuration
+untrustworthy. One source of truth is better here, and the UI is the one the user actually
+touches. The trade-off accepted: provider config is not in git, and is restored from the PVC
+rather than from a sync.
 
 ## Networking
 
