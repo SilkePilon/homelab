@@ -39,7 +39,9 @@ metadata:
   labels:
     app.kubernetes.io/name: twenty
 spec:
-  replicas: 1
+  # MIGRATION IN PROGRESS — volume is being restored onto server-1 from the
+  # pi52 card recovery. Restored to 1 in the follow-up commit.
+  replicas: 0
   # Recreate: the shared .local-storage PVC is ReadWriteOnce.
   strategy:
     type: Recreate
@@ -52,6 +54,11 @@ spec:
         app.kubernetes.io/name: twenty
     spec:
       # Twenty's image runs as UID 1000; fsGroup makes the mounted PVC writable.
+      # pi52 (this workload's former node) failed: its SD card stopped
+      # completing writes. Data was recovered off the card and restored onto
+      # server-1, which is amd64 with a 474Gi SSD. See docs/pi52-recovery.md
+      nodeSelector:
+        kubernetes.io/hostname: server-1
       securityContext:
         fsGroup: 1000
       # Give Postgres a head start so the server's first migration run connects

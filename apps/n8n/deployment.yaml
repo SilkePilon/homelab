@@ -24,7 +24,9 @@ metadata:
   labels:
     app.kubernetes.io/name: n8n
 spec:
-  replicas: 1
+  # MIGRATION IN PROGRESS — volume is being restored onto server-1 from the
+  # pi52 card recovery. Restored to 1 in the follow-up commit.
+  replicas: 0
   # Recreate: PVC is ReadWriteOnce; only one pod may write at a time.
   strategy:
     type: Recreate
@@ -37,6 +39,11 @@ spec:
         app.kubernetes.io/name: n8n
     spec:
       # n8n runs as the built-in "node" user (UID 1000).
+      # pi52 (this workload's former node) failed: its SD card stopped
+      # completing writes. Data was recovered off the card and restored onto
+      # server-1, which is amd64 with a 474Gi SSD. See docs/pi52-recovery.md
+      nodeSelector:
+        kubernetes.io/hostname: server-1
       securityContext:
         fsGroup: 1000
         runAsUser: 1000
