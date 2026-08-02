@@ -42,17 +42,17 @@ subjects:
     name: prometheus
     namespace: monitoring
 ---
-# ── Promtail ──────────────────────────────────────────────────────────────────
+# ── Alloy (log collection — replaced Promtail, which is EOL) ──────────────────
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: promtail
+  name: alloy
   namespace: monitoring
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: monitoring-promtail
+  name: monitoring-alloy
 rules:
   - apiGroups: [""]
     resources:
@@ -67,14 +67,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: monitoring-promtail
+  name: monitoring-alloy
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: monitoring-promtail
+  name: monitoring-alloy
 subjects:
   - kind: ServiceAccount
-    name: promtail
+    name: alloy
     namespace: monitoring
 ---
 # ── kube-state-metrics ────────────────────────────────────────────────────────

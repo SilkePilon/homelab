@@ -41,7 +41,7 @@ resources:
   - prometheus.yaml
   - grafana.yaml
   - loki.yaml
-  - promtail.yaml
+  - alloy.yaml
   - node-exporter.yaml
   - kube-state-metrics.yaml
   - nut-exporter.yaml
