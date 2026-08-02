@@ -69,7 +69,7 @@ spec:
       initContainers:
         # Ensure /dev/net/tun exists before gluetun starts
         - name: init-tun
-          image: busybox:latest
+          image: busybox:1.38.0
           command:
             - sh
             - -c
@@ -82,7 +82,7 @@ spec:
       containers:
         # ── gluetun: ProtonVPN WireGuard tunnel ──────────────────────────────
         - name: gluetun
-          image: ghcr.io/qdm12/gluetun:latest
+          image: ghcr.io/qdm12/gluetun:v3.41.3
           imagePullPolicy: IfNotPresent
           securityContext:
             capabilities:
@@ -175,7 +175,7 @@ spec:
               memory: 1Gi
         # ── qBittorrent ───────────────────────────────────────────────────────
         - name: qbittorrent
-          image: lscr.io/linuxserver/qbittorrent:latest
+          image: lscr.io/linuxserver/qbittorrent:5.2.3_v2.0.13-ls469
           imagePullPolicy: IfNotPresent
           env:
             - name: PUID

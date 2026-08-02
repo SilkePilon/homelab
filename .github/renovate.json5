@@ -1,0 +1,57 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":timezone(Europe/Amsterdam)",
+    "helpers:pinGitHubActionDigests",
+  ],
+  dependencyDashboardTitle: "Renovate Dashboard 🤖",
+  commitMessageTopic: "{{depName}}",
+  commitMessageExtra: "to {{newVersion}}",
+  prConcurrentLimit: 5,
+  prHourlyLimit: 0,
+  ignorePaths: [
+    "bootstrap/argocd/applications/_template.yaml.tpl",
+  ],
+  kubernetes: {
+    managerFilePatterns: [
+      "/^apps/.+\\.ya?ml$/",
+      "/^bootstrap/.+\\.ya?ml$/",
+    ],
+  },
+  packageRules: [
+    {
+      description: "Group all linuxserver.io images",
+      matchDatasources: ["docker"],
+      matchPackageNames: ["lscr.io/linuxserver/**"],
+      groupName: "linuxserver.io",
+    },
+    {
+      description: "Group Grafana stack",
+      matchDatasources: ["docker"],
+      matchPackageNames: ["grafana/**"],
+      groupName: "grafana stack",
+    },
+    {
+      description: "Auto-merge digest pins and patch bumps",
+      matchDatasources: ["docker"],
+      matchUpdateTypes: ["digest", "patch"],
+      automerge: true,
+      automergeType: "branch",
+    },
+    {
+      description: "Pin digests for mutable tags so :latest is still tracked",
+      matchDatasources: ["docker"],
+      matchCurrentValue: "/^(latest|stable)$/",
+      pinDigests: true,
+    },
+    {
+      description: "Never auto-merge major bumps",
+      matchUpdateTypes: ["major"],
+      automerge: false,
+      labels: ["major-update"],
+    },
+  ],
+}

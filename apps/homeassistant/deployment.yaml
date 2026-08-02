@@ -1,7 +1,7 @@
 ---
 # ─────────────────────────────────────────────────────────────────────────────
 # Home Assistant Deployment
-# Image: ghcr.io/home-assistant/home-assistant:stable
+# Image: ghcr.io/home-assistant/home-assistant:2026.7.4
 # Port:  8123
 # Data:  /config  (PVC homeassistant-config)
 #
@@ -42,7 +42,7 @@ spec:
       # official image). Do not set runAsNonRoot here.
       containers:
         - name: homeassistant
-          image: ghcr.io/home-assistant/home-assistant:stable
+          image: ghcr.io/home-assistant/home-assistant:2026.7.4
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

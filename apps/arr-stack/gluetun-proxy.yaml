@@ -64,10 +64,10 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: rotate
-              image: bitnami/kubectl:latest
+              image: registry.k8s.io/kubectl:v1.36.3
               imagePullPolicy: IfNotPresent
-              command:
-                - kubectl
+              # entrypoint is /bin/kubectl — pass subcommand via args
+              args:
                 - rollout
                 - restart
                 - deployment/flaresolverr

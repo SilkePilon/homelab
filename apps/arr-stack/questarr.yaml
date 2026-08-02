@@ -35,7 +35,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: questarr
-          image: ghcr.io/doezer/questarr:latest
+          image: ghcr.io/doezer/questarr:v1.4.0
           imagePullPolicy: IfNotPresent
           env:
             - name: HOST
