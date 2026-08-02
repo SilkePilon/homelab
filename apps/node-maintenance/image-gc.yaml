@@ -1,0 +1,77 @@
+# ── Image garbage collection ──────────────────────────────────────────────────
+# Kubelet only prunes images once a node crosses imageGCHighThresholdPercent
+# (85% by default). On the Pis, 28-58Gi disks means the node sits at 60-70%
+# full for weeks holding images nothing runs any more. This prunes on a timer
+# instead of waiting for the threshold.
+#
+# A DaemonSet rather than a CronJob: a CronJob schedules one pod, and there is
+# no supported way to make it fan out across every node. This is a DaemonSet
+# with its own sleep loop, which is the standard shape for node maintenance.
+#
+# crictl on a k3s node is a symlink to the k3s binary and needs the k3s data
+# dir, so it cannot simply be mounted into a container. Instead the pod enters
+# the host namespaces with nsenter and runs the host's own crictl.
+#
+# See docs/node-storage.md for the kubelet threshold tuning that complements
+# this — that part has to be applied per node, outside GitOps.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: image-gc
+  namespace: node-maintenance
+spec:
+  selector:
+    matchLabels:
+      app: image-gc
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: image-gc
+    spec:
+      # Run everywhere, including the control plane
+      tolerations:
+        - operator: Exists
+      hostPID: true
+      containers:
+        - name: image-gc
+          image: busybox:1.38.0
+          command:
+            - sh
+            - -c
+            - |
+              set -u
+              INTERVAL="${INTERVAL_SECONDS}"
+              while true; do
+                echo "$(date -Iseconds) starting image prune on ${NODE_NAME}"
+                before=$(nsenter -t 1 -m -u -i -n -p -- crictl images -q 2>/dev/null | wc -l)
+                # Removes every image not referenced by an existing container.
+                # Images belonging to running pods are never touched.
+                if nsenter -t 1 -m -u -i -n -p -- crictl rmi --prune; then
+                  after=$(nsenter -t 1 -m -u -i -n -p -- crictl images -q 2>/dev/null | wc -l)
+                  echo "$(date -Iseconds) prune ok on ${NODE_NAME}: ${before} -> ${after} images"
+                else
+                  echo "$(date -Iseconds) prune FAILED on ${NODE_NAME}" >&2
+                fi
+                sleep "${INTERVAL}"
+              done
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            # Every 6 hours
+            - name: INTERVAL_SECONDS
+              value: "21600"
+          securityContext:
+            # nsenter into PID 1's mount/network/PID namespaces needs full
+            # privileges. This container runs one command and sleeps.
+            privileged: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
