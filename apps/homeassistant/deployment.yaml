@@ -22,9 +22,7 @@ metadata:
   labels:
     app.kubernetes.io/name: homeassistant
 spec:
-  # MIGRATION IN PROGRESS — volume is being restored onto server-1 from the
-  # pi52 card recovery. Restored to 1 in the follow-up commit.
-  replicas: 0
+  replicas: 1
   # Recreate: PVC is ReadWriteOnce.
   strategy:
     type: Recreate

@@ -24,9 +24,7 @@ metadata:
   labels:
     app.kubernetes.io/name: n8n
 spec:
-  # MIGRATION IN PROGRESS — volume is being restored onto server-1 from the
-  # pi52 card recovery. Restored to 1 in the follow-up commit.
-  replicas: 0
+  replicas: 1
   # Recreate: PVC is ReadWriteOnce; only one pod may write at a time.
   strategy:
     type: Recreate

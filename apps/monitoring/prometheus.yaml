@@ -215,11 +215,7 @@ metadata:
   name: prometheus
   namespace: monitoring
 spec:
-  # MIGRATION IN PROGRESS — moving off pi52, whose SD card sits at 100% io
-  # utilisation while sustaining only ~3 MB/s. Scaled to 0 so the local-path
-  # volume can be copied to server-1 consistently. Restored to 1 in the
-  # follow-up commit once the data is in place. See docs/monitoring-migration.md
-  replicas: 0
+  replicas: 1
   strategy:
     type: Recreate
   selector:
