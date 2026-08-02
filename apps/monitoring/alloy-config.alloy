@@ -1,0 +1,86 @@
+// ── Pod discovery ─────────────────────────────────────────────────────────
+discovery.kubernetes "pods" {
+  role = "pod"
+}
+
+discovery.relabel "pods" {
+  targets = discovery.kubernetes.pods.targets
+
+  // Drop pods that are not running
+  rule {
+    source_labels = ["__meta_kubernetes_pod_phase"]
+    regex         = "Pending|Succeeded|Failed|Completed"
+    action        = "drop"
+  }
+
+  // Propagate pod labels to log stream labels
+  rule {
+    action = "labelmap"
+    regex  = "__meta_kubernetes_pod_label_(.+)"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label  = "namespace"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label  = "pod"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_node_name"]
+    target_label  = "node"
+  }
+
+  // Build the host filesystem path to the container log file.
+  // k3s / containerd path: /var/log/pods/<ns>_<name>_<uid>/<container>/<n>.log
+  // Anchor on pod UID — it always appears at the end of the directory name,
+  // so *<uid>*/<container>/*.log reliably matches across all namespaces.
+  rule {
+    source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+    separator     = "/"
+    regex         = "(.+)/(.+)"
+    target_label  = "__path__"
+    replacement   = "/var/log/pods/*$1*/$2/*.log"
+  }
+}
+
+// ── Tail the discovered files ─────────────────────────────────────────────
+local.file_match "pods" {
+  path_targets = discovery.relabel.pods.output
+  sync_period  = "10s"
+}
+
+loki.source.file "pods" {
+  targets    = local.file_match.pods.targets
+  forward_to = [loki.process.pods.receiver]
+}
+
+// ── Parse and filter ──────────────────────────────────────────────────────
+loki.process "pods" {
+  // CRI format used by containerd (default in k3s)
+  stage.cri {}
+
+  // Silently drop old entries when Alloy first reads pre-existing log
+  // files. The bound is Loki's per-stream accept window, NOT its 168h
+  // retention: for a stream that already has chunks, anything older than
+  // max_chunk_age (1h here) behind the stream head is rejected with
+  //   400 ... 'entry too far behind, oldest acceptable timestamp is ...'
+  // Dropping locally at 55m keeps us just inside that window.
+  stage.drop {
+    older_than          = "55m"
+    drop_counter_reason = "too_old"
+  }
+
+  forward_to = [loki.write.loki.receiver]
+}
+
+// ── Ship to Loki ──────────────────────────────────────────────────────────
+loki.write "loki" {
+  endpoint {
+    url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+  }
+}

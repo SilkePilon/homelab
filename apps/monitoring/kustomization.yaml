@@ -34,6 +34,15 @@ namespace: monitoring
 #
 # ─────────────────────────────────────────────────────────────────────────────
 
+# The generated ConfigMap gets a content-hash name suffix, and Kustomize
+# rewrites the DaemonSet's volume reference to match. Editing the Alloy config
+# therefore rolls the DaemonSet automatically — a plain inline ConfigMap would
+# be updated in place and leave every pod running the old config.
+configMapGenerator:
+  - name: alloy-config
+    files:
+      - config.alloy=alloy-config.alloy
+
 resources:
   - namespace.yaml
   - rbac.yaml
