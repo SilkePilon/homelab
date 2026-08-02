@@ -71,10 +71,14 @@ data:
       // CRI format used by containerd (default in k3s)
       stage.cri {}
 
-      // Silently drop entries older than Loki's retention window (168h)
-      // to avoid 400 errors when Alloy first reads pre-existing log files.
+      // Silently drop old entries when Alloy first reads pre-existing log
+      // files. The bound is Loki's per-stream accept window, NOT its 168h
+      // retention: for a stream that already has chunks, anything older than
+      // max_chunk_age (1h here) behind the stream head is rejected with
+      //   400 ... 'entry too far behind, oldest acceptable timestamp is ...'
+      // Dropping locally at 55m keeps us just inside that window.
       stage.drop {
-        older_than          = "168h"
+        older_than          = "55m"
         drop_counter_reason = "too_old"
       }
 
