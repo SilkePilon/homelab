@@ -95,8 +95,16 @@ spec:
                 # https://github.com/qdm12/gluetun-wiki/blob/main/setup/advanced/kubernetes.md
                 command: ["/bin/sh", "-c", "(ip rule del table 51820; ip -6 rule del table 51820) || true"]
           env:
+            # Native ProtonVPN provider rather than a hardcoded custom endpoint.
+            # A Proton WireGuard private key is valid on every Proton server, so
+            # gluetun picks the server, its public key and endpoint from its own
+            # server list. PORT_FORWARD_ONLY restricts that choice to servers
+            # that support NAT-PMP port forwarding — on Proton those are exactly
+            # the P2P/torrent servers (391 of 800 WireGuard servers). If one is
+            # retired or overloaded, gluetun moves to another instead of dying
+            # on a dead IP.
             - name: VPN_SERVICE_PROVIDER
-              value: custom
+              value: protonvpn
             - name: VPN_TYPE
               value: wireguard
             - name: WIREGUARD_PRIVATE_KEY
@@ -104,14 +112,14 @@ spec:
                 secretKeyRef:
                   name: protonvpn-wg
                   key: privateKey
-            - name: WIREGUARD_PUBLIC_KEY
-              value: "pWeh73ei2uNWC7PhHbYu45a0tfoI1YAieeXfib9ne3g="
             - name: WIREGUARD_ADDRESSES
               value: "10.2.0.2/32"
-            - name: WIREGUARD_ENDPOINT_IP
-              value: "169.150.196.66"
-            - name: WIREGUARD_ENDPOINT_PORT
-              value: "51820"
+            - name: PORT_FORWARD_ONLY
+              value: "on"
+            # Keeps the exit in the same country as the previous pinned server.
+            # Widen or drop this to give gluetun more servers to choose from.
+            - name: SERVER_COUNTRIES
+              value: "Netherlands"
             - name: WIREGUARD_PERSISTENT_KEEPALIVE_INTERVAL
               value: "25s"
             # Lower MTU fixes TCP MSS clamping issues (ICMP works but TCP times out)

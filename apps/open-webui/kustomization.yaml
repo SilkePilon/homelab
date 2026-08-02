@@ -40,3 +40,21 @@ labels:
   - pairs:
       app.kubernetes.io/part-of: homelab
     includeSelectors: false
+
+# Keep only 2 old ReplicaSets/ControllerRevisions per workload instead of the
+# Kubernetes default of 10. Without this the cluster accumulates dozens of
+# empty ReplicaSets, and each retained revision pins its container image on the
+# node — costly on the Pis, which have 28-58Gi disks.
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2
+  - target:
+      kind: DaemonSet
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2
