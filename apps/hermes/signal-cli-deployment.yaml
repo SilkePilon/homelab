@@ -69,7 +69,7 @@ spec:
         # Uses a version-marker file so the 102 MB tarball is only downloaded
         # once and re-downloaded only when SIGNAL_CLI_VERSION changes.
         - name: download-signal-cli
-          image: alpine:3.20
+          image: alpine:3.24
           imagePullPolicy: IfNotPresent
           command:
             - sh
