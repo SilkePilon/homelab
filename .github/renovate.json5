@@ -1,5 +1,7 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  // Mend hosted app defaults new repos to "silent" (scan only, no PRs).
+  mode: "full",
   extends: [
     "config:recommended",
     ":dependencyDashboard",
