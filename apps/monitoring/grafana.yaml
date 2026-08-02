@@ -53,7 +53,11 @@ metadata:
   name: grafana
   namespace: monitoring
 spec:
-  replicas: 1
+  # MIGRATION IN PROGRESS — moving off pi52, whose SD card sits at 100% io
+  # utilisation while sustaining only ~3 MB/s. Scaled to 0 so the local-path
+  # volume can be copied to server-1 consistently. Restored to 1 in the
+  # follow-up commit once the data is in place. See docs/monitoring-migration.md
+  replicas: 0
   strategy:
     type: Recreate
   selector:
@@ -64,6 +68,10 @@ spec:
       labels:
         app: grafana
     spec:
+      # server-1 is amd64 with a 474Gi SSD. The Pis run on SD cards that
+      # cannot sustain the write rate Prometheus/Loki/Grafana need.
+      nodeSelector:
+        kubernetes.io/hostname: server-1
       securityContext:
         fsGroup: 472
         runAsUser: 472
