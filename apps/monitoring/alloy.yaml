@@ -114,8 +114,10 @@ spec:
           args:
             - run
             - /etc/alloy/config.alloy
-            # Positions/WAL live on a hostPath so they survive pod restarts
-            - --storage.path=/var/lib/alloy/data
+            # Positions/WAL live on a hostPath so they survive pod restarts.
+            # NOT under /var/lib/alloy — the image ships that dir as 0770 473:473,
+            # and with capabilities dropped, root has no CAP_DAC_OVERRIDE to enter it.
+            - --storage.path=/var/lib/alloy-data
             - --server.http.listen-addr=0.0.0.0:12345
           env:
             - name: HOSTNAME
@@ -152,7 +154,7 @@ spec:
               mountPath: /var/log/pods
               readOnly: true
             - name: data
-              mountPath: /var/lib/alloy/data
+              mountPath: /var/lib/alloy-data
             - name: tmp
               mountPath: /tmp
       volumes:
@@ -164,7 +166,7 @@ spec:
             path: /var/log/pods
         - name: data
           hostPath:
-            path: /var/lib/alloy/data
+            path: /var/lib/alloy-data
             type: DirectoryOrCreate
         - name: tmp
           emptyDir: {}

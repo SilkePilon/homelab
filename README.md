@@ -51,7 +51,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 
 | App | Namespace | What it is |
 | --- | --- | --- |
-| [arr-stack](apps/arr-stack) | `arr-stack` | Media automation: qBittorrent, Sonarr, Radarr, Lidarr, Questarr, Scraparr, FlareSolverr behind a Gluetun/ProtonVPN sidecar |
+| [arr-stack](apps/arr-stack) | `arr-stack` | Media automation: qBittorrent, Sonarr, Radarr, Lidarr, Scraparr, FlareSolverr behind a Gluetun/ProtonVPN sidecar |
 | [cloudflared](apps/cloudflared) | `cloudflared` | Cloudflare Tunnel daemon (2 replicas) — the only way traffic gets in |
 | [hermes](apps/hermes) | `hermes` | [Hermes Agent](https://github.com/NousResearch/hermes-agent) + a `signal-cli` sidecar for the Signal channel |
 | [homeassistant](apps/homeassistant) | `homeassistant` | Home Assistant |

@@ -20,7 +20,6 @@
 #   radarr    → /data/torrents/movies
 #   sonarr    → /data/torrents/tv
 #   lidarr    → /data/torrents/music
-#   questarr  → /data/media/games   (saves directly to SMB share)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
