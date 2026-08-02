@@ -94,12 +94,23 @@ spec:
             # Grafana's internal concurrent job drivers write simultaneously.
             - name: GF_DATABASE_WAL
               value: "true"
+            # SQLite lock retries. Grafana 13's unified storage runs several
+            # concurrent job drivers against the same file; on slow node storage
+            # they collide and surface as SQLITE_BUSY. Defaults are far too low
+            # (query_retries=0, transaction_retries=5).
+            - name: GF_DATABASE_QUERY_RETRIES
+              value: "5"
+            - name: GF_DATABASE_TRANSACTION_RETRIES
+              value: "20"
             # Disable the background plugin installer. In a container the
             # bundled plugin path (/usr/share/grafana/data/plugins-bundled/)
             # is owned by root and not writable by the grafana user (472),
             # so the installer always fails with "permission denied".
+            # plugin_admin_enabled alone does NOT stop it — preinstall does.
             - name: GF_PLUGINS_PLUGIN_ADMIN_ENABLED
               value: "false"
+            - name: GF_PLUGINS_PREINSTALL_DISABLED
+              value: "true"
           ports:
             - containerPort: 3000
               name: web
@@ -110,18 +121,28 @@ spec:
             limits:
               cpu: 1000m
               memory: 2Gi
+          # Readiness uses /api/health (includes a DB check) so traffic is only
+          # sent to a Grafana that can actually serve queries.
           readinessProbe:
             httpGet:
               path: /api/health
               port: web
             initialDelaySeconds: 15
             periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 6
+          # Liveness uses /healthz, which returns 200 without touching SQLite.
+          # /api/health blocks on the DB, so a lock storm used to time out the
+          # probe and get the container killed — which made the contention worse
+          # on restart. Only restart when the process is genuinely wedged.
           livenessProbe:
             httpGet:
-              path: /api/health
+              path: /healthz
               port: web
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 6
           volumeMounts:
             - name: data
               mountPath: /var/lib/grafana
