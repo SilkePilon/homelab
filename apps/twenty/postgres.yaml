@@ -13,7 +13,9 @@ metadata:
   labels:
     app.kubernetes.io/name: twenty-db
 spec:
-  replicas: 1
+  # MIGRATION commit A: 0 while twenty-postgres-data is copied from pi51 to
+  # server-1. Back to 1 in commit B. See docs/pi-decommission.md.
+  replicas: 0
   # ReadWriteOnce PVC — only one writer at a time.
   strategy:
     type: Recreate
@@ -25,6 +27,11 @@ spec:
       labels:
         app.kubernetes.io/name: twenty-db
     spec:
+      # The Pis are being rebuilt (SD card -> NVMe), so every stateful workload
+      # lives on server-1 until Longhorn replaces local-path and volumes stop
+      # being node-local. See docs/pi-decommission.md.
+      nodeSelector:
+        kubernetes.io/hostname: server-1
       # postgres:16 starts as root then drops to the postgres user via its own
       # entrypoint (it chowns PGDATA itself), so no custom securityContext.
       containers:
