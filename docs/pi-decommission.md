@@ -115,10 +115,28 @@ All of those images are multi-arch, including the digest-pinned
 DaemonSets — node-exporter, alloy, image-gc, csi-smb-node, svclb-traefik — are
 not drained and simply disappear with the node.
 
+Their `svclb-traefik` pods keep the Pi IPs listed as external IPs on the
+`traefik` Service until the nodes go. That is cosmetic — `cloudflared` dials
+`traefik.kube-system.svc.cluster.local`, not a node IP.
+
 ## 4. Remove the nodes
 
+pi52 was already powered off, so it went immediately:
+
 ```bash
-for n in pi41 pi43 pi51 pi52; do kubectl delete node "$n"; done
+kubectl delete node pi52
+```
+
+Its `node-exporter` pod was left stuck in `Terminating` — the kubelet was gone
+and could not confirm the delete — and needed
+`kubectl delete pod -n monitoring <pod> --force --grace-period=0`.
+
+The other three stay cordoned and drained until you pull their SD cards.
+Deleting the node object while `k3s-agent` is still running is pointless: the
+agent re-registers within seconds. Power the Pi off first, then:
+
+```bash
+kubectl delete node pi41   # and pi43, pi51, as each comes down
 ```
 
 ## After the rebuild

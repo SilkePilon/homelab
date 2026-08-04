@@ -1,15 +1,20 @@
 # Node storage and garbage collection
 
-The Pis have small disks. `server-1` has 474Gi; the Pis have 28-58Gi:
+> [!NOTE]
+> The Pis are being rebuilt onto M.2 NVMe and are cordoned and drained — every
+> workload runs on server-1. See [pi-decommission.md](pi-decommission.md). The
+> table below describes the SD-card era; re-measure after the rebuild.
+
+The Pis have small disks. `server-1` has 952Gi; the Pis have 28-58Gi:
 
 | Node     | Arch  | Disk  | Notes                          |
 |----------|-------|-------|--------------------------------|
-| server-1 | amd64 | 474Gi | control plane, all bulk storage |
-| pi41     | arm64 | 57Gi  |                                |
-| pi42     | arm64 | 28Gi  | smallest                        |
-| pi43     | arm64 | 28Gi  | smallest                        |
-| pi51     | arm64 | 57Gi  |                                |
-| pi52     | arm64 | 58Gi  |                                |
+| server-1 | amd64 | 952Gi | control plane, all bulk storage |
+| pi41     | arm64 | 57Gi  | drained, awaiting NVMe          |
+| pi42     | arm64 | 28Gi  | removed from the cluster        |
+| pi43     | arm64 | 28Gi  | drained, awaiting NVMe          |
+| pi51     | arm64 | 57Gi  | drained, awaiting NVMe          |
+| pi52     | arm64 | 58Gi  | deleted — SD card failed        |
 
 Cleanup has three layers. Two are in this repo; the kubelet one is not.
 
@@ -99,7 +104,7 @@ data.
 ## Current usage
 
 ```bash
-for n in server-1 pi41 pi42 pi43 pi51 pi52; do
+for n in $(kubectl get nodes -o name | cut -d/ -f2); do
   kubectl get --raw "/api/v1/nodes/$n/proxy/stats/summary" \
   | jq -r --arg n "$n" '"\($n) fs=\(.node.fs.usedBytes/1073741824|floor)Gi/\(.node.fs.capacityBytes/1073741824|floor)Gi images=\(.node.runtime.imageFs.usedBytes/1073741824|floor)Gi"'
 done
