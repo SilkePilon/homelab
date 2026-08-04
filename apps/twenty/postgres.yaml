@@ -13,9 +13,7 @@ metadata:
   labels:
     app.kubernetes.io/name: twenty-db
 spec:
-  # MIGRATION commit A: 0 while twenty-postgres-data is copied from pi51 to
-  # server-1. Back to 1 in commit B. See docs/pi-decommission.md.
-  replicas: 0
+  replicas: 1
   # ReadWriteOnce PVC — only one writer at a time.
   strategy:
     type: Recreate

@@ -85,8 +85,10 @@ cmd_backup() {
   [ "$size" -gt 1048576 ] || die "${PVC}.tgz is only ${size} bytes — refusing to continue"
   log "${PVC} -> ${BACKUP_DIR}/${PVC}.tgz ($(numfmt --to=iec "$size"))"
 
-  # PG_VERSION is the cheapest proof the archive holds a real PGDATA
-  tar tzf "${BACKUP_DIR}/${PVC}.tgz" | grep -q './pgdata/PG_VERSION' \
+  # PG_VERSION is the cheapest proof the archive holds a real PGDATA.
+  # grep -c, not grep -q: -q exits on the first match and SIGPIPEs tar, which
+  # pipefail then reports as a failure.
+  [ "$(tar tzf "${BACKUP_DIR}/${PVC}.tgz" | grep -cxF './pgdata/PG_VERSION')" = "1" ] \
     || die "archive has no pgdata/PG_VERSION — refusing to continue"
   log "archive contains pgdata/PG_VERSION"
 
