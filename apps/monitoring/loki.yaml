@@ -83,7 +83,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: loki
-          image: grafana/loki:3.7.4
+          image: grafana/loki:3.7.5
           args:
             - -config.file=/etc/loki/loki.yaml
           ports:
