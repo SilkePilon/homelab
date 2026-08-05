@@ -47,7 +47,7 @@ spec:
         kubernetes.io/hostname: server-1
       containers:
         - name: homeassistant
-          image: ghcr.io/home-assistant/home-assistant:2026.7.4
+          image: ghcr.io/home-assistant/home-assistant:2026.8.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
