@@ -63,7 +63,7 @@ spec:
       # cleanly instead of crash-looping while the DB initialises.
       initContainers:
         - name: wait-for-db
-          image: postgres:16
+          image: postgres:18
           imagePullPolicy: IfNotPresent
           command:
             - sh
