@@ -20,7 +20,7 @@ spec:
         - operator: Exists
       containers:
         - name: alloy
-          image: grafana/alloy:v1.18.0
+          image: grafana/alloy:v1.18.1
           args:
             - run
             - /etc/alloy/config.alloy
