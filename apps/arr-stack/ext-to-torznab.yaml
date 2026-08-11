@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
         - name: ext-to-torznab
-          image: ghcr.io/silkepilon/ext-to-torznab:latest@sha256:5985a28c4c9a99963ee12a7b375ada91c67377cb56debdf96e8db931b950e81b
+          image: ghcr.io/silkepilon/ext-to-torznab:latest@sha256:f1f19627bfb33a78ac13c0292af0a9e5ae0257bb4cd1c2b428c1603d24042e0d
           imagePullPolicy: Always
           env:
             - name: FLARESOLVERR_URL
