@@ -11,7 +11,7 @@ Seven nodes as of 2026-08-12:
 
 | Node                   | Arch  | Disk  | RAM  | Notes                           |
 |------------------------|-------|-------|------|---------------------------------|
-| server-1               | amd64 | 952Gi | 16Gi | control plane, all bulk storage |
+| server-1               | amd64 | 475Gi | 16Gi | control plane, all bulk storage; plus an unused 149Gi `sda` |
 | hp-elitedesk-800-g6-i5 | amd64 | 475Gi | 16Gi | i5-10500, 12 CPU                |
 | hp-elitedesk-800-g6-i7 | amd64 | 475Gi | 16Gi | i7-10700, 16 CPU                |
 | raspberrypi-5-16gb-1   | arm64 | 238Gi | 16Gi |                                 |

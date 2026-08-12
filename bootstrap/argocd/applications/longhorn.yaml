@@ -1,0 +1,85 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: longhorn
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  # ───────────────────────────────────────────────────────────────────────────
+  # Distributed block storage, so volumes stop being pinned to whichever node
+  # provisioned them. Follows the upstream Argo CD install guide:
+  # https://longhorn.io/docs/1.12.0/deploy/install/install-with-argocd/
+  #
+  # Helm-sourced, like tailscale — the chart carries a large set of CRDs and
+  # rendering it to static manifests would mean re-rendering on every bump.
+  #
+  # Node prerequisites are already applied and are NOT managed here; see
+  # docs/longhorn-prerequisites.md.
+  # ───────────────────────────────────────────────────────────────────────────
+  source:
+    repoURL: https://charts.longhorn.io
+    chart: longhorn
+    targetRevision: 1.12.0
+    helm:
+      releaseName: longhorn
+      values: |
+        # The pre-upgrade checker runs as a Job, which Argo CD will re-run on
+        # every sync. Upstream disables it for GitOps installs.
+        preUpgradeChecker:
+          jobEnabled: false
+
+        persistence:
+          createStorageClass: true
+          # local-path stays the cluster default until volumes are migrated.
+          # Two default StorageClasses is undefined behaviour, so this must
+          # stay false while local-path is still marked default.
+          defaultClass: false
+          defaultClassReplicaCount: 3
+          defaultFsType: ext4
+          # Matches the local-path behaviour documented in node-storage.md:
+          # deleting a PVC reclaims the space. Switch to Retain if you would
+          # rather orphan the data than lose it on an accidental delete.
+          reclaimPolicy: Delete
+
+        defaultSettings:
+          defaultDataPath: /var/lib/longhorn
+          defaultReplicaCount: 3
+
+          # Keep Longhorn away from the last of the OS disk. Every node stores
+          # Longhorn data on its root filesystem — no node has a dedicated
+          # disk yet (server-1 has an unused 149G sda that could become one).
+          storageReservedPercentageForDefaultDisk: 25
+          storageMinimalAvailablePercentage: 15
+
+          # Hard anti-affinity: never place two replicas of a volume on the
+          # same node. With 7 nodes and 3 replicas there is plenty of room.
+          replicaSoftAntiAffinity: false
+
+          # v2DataEngine is deliberately left off. Its prerequisites exist on
+          # the three amd64 nodes, but the Raspberry Pi kernel has no
+          # CONFIG_HUGETLBFS/VFIO/NVME_TCP, so enabling it cluster-wide would
+          # break the arm64 nodes. See docs/longhorn-prerequisites.md.
+
+        service:
+          ui:
+            type: ClusterIP
+            annotations:
+              # The UI ships with no authentication of its own, so it is put on
+              # the tailnet rather than behind the public traefik ingress.
+              # Reachable at longhorn.<tailnet>.ts.net.
+              tailscale.com/expose: "true"
+              tailscale.com/hostname: longhorn
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: longhorn-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Longhorn's CRDs exceed the 262144-byte limit on the
+      # last-applied-configuration annotation that client-side apply uses.
+      - ServerSideApply=true
