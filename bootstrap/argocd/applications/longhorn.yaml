@@ -57,6 +57,20 @@ spec:
           # same node. With 7 nodes and 3 replicas there is plenty of room.
           replicaSoftAntiAffinity: false
 
+          # A node that is unplugged leaves its pods stuck Terminating and the
+          # RWO volume attached, so nothing can start elsewhere. This lets
+          # Longhorn force-delete those pods so the volume detaches and the
+          # workload reschedules.
+          nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod
+
+          # When a node comes back, spread replicas onto it again rather than
+          # leaving them bunched on the survivors.
+          replicaAutoBalance: best-effort
+
+          # Keep one replica on whichever node runs the pod, so reads are local
+          # and only writes cross the 1GbE link.
+          defaultDataLocality: best-effort
+
           # v2DataEngine is deliberately left off. Its prerequisites exist on
           # the three amd64 nodes, but the Raspberry Pi kernel has no
           # CONFIG_HUGETLBFS/VFIO/NVME_TCP, so enabling it cluster-wide would

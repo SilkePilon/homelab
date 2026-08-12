@@ -22,7 +22,7 @@ metadata:
   labels:
     app.kubernetes.io/name: homeassistant
 spec:
-  replicas: 0
+  replicas: 1
   # Recreate: PVC is ReadWriteOnce.
   strategy:
     type: Recreate
