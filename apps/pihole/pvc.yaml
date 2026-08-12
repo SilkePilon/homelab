@@ -1,0 +1,18 @@
+# Pi-hole v6 keeps everything in /etc/pihole: pihole.toml, gravity.db (the
+# compiled blocklists) and the FTL query database. /etc/dnsmasq.d is no longer
+# used, so this is the only volume needed.
+#
+# The query log grows with traffic — 2Gi is generous for a home LAN, but if
+# `pihole-FTL.db` ever fills it, lower FTLCONF_database_maxDBdays in
+# deployment.yaml rather than growing the volume forever.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pihole-data
+  namespace: pihole
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi

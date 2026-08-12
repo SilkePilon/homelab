@@ -58,6 +58,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | [monitoring](apps/monitoring) | `monitoring` | Prometheus, Grafana, Loki, Promtail, node-exporter, kube-state-metrics, NUT exporter |
 | [n8n](apps/n8n) | `n8n` | n8n workflow automation |
 | [open-webui](apps/open-webui) | `open-webui` | Open WebUI (LLM chat front-end; providers configured in its admin UI) |
+| [pihole](apps/pihole) | `pihole` | Pi-hole DNS ad blocking, served on port 53 of every node |
 | [twenty](apps/twenty) | `twenty` | Twenty CRM + its own Postgres and Redis |
 
 `apps/_template/` is a skeleton, not a deployed app.
@@ -127,6 +128,7 @@ kubectl -n n8n create secret generic n8n-secret \
 | `grafana-admin-creds` | `monitoring` | Grafana admin login |
 | `n8n-secret` | `n8n` | n8n encryption key |
 | `open-webui-secret` | `open-webui` | Session signing key (`WEBUI_SECRET_KEY`) |
+| `pihole-secret` | `pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
 | `twenty-secret` | `twenty` | Postgres URL/password, app secret, encryption key |
 | `hermes-secret` | `hermes` | LLM provider keys, dashboard basic auth, Signal account |
 
@@ -139,10 +141,16 @@ manifest that consumes it.
 node first scheduled them. The arr-stack media library is the exception: a
 statically bound SMB `PersistentVolume` pointing at the NAS.
 
-**Networking.** Every app gets a Traefik `Ingress` (`ingressClassName: traefik`).
+**Networking.** Public apps get a Traefik `Ingress` (`ingressClassName: traefik`).
 Nothing is port-forwarded on the router — `cloudflared` dials out to Cloudflare's
 edge, and each public hostname in the tunnel config points back at
 `traefik.kube-system.svc.cluster.local:80`. TLS is terminated by Cloudflare.
+
+Two things deliberately skip that path. Admin UIs that control the whole
+cluster — Longhorn and Pi-hole — are exposed on the tailnet instead, via the
+Tailscale operator. And [pihole](apps/pihole) serves DNS on the LAN through a
+`LoadBalancer`, so k3s ServiceLB claims port 53 on every node and any node IP
+works as a resolver.
 
 ## Header Image
 
