@@ -33,7 +33,7 @@ metadata:
   labels:
     app.kubernetes.io/name: open-webui
 spec:
-  replicas: 1
+  replicas: 0
   # Recreate: PVC is ReadWriteOnce; only one pod may write at a time.
   # Scaling past 1 replica also needs external Postgres (DATABASE_URL) —
   # the bundled SQLite database does not support multiple writers.

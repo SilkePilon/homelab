@@ -24,7 +24,7 @@ metadata:
   labels:
     app.kubernetes.io/name: n8n
 spec:
-  replicas: 1
+  replicas: 0
   # Recreate: PVC is ReadWriteOnce; only one pod may write at a time.
   strategy:
     type: Recreate
