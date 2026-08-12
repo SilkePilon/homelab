@@ -43,8 +43,6 @@ spec:
       # pi52 (this workload's former node) failed: its SD card stopped
       # completing writes. Data was recovered off the card and restored onto
       # server-1, which is amd64 with a 474Gi SSD. See docs/pi52-recovery.md
-      nodeSelector:
-        kubernetes.io/hostname: server-1
       containers:
         - name: homeassistant
           image: ghcr.io/home-assistant/home-assistant:2026.8.1
