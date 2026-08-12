@@ -160,7 +160,7 @@ data:
                 model:
                   refId: A
                   instant: true
-                  expr: min by (node) (node_hwmon_fan_rpm{chip="pwmfan"})
+                  expr: min by (node) (node_hwmon_fan_rpm{chip="platform_cooling_fan"})
               - refId: C
                 datasourceUid: __expr__
                 model:
