@@ -141,10 +141,16 @@ kubectl delete node pi41   # and pi43, pi51, as each comes down
 
 ## After the rebuild
 
+> [!NOTE]
+> Done as of 2026-08-12. Four Raspberry Pi 5 boards on NVMe are joined and
+> Ready — build details, per-node configuration and the hardware faults found
+> along the way are in [raspberry-pi-5-nodes.md](raspberry-pi-5-nodes.md).
+> The kubelet thresholds are applied. The remaining items below are still open.
+
 When a Pi rejoins with its NVMe, before it takes on any storage:
 
-- Apply the kubelet thresholds from [node-storage.md](node-storage.md) — the
-  disk is bigger but the defaults are still wrong.
+- ~~Apply the kubelet thresholds from [node-storage.md](node-storage.md)~~ —
+  done on all four nodes.
 - Install Longhorn and migrate the `local-path` PVCs to it. Once volumes are
   replicated, drop every `nodeSelector: kubernetes.io/hostname: server-1` in
   `apps/` — they exist only because `local-path` pins data to a node. They are

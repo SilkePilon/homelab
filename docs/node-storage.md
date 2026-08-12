@@ -1,20 +1,27 @@
 # Node storage and garbage collection
 
 > [!NOTE]
-> The Pis are being rebuilt onto M.2 NVMe and are cordoned and drained — every
-> workload runs on server-1. See [pi-decommission.md](pi-decommission.md). The
-> table below describes the SD-card era; re-measure after the rebuild.
+> The rebuild is done. The SD-card Pis are gone and four Raspberry Pi 5 boards
+> on M.2 NVMe joined the cluster on 2026-08-12 — see
+> [raspberry-pi-5-nodes.md](raspberry-pi-5-nodes.md). Disks are now 238Gi
+> rather than 28-58Gi, so the pressure that motivated the thresholds below is
+> much lower, but the kubelet defaults are still wrong.
 
-The Pis have small disks. `server-1` has 952Gi; the Pis have 28-58Gi:
+Seven nodes as of 2026-08-12:
 
-| Node     | Arch  | Disk  | Notes                          |
-|----------|-------|-------|--------------------------------|
-| server-1 | amd64 | 952Gi | control plane, all bulk storage |
-| pi41     | arm64 | 57Gi  | drained, awaiting NVMe          |
-| pi42     | arm64 | 28Gi  | removed from the cluster        |
-| pi43     | arm64 | 28Gi  | drained, awaiting NVMe          |
-| pi51     | arm64 | 57Gi  | drained, awaiting NVMe          |
-| pi52     | arm64 | 58Gi  | deleted — SD card failed        |
+| Node                   | Arch  | Disk  | RAM  | Notes                           |
+|------------------------|-------|-------|------|---------------------------------|
+| server-1               | amd64 | 952Gi | 16Gi | control plane, all bulk storage |
+| hp-elitedesk-800-g6-i5 | amd64 | 475Gi | 16Gi | i5-10500, 12 CPU                |
+| hp-elitedesk-800-g6-i7 | amd64 | 475Gi | 16Gi | i7-10700, 16 CPU                |
+| raspberrypi-5-16gb-1   | arm64 | 238Gi | 16Gi |                                 |
+| raspberrypi-5-8gb-1    | arm64 | 238Gi | 8Gi  |                                 |
+| raspberrypi-5-8gb-2    | arm64 | 238Gi | 8Gi  | PCIe Gen 2, ~half read speed    |
+| raspberrypi-5-8gb-3    | arm64 | 238Gi | 8Gi  |                                 |
+
+The three amd64 nodes each reserve 2Gi as hugepages for the Longhorn V2 data
+engine, so their schedulable memory is ~2Gi lower than the table shows. See
+[longhorn-prerequisites.md](longhorn-prerequisites.md).
 
 Cleanup has three layers. Two are in this repo; the kubelet one is not.
 
