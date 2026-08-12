@@ -73,8 +73,6 @@ spec:
       labels:
         app: loki
     spec:
-      # server-1 is amd64 with a 474Gi SSD. The Pis run on SD cards that
-      # cannot sustain the write rate Prometheus/Loki/Grafana need.
       securityContext:
         fsGroup: 10001
         runAsUser: 10001

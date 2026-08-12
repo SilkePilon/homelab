@@ -49,7 +49,7 @@ spec:
 
           # Keep Longhorn away from the last of the OS disk. Every node stores
           # Longhorn data on its root filesystem — no node has a dedicated
-          # disk yet (server-1 has an unused 149G sda that could become one).
+          # disk yet (hp-elitedesk-800-g5-i7 has an unused 149G sda that could become one).
           storageReservedPercentageForDefaultDisk: 25
           storageMinimalAvailablePercentage: 15
 

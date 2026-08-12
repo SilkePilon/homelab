@@ -242,8 +242,6 @@ spec:
       labels:
         app: prometheus
     spec:
-      # server-1 is amd64 with a 474Gi SSD. The Pis run on SD cards that
-      # cannot sustain the write rate Prometheus/Loki/Grafana need.
       serviceAccountName: prometheus
       securityContext:
         fsGroup: 65534

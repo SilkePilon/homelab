@@ -80,7 +80,7 @@ kubectl get nodes -o custom-columns='NAME:.metadata.name,HUGEPAGES:.status.capac
 ```
 
 > [!NOTE]
-> That 2Gi is reserved and unavailable to normal workloads. `server-1` is the
+> That 2Gi is reserved and unavailable to normal workloads. `hp-elitedesk-800-g5-i7` is the
 > tightest node — it hosts every workload and went from ~7.2Gi to ~5.3Gi
 > available. To reclaim it, drop the grubby args and reboot.
 
