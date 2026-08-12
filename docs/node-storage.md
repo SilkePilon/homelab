@@ -1,7 +1,9 @@
 # Node storage and garbage collection
 
 > [!NOTE]
-> The rebuild is done. The SD-card Pis are gone and four Raspberry Pi 5 boards
+> Volumes now live on Longhorn with 3 replicas, not `local-path` — see
+> [high-availability.md](high-availability.md). Only `arr-downloads` is still
+> `local-path`. The rebuild is done. The SD-card Pis are gone and four Raspberry Pi 5 boards
 > on M.2 NVMe joined the cluster on 2026-08-12 — see
 > [raspberry-pi-5-nodes.md](raspberry-pi-5-nodes.md). Disks are now 238Gi
 > rather than 28-58Gi, so the pressure that motivated the thresholds below is

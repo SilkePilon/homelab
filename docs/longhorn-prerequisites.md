@@ -1,8 +1,10 @@
 # Longhorn node prerequisites
 
 Applied 2026-08-12 for Longhorn v1.12, ahead of replacing `local-path` (see
-[pi-decommission.md](pi-decommission.md#after-the-rebuild)). Longhorn itself is
-**not installed yet** — this is node preparation only.
+[pi-decommission.md](pi-decommission.md#after-the-rebuild)). Longhorn is installed
+(see [`apps/longhorn/README.md`](../apps/longhorn/README.md)) and all stateful
+volumes were migrated onto it on 2026-08-12; see
+[high-availability.md](high-availability.md).
 
 None of this is GitOps. It is per-node host configuration and has to be
 re-applied after a reflash.
