@@ -64,6 +64,13 @@ spec:
       labels:
         app.kubernetes.io/name: signal-cli
     spec:
+      # signal-cli's distribution bundles libsignal-client as an x86_64-only
+      # native library, so the JVM aborts on arm64 with:
+      #   Failed to call libsignal-client: no signal_jni in java.library.path
+      # This is an architecture constraint, not a host pin -- it can still run
+      # on any of the three amd64 nodes.
+      nodeSelector:
+        kubernetes.io/arch: amd64
       initContainers:
         # ── Download signal-cli if not already present ────────────────────────
         # Uses a version-marker file so the 102 MB tarball is only downloaded
