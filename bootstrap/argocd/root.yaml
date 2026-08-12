@@ -21,6 +21,15 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
+  # Argo CD adds its own pre-delete finalizers to child Applications whose
+  # charts carry pre-delete hooks (longhorn does). Those are never in git, so
+  # without this the root app sits permanently OutOfSync on a field it wrote
+  # itself.
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jsonPointers:
+        - /metadata/finalizers
   syncPolicy:
     automated:
       prune: true
