@@ -1,0 +1,67 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tailscale
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  # ───────────────────────────────────────────────────────────────────────────
+  # The only Helm-sourced app in this repo. Every other app is a plain
+  # Kustomize base, but the Tailscale operator ships as a chart and carries its
+  # own CRDs (Connector, ProxyClass, ProxyGroup, Recorder), so rendering it to
+  # static manifests would mean re-rendering on every upgrade.
+  #
+  # BEFORE this app can sync, see apps/tailscale/README.md. In short:
+  #   1. Add tag:k8s-operator and tag:k8s to the tailnet ACLs.
+  #   2. Create an OAuth client tagged tag:k8s-operator.
+  #   3. Create the secret (NOT committed to git):
+  #        kubectl create namespace tailscale
+  #        kubectl create secret generic operator-oauth -n tailscale \
+  #          --from-literal=client_id=YOUR_CLIENT_ID \
+  #          --from-literal=client_secret=YOUR_CLIENT_SECRET
+  #
+  # oauth.clientId / oauth.clientSecret are deliberately left unset. When they
+  # are empty the chart creates no Secret of its own and mounts the
+  # pre-created `operator-oauth` instead, so no credential ever reaches git.
+  # ───────────────────────────────────────────────────────────────────────────
+  source:
+    repoURL: https://pkgs.tailscale.com/helmcharts
+    chart: tailscale-operator
+    targetRevision: 1.102.2
+    helm:
+      releaseName: tailscale-operator
+      values: |
+        installCRDs: true
+
+        operatorConfig:
+          hostname: homelab-k8s-operator
+          logging: info
+          defaultTags:
+            - "tag:k8s-operator"
+
+        # Reach the Kubernetes API over the tailnet instead of exposing 6443.
+        # "true" runs the in-process proxy in auth mode, which impersonates
+        # tailnet users/groups according to ACL grants.
+        apiServerProxyConfig:
+          mode: "true"
+          allowImpersonation: "true"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tailscale
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  ignoreDifferences:
+    # The operator writes its own device state back onto these; letting Argo CD
+    # fight it causes a permanent OutOfSync.
+    - group: apps
+      kind: StatefulSet
+      namespace: tailscale
+      jsonPointers:
+        - /spec/template/spec/containers/0/env
