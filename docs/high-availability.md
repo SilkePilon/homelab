@@ -10,12 +10,41 @@ back in and storage re-spreads onto it.
 |-------|--------|-------|
 | Control plane | 1 server, SQLite | 3 servers, embedded etcd |
 | Storage | `local-path`, node-local | Longhorn, 3 replicas |
-| Placement | every stateful app pinned to `server-1` | free to schedule |
+| Placement | every stateful app pinned to `hp-elitedesk-800-g5-i7` | free to schedule |
 | Dead-node detection | ~5 min | ~60s |
+
+## The server-1 rename
+
+The control-plane node was called `server-1` via a `node-name` override while
+its actual hostname was already `hp-elitedesk-800-g5-i7`. The override was
+removed on 2026-08-12 so it matches the two G6 minis.
+
+A k3s node cannot be renamed in place — it registers as a new node object — so
+this was staged:
+
+1. `evictionRequested: true` on its Longhorn node, moving all 14 replicas off
+   while every volume still had two healthy copies elsewhere. Zero volumes went
+   degraded.
+2. Drain, `k3s-uninstall.sh`, `kubectl delete node server-1` (which removes the
+   etcd member).
+3. Reinstall as a server with no `node-name`, rejoining under its hostname.
+4. Recreate the `arr-downloads` PVC — its `local-path` PV had hard node
+   affinity to `server-1` and became unschedulable.
+5. Re-apply the `arr-downloads=true` node label, which arr-stack schedules on.
+
+> [!WARNING]
+> Between steps 2 and 3 etcd runs on two members, so quorum is 2 of 2 and
+> losing either one breaks the cluster. Keep that window short and do not touch
+> the other servers during it. Take a snapshot first:
+> `sudo k3s etcd-snapshot save --name pre-rename`.
+
+Historical docs (`pi52-recovery.md`, `monitoring-migration.md`,
+`pi-decommission.md`) still say `server-1`. That is deliberate — they describe
+what happened when the node had that name.
 
 ## Control plane
 
-`server-1` ran a single k3s server on SQLite, so losing it meant losing the API
+`hp-elitedesk-800-g5-i7` ran a single k3s server on SQLite, so losing it meant losing the API
 server — nothing could reschedule anywhere and no amount of storage
 replication would have helped.
 
@@ -24,7 +53,7 @@ migrates the SQLite datastore on restart), and both EliteDesk minis were
 rebuilt from agents into servers:
 
 ```
-server-1                 control-plane,etcd
+hp-elitedesk-800-g5-i7                 control-plane,etcd
 hp-elitedesk-800-g6-i5   control-plane,etcd
 hp-elitedesk-800-g6-i7   control-plane,etcd
 raspberrypi-5-*          agents
@@ -33,7 +62,7 @@ raspberrypi-5-*          agents
 Three etcd members tolerate losing one. **Losing two breaks quorum** and the
 cluster goes read-only, so never take two of the amd64 boxes down at once.
 
-A pre-migration backup of the SQLite datastore is on `server-1` at
+A pre-migration backup of the SQLite datastore is on `hp-elitedesk-800-g5-i7` at
 `/root/k3s-backups/`.
 
 > [!NOTE]
@@ -42,7 +71,7 @@ A pre-migration backup of the SQLite datastore is on `server-1` at
 > trade. Four agents is plenty of capacity.
 
 `tls-san` lists all three server IPs, so a kubeconfig can point at any of them.
-The local kubeconfig still points only at `192.168.0.158` — if `server-1` is
+The local kubeconfig still points only at `192.168.0.158` — if `hp-elitedesk-800-g5-i7` is
 down, switch the `server:` field to `192.168.0.223` or `192.168.0.9`, or use
 the Tailscale API server proxy, which is not tied to one node.
 
@@ -121,9 +150,9 @@ docker manifest inspect <image> | jq -r '.manifests[].platform.architecture'
 ## What is not covered
 
 - **Two amd64 nodes down at once** breaks etcd quorum. Single-node loss only.
-- **`arr-downloads`** is still `local-path` on `server-1` and does not follow a
+- **`arr-downloads`** is still `local-path` on `hp-elitedesk-800-g5-i7` and does not follow a
   failover. It is scratch space until downloads reach the NAS; replicating it
-  three times would be wasteful. If `server-1` is down, the arr apps start but
+  three times would be wasteful. If `hp-elitedesk-800-g5-i7` is down, the arr apps start but
   cannot stage downloads.
 - **Pods do not move back** when a node returns — only Longhorn replicas
   re-spread. A returned node picks up work at the next restart. A descheduler

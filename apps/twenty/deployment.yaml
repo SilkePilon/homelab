@@ -52,9 +52,9 @@ spec:
         app.kubernetes.io/name: twenty
     spec:
       # Twenty's image runs as UID 1000; fsGroup makes the mounted PVC writable.
-      # pi52 (this workload's former node) failed: its SD card stopped
-      # completing writes. Data was recovered off the card and restored onto
-      # server-1, which is amd64 with a 474Gi SSD. See docs/pi52-recovery.md
+      # This workload's former node pi52 failed when its SD card stopped
+      # completing writes; the data was recovered (docs/pi52-recovery.md).
+      # It is no longer pinned anywhere - the volume lives on Longhorn now.
       securityContext:
         fsGroup: 1000
       # Give Postgres a head start so the server's first migration run connects

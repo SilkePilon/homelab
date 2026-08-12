@@ -295,7 +295,7 @@ data:
             labels: {severity: critical}
             annotations:
               summary: "Node {{ $labels.node }} is not Ready"
-              description: "Losing one node is survivable. Losing two of server-1 / the two EliteDesks breaks etcd quorum and the cluster goes read-only."
+              description: "Losing one node is survivable. Losing two of hp-elitedesk-800-g5-i7 / the two EliteDesks breaks etcd quorum and the cluster goes read-only."
             noDataState: Alerting
             execErrState: Alerting
             data:

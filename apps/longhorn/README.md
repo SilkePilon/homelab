@@ -2,7 +2,7 @@
 
 Distributed block storage. Replaces `local-path`, whose volumes are pinned to
 the node that provisioned them — the reason every stateful app in `apps/` still
-carries `nodeSelector: kubernetes.io/hostname: server-1`.
+carries `nodeSelector: kubernetes.io/hostname: hp-elitedesk-800-g5-i7`.
 
 Like `tailscale`, there is no Kustomize base: the chart is rendered directly by
 the Argo CD Application at
@@ -32,7 +32,7 @@ Storage is not the constraint. The constraints are:
 - **No node has a dedicated disk.** Longhorn stores to `/var/lib/longhorn` on
   each root filesystem. `storageReservedPercentageForDefaultDisk: 25` and
   `storageMinimalAvailablePercentage: 15` keep it from filling the OS disk.
-  `server-1` has an **unused 149G `sda`** that would make a proper dedicated
+  `hp-elitedesk-800-g5-i7` has an **unused 149G `sda`** that would make a proper dedicated
   disk; adding it means formatting it, so it is deliberately left alone.
 
 ## Deliberate settings
@@ -103,7 +103,7 @@ Once everything else is on Longhorn:
 
 1. Set `persistence.defaultClass: true` here and remove the default annotation
    from `local-path` in the same change.
-2. Drop the `nodeSelector: kubernetes.io/hostname: server-1` lines from
+2. Drop the `nodeSelector: kubernetes.io/hostname: hp-elitedesk-800-g5-i7` lines from
    `apps/monitoring/{prometheus,grafana,loki}.yaml`,
    `apps/homeassistant/deployment.yaml`, `apps/n8n/deployment.yaml`,
    `apps/twenty/{deployment,postgres}.yaml`.
