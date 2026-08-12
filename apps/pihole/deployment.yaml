@@ -1,0 +1,117 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Pi-hole — network-wide DNS ad blocking
+# Image: pihole/pihole (multi-arch: runs on the amd64 minis and the arm64 Pis)
+# Ports: 53/UDP + 53/TCP (DNS), 80/TCP (admin UI)
+# Data:  /etc/pihole  (PVC pihole-data)
+#
+# BEFORE applying, create the admin password secret (NOT committed to git):
+#   kubectl create namespace pihole
+#   kubectl -n pihole create secret generic pihole-secret \
+#     --from-literal=WEBPASSWORD="$(openssl rand -base64 18)"
+#
+# Read it back with:
+#   kubectl -n pihole get secret pihole-secret \
+#     -o jsonpath='{.data.WEBPASSWORD}' | base64 -d; echo
+#
+# This does NOT touch DNS on the cluster nodes or anywhere else. Point your
+# router at one of the node IPs when you are ready — see README.md.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pihole
+  namespace: pihole
+  labels:
+    app.kubernetes.io/name: pihole
+spec:
+  replicas: 1
+  # Recreate: the PVC is ReadWriteOnce and FTL takes an exclusive lock on its
+  # SQLite databases. Two pods must never run at once.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pihole
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pihole
+    spec:
+      # Do NOT use cluster DNS here. CoreDNS forwards anything it does not own
+      # to the node's /etc/resolv.conf, which points at the router — and once
+      # the router points at Pi-hole, Pi-hole would be resolving through
+      # itself. Gravity (blocklist) updates would then break exactly when
+      # Pi-hole is unhealthy. Talking straight to public resolvers breaks that
+      # loop. Pi-hole needs no cluster service discovery.
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+          - 1.1.1.1
+          - 9.9.9.9
+      containers:
+        - name: pihole
+          image: pihole/pihole:2026.07.2
+          ports:
+            - name: dns-udp
+              containerPort: 53
+              protocol: UDP
+            - name: dns-tcp
+              containerPort: 53
+              protocol: TCP
+            - name: http
+              containerPort: 80
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+            # ── Pi-hole v6 configuration ─────────────────────────────────────
+            # Every FTLCONF_* variable maps to a key in pihole.toml and is
+            # marked read-only in the web UI. That is deliberate: these values
+            # live in git. Blocklists, per-client groups and local DNS records
+            # are NOT set here — they live in gravity.db on the PVC and are
+            # managed from the admin UI.
+            - name: FTLCONF_webserver_api_password
+              valueFrom:
+                secretKeyRef:
+                  name: pihole-secret
+                  key: WEBPASSWORD
+            # Upstream resolvers, semicolon-separated.
+            - name: FTLCONF_dns_upstreams
+              value: "1.1.1.1;1.0.0.1"
+            # REQUIRED in Kubernetes. The default ("local") only answers
+            # clients on the same subnet as the pod's own interface. Queries
+            # arrive from another node's pod CIDR after the LoadBalancer
+            # forwards them, so the default silently refuses them.
+            - name: FTLCONF_dns_listeningMode
+              value: "all"
+            - name: FTLCONF_dns_dnssec
+              value: "true"
+            # Trim the query database so the 2Gi PVC cannot fill up.
+            - name: FTLCONF_database_maxDBdays
+              value: "90"
+          volumeMounts:
+            - name: data
+              mountPath: /etc/pihole
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          # Probe DNS itself, not the web UI — a Pi-hole that serves its admin
+          # page but stopped resolving is the failure that actually matters.
+          readinessProbe:
+            tcpSocket:
+              port: dns-tcp
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: dns-tcp
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pihole-data

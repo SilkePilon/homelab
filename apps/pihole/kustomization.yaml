@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pihole
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BEFORE applying this stack:
+#
+#  1. Create the namespace and the admin password secret (NOT committed):
+#       kubectl create namespace pihole
+#       kubectl -n pihole create secret generic pihole-secret \
+#         --from-literal=WEBPASSWORD="$(openssl rand -base64 18)"
+#
+#  2. Only then point your router's DNS at a node IP. Deploying this does not
+#     change DNS for anything on its own — see README.md.
+#
+# There is no ingress.yaml on purpose: the admin UI is exposed over Tailscale,
+# not through the public Cloudflare tunnel. See service.yaml.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - service.yaml
+  - deployment.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
+
+# Keep only 2 old ReplicaSets per workload instead of the Kubernetes default
+# of 10 — each retained revision pins its container image on the node.
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2

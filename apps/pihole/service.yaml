@@ -1,0 +1,64 @@
+---
+# ── DNS (LAN-facing) ─────────────────────────────────────────────────────────
+# type: LoadBalancer, served by k3s ServiceLB (klipper). It runs a DaemonSet
+# that claims host port 53 on EVERY node, so the Service's external IPs become
+# all seven node IPs and any one of them is a working DNS server regardless of
+# which node the Pi-hole pod currently sits on. That is what makes this
+# survive a node failure — point the router at a node IP and forget about it.
+#
+# Nothing else on the nodes listens on :53 (checked on both Fedora and Pi OS;
+# systemd-resolved's stub listener is not enabled), so there is no conflict.
+#
+# externalTrafficPolicy is deliberately Cluster, not Local:
+#   Cluster — every node IP answers, but klipper masquerades the source, so
+#             Pi-hole logs every query as coming from one address and
+#             per-client statistics are lost.
+#   Local   — real client IPs, but the Service's external IP list shrinks to
+#             just the node running the pod, so the router's DNS setting would
+#             have to change whenever the pod moves.
+# Always-working DNS beats prettier graphs. Switch the line below if you would
+# rather have the stats and pin the pod to one node.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pihole-dns
+  namespace: pihole
+  labels:
+    app.kubernetes.io/name: pihole
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    app.kubernetes.io/name: pihole
+  ports:
+    - name: dns-udp
+      port: 53
+      targetPort: dns-udp
+      protocol: UDP
+    - name: dns-tcp
+      port: 53
+      targetPort: dns-tcp
+      protocol: TCP
+---
+# ── Admin UI ─────────────────────────────────────────────────────────────────
+# Kept off the public Cloudflare tunnel. The admin UI can change what every
+# device on the LAN resolves, so it goes on the tailnet instead — same
+# reasoning as the Longhorn UI. Reachable at pihole.<tailnet>.ts.net.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pihole-web
+  namespace: pihole
+  labels:
+    app.kubernetes.io/name: pihole
+  annotations:
+    tailscale.com/expose: "true"
+    tailscale.com/hostname: pihole
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: pihole
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
