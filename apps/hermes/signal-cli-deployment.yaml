@@ -53,7 +53,7 @@ metadata:
   labels:
     app.kubernetes.io/name: signal-cli
 spec:
-  replicas: 1
+  replicas: 0
   strategy:
     type: Recreate
   selector:

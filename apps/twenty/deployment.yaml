@@ -39,7 +39,7 @@ metadata:
   labels:
     app.kubernetes.io/name: twenty
 spec:
-  replicas: 1
+  replicas: 0
   # Recreate: the shared .local-storage PVC is ReadWriteOnce.
   strategy:
     type: Recreate
