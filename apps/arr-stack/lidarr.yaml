@@ -17,7 +17,7 @@ metadata:
   labels:
     app.kubernetes.io/name: lidarr
 spec:
-  replicas: 0
+  replicas: 1
   strategy:
     type: Recreate
   selector:

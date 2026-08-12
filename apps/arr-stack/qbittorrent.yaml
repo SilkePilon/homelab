@@ -28,7 +28,7 @@ metadata:
   labels:
     app.kubernetes.io/name: qbittorrent
 spec:
-  replicas: 0
+  replicas: 1
   strategy:
     type: Recreate
   selector:
