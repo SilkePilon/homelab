@@ -1,0 +1,395 @@
+# ── Grafana unified alerting (provisioned) ───────────────────────────────────
+# Mounted at /etc/grafana/provisioning/alerting. Grafana reads these at start
+# and the resulting rules/policies are READ-ONLY in the UI — to change a
+# threshold, edit this file, not the web interface.
+#
+# The Discord contact point itself is NOT provisioned here: it holds a webhook
+# URL, which is a secret and must not live in git. It was created in the UI and
+# is referenced by name ("Discord") from the notification policy below. If you
+# ever rename it in Grafana, update `receiver:` here to match or alerts stop
+# being delivered.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alerting
+  namespace: monitoring
+data:
+  policies.yaml: |
+    apiVersion: 1
+    policies:
+      - orgId: 1
+        # Everything routes to Discord. Before this was provisioned the default
+        # receiver was "empty", so no alert could ever have been delivered.
+        receiver: Discord
+        group_by: [alertname, node]
+        group_wait: 30s
+        group_interval: 5m
+        # Re-notify about a still-firing alert every 4h rather than every cycle.
+        repeat_interval: 4h
+
+  rules.yaml: |
+    apiVersion: 1
+    groups:
+      # ── Hardware health ───────────────────────────────────────────────────
+      - orgId: 1
+        name: hardware
+        folder: Homelab
+        interval: 1m
+        rules:
+          - uid: hw-nvme-temp-warn
+            title: NVMe SSD running hot
+            condition: C
+            for: 5m
+            labels: {severity: warning}
+            annotations:
+              summary: "NVMe on {{ $labels.node }} at {{ $values.A }}°C"
+              description: "Sustained above 70°C. These are DRAM-less PM991a drives in a stacked rack; check airflow before it throttles."
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 300, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: max by (node) (node_hwmon_temp_celsius{chip="nvme_nvme0"})
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: gt, params: [70]}
+
+          - uid: hw-nvme-temp-crit
+            title: NVMe SSD critically hot
+            condition: C
+            for: 2m
+            labels: {severity: critical}
+            annotations:
+              summary: "NVMe on {{ $labels.node }} at {{ $values.A }}°C"
+              description: "Above 78°C. The drive will throttle and may drop off the PCIe bus. Act now."
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 300, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: max by (node) (node_hwmon_temp_celsius{chip="nvme_nvme0"})
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: gt, params: [78]}
+
+          - uid: hw-cpu-temp-warn
+            title: CPU running hot
+            condition: C
+            for: 5m
+            labels: {severity: warning}
+            annotations:
+              summary: "CPU on {{ $labels.node }} at {{ $values.A }}°C"
+              description: "Pi 5 begins throttling at 80°C. chip matches coretemp on amd64 and thermal_zone0 on arm64."
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 300, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: max by (node) (node_hwmon_temp_celsius{chip=~"platform_coretemp_0|thermal_thermal_zone0"})
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: gt, params: [80]}
+
+          - uid: hw-cpu-temp-crit
+            title: CPU critically hot
+            condition: C
+            for: 2m
+            labels: {severity: critical}
+            annotations:
+              summary: "CPU on {{ $labels.node }} at {{ $values.A }}°C"
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 300, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: max by (node) (node_hwmon_temp_celsius{chip=~"platform_coretemp_0|thermal_thermal_zone0"})
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: gt, params: [88]}
+
+          - uid: hw-fan-stopped
+            title: Pi cooling fan stopped
+            condition: C
+            for: 10m
+            labels: {severity: critical}
+            annotations:
+              summary: "Fan on {{ $labels.node }} reads 0 rpm"
+              description: "The fan curve keeps these permanently spinning (~4000 rpm at idle), so 0 rpm means a failed fan or unplugged connector. The Pis are stacked with little airflow."
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: min by (node) (node_hwmon_fan_rpm{chip="pwmfan"})
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: lt, params: [1]}
+
+      # ── Capacity ──────────────────────────────────────────────────────────
+      - orgId: 1
+        name: capacity
+        folder: Homelab
+        interval: 1m
+        rules:
+          - uid: cap-memory-high
+            title: Memory nearly exhausted
+            condition: C
+            for: 10m
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.node }} memory {{ $values.A }}% used"
+              description: "Note the three amd64 nodes each reserve 2Gi as hugepages for Longhorn V2, so their usable total is lower than the sticker figure."
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: gt, params: [90]}
+
+          - uid: cap-disk-high
+            title: Root filesystem nearly full
+            condition: C
+            for: 10m
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.node }} root filesystem {{ $values.A }}% full"
+              description: "Longhorn stores replicas on the root filesystem on every node. Passing its 25% reserve makes the node unschedulable for new replicas."
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: (1 - (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay|squashfs"})) * 100
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: gt, params: [85]}
+
+          - uid: cap-pvc-high
+            title: PersistentVolume nearly full
+            condition: C
+            for: 10m
+            labels: {severity: warning}
+            annotations:
+              summary: "PVC {{ $labels.persistentvolumeclaim }} is {{ $values.A }}% full"
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: (1 - (kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes)) * 100
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: gt, params: [85]}
+
+          - uid: cap-longhorn-disk
+            title: Longhorn disk nearly full
+            condition: C
+            for: 10m
+            labels: {severity: warning}
+            annotations:
+              summary: "Longhorn storage on {{ $labels.node }} is {{ $values.A }}% used"
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: (sum by (node) (longhorn_disk_usage_bytes) / sum by (node) (longhorn_disk_capacity_bytes)) * 100
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: gt, params: [80]}
+
+      # ── Cluster and storage health ────────────────────────────────────────
+      - orgId: 1
+        name: cluster
+        folder: Homelab
+        interval: 1m
+        rules:
+          - uid: cl-node-notready
+            title: Node not ready
+            condition: C
+            for: 2m
+            labels: {severity: critical}
+            annotations:
+              summary: "Node {{ $labels.node }} is not Ready"
+              description: "Losing one node is survivable. Losing two of server-1 / the two EliteDesks breaks etcd quorum and the cluster goes read-only."
+            noDataState: Alerting
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 300, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: min by (node) (kube_node_status_condition{condition="Ready",status="true"})
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: lt, params: [1]}
+
+          - uid: cl-longhorn-degraded
+            title: Longhorn volume degraded
+            condition: C
+            for: 15m
+            labels: {severity: warning}
+            annotations:
+              summary: "Volume {{ $labels.volume }} is not healthy"
+              description: "robustness 2 = degraded (rebuilding), 3 = faulted. A short degraded window after a node reboot is normal; 15m or more is not."
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 900, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: max by (volume) (longhorn_volume_robustness)
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: gt, params: [1]}
+
+          - uid: cl-pod-crashloop
+            title: Pod crash looping
+            condition: C
+            for: 5m
+            labels: {severity: warning}
+            annotations:
+              summary: "{{ $labels.namespace }}/{{ $labels.pod }} restarted {{ $values.A }} times in 15m"
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 900, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total[15m]))
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: gt, params: [3]}
+
+          - uid: cl-target-down
+            title: Prometheus target down
+            condition: C
+            for: 10m
+            labels: {severity: warning}
+            annotations:
+              summary: "Scrape target {{ $labels.job }} / {{ $labels.instance }} is down"
+            noDataState: OK
+            execErrState: Alerting
+            data:
+              - refId: A
+                relativeTimeRange: {from: 600, to: 0}
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  expr: min by (job, instance) (up)
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  refId: C
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: {type: lt, params: [1]}
