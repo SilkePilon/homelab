@@ -16,7 +16,7 @@
 #  4. Create the smb-creds Secret (see secret.yaml).
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── Config volumes (one per app, local-path on k3s) ──────────────────────────
+# ── Config volumes (one per app, replicated by Longhorn) ─────────────────────
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -24,7 +24,7 @@ metadata:
   namespace: arr-stack
 spec:
   accessModes: [ReadWriteOnce]
-  storageClassName: local-path
+  storageClassName: longhorn
   resources:
     requests:
       storage: 1Gi
@@ -36,7 +36,7 @@ metadata:
   namespace: arr-stack
 spec:
   accessModes: [ReadWriteOnce]
-  storageClassName: local-path
+  storageClassName: longhorn
   resources:
     requests:
       storage: 1Gi
@@ -48,7 +48,7 @@ metadata:
   namespace: arr-stack
 spec:
   accessModes: [ReadWriteOnce]
-  storageClassName: local-path
+  storageClassName: longhorn
   resources:
     requests:
       storage: 1Gi
@@ -60,7 +60,7 @@ metadata:
   namespace: arr-stack
 spec:
   accessModes: [ReadWriteOnce]
-  storageClassName: local-path
+  storageClassName: longhorn
   resources:
     requests:
       storage: 1Gi

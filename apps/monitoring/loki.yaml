@@ -75,8 +75,6 @@ spec:
     spec:
       # server-1 is amd64 with a 474Gi SSD. The Pis run on SD cards that
       # cannot sustain the write rate Prometheus/Loki/Grafana need.
-      nodeSelector:
-        kubernetes.io/hostname: server-1
       securityContext:
         fsGroup: 10001
         runAsUser: 10001
