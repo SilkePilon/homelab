@@ -154,6 +154,8 @@ spec:
               mountPath: /etc/grafana/provisioning/dashboards
             - name: dashboard-storage
               mountPath: /var/lib/grafana/dashboards
+            - name: alerting
+              mountPath: /etc/grafana/provisioning/alerting
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -166,6 +168,9 @@ spec:
             name: grafana-dashboard-providers
         - name: dashboard-storage
           emptyDir: {}
+        - name: alerting
+          configMap:
+            name: grafana-alerting
 ---
 apiVersion: v1
 kind: Service

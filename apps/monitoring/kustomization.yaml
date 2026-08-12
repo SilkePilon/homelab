@@ -54,6 +54,7 @@ resources:
   - node-exporter.yaml
   - kube-state-metrics.yaml
   - nut-exporter.yaml
+  - alerting.yaml
 
 # Keep only 2 old ReplicaSets/ControllerRevisions per workload instead of the
 # Kubernetes default of 10. Without this the cluster accumulates dozens of

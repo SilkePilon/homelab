@@ -194,6 +194,22 @@ data:
       # Prometheus scrapes the in-cluster exporter but passes the out-of-cluster
       # NUT server (192.168.1.172:3493) as the ?target= param via relabeling.
       # The exporter auto-discovers the UPS ("apc") and labels series ups="apc".
+      # ── Longhorn (volume robustness, disk usage, node storage) ─────────────
+      - job_name: longhorn
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names: [longhorn-system]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            regex: longhorn-backend;manager
+            action: keep
+          - source_labels: [__meta_kubernetes_endpoint_node_name]
+            target_label: node
+        metric_relabel_configs:
+          - target_label: cluster
+            replacement: homelab
+
       - job_name: nut
         metrics_path: /nut
         static_configs:
