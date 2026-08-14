@@ -61,6 +61,18 @@ spec:
             - name: localtime
               mountPath: /etc/localtime
               readOnly: true
+            # BlueZ is reached over the host's D-Bus system bus. Without this
+            # socket the bluetooth integration fails with
+            # "DBus service not found; make sure the DBus socket is available".
+            - name: dbus
+              mountPath: /run/dbus/system_bus_socket
+          securityContext:
+            capabilities:
+              add:
+                # Bluetooth adapter management: NET_ADMIN resets a wedged
+                # adapter, NET_RAW opens the HCI socket for passive scanning.
+                - NET_ADMIN
+                - NET_RAW
           resources:
             requests:
               cpu: 200m
@@ -90,3 +102,10 @@ spec:
           hostPath:
             path: /etc/localtime
             type: File
+        # Every node runs systemd + bluez, so this socket exists cluster-wide
+        # and the pod stays schedulable anywhere. The adapter it reaches is
+        # whichever radio that node has - see README.md, "Bluetooth".
+        - name: dbus
+          hostPath:
+            path: /run/dbus/system_bus_socket
+            type: Socket

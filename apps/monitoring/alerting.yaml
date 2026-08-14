@@ -43,7 +43,7 @@ data:
             labels: {severity: warning}
             annotations:
               summary: "NVMe on {{ $labels.node }} at {{ $values.A }}°C"
-              description: "Sustained above 70°C. These are DRAM-less PM991a drives in a stacked rack; check airflow before it throttles."
+              description: "Sustained above 70°C. Mixed fleet (PM981a, Patriot, Kioxia on the EliteDesks; DRAM-less PM991a on the Pis) in a stacked rack; check airflow before it throttles. sensor=temp1 is Composite, the only sensor the drive throttles on — do not use max across sensors, some drives expose a controller sensor that idles 20°C higher."
             noDataState: OK
             execErrState: Alerting
             data:
@@ -53,7 +53,7 @@ data:
                 model:
                   refId: A
                   instant: true
-                  expr: max by (node) (node_hwmon_temp_celsius{chip="nvme_nvme0"})
+                  expr: max by (node) (node_hwmon_temp_celsius{chip="nvme_nvme0", sensor="temp1"})
               - refId: C
                 datasourceUid: __expr__
                 model:
@@ -80,7 +80,7 @@ data:
                 model:
                   refId: A
                   instant: true
-                  expr: max by (node) (node_hwmon_temp_celsius{chip="nvme_nvme0"})
+                  expr: max by (node) (node_hwmon_temp_celsius{chip="nvme_nvme0", sensor="temp1"})
               - refId: C
                 datasourceUid: __expr__
                 model:

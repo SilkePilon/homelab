@@ -5,6 +5,12 @@
 # SSDP). Traefik still routes via the ClusterIP Service, which selects the pod
 # by label regardless of hostNetwork.
 #
+# HA must be told to trust this proxy or it answers every request with 400 and
+# the frontend websocket never connects. That setting lives in HA's storage
+# (/config/.storage/http), NOT in configuration.yaml, and it lists every node
+# IP because hostNetwork SNATs Traefik to whichever node it runs on. See
+# README.md in this directory before touching the ingress or renumbering nodes.
+#
 # In CF Zero Trust → Tunnel → Public Hostnames, add:
 #   Subdomain: ha   Domain: yourdomain.com
 #   Service:   HTTP http://traefik.kube-system.svc.cluster.local:80

@@ -13,10 +13,13 @@ EEPROM. Re-apply it by hand after any reflash — see
 
 | Hostname               | IP            | MAC               | RAM  | Board rev        | PCIe   |
 |------------------------|---------------|-------------------|------|------------------|--------|
-| `raspberrypi-5-16gb-1` | 192.168.0.98  | 2c:cf:67:d8:27:3e | 16GB | Rev 1.1 (rev 30) | Gen 3  |
-| `raspberrypi-5-8gb-1`  | 192.168.0.233 | 2c:cf:67:9b:3f:ce | 8GB  | Rev 1.0 (rev 21) | Gen 3  |
+| `raspberrypi-5-16gb-1` | 192.168.0.98  | 2c:cf:67:d8:27:3e | 16GB | Rev 1.1 (rev 30) | Gen 2  |
+| `raspberrypi-5-8gb-1`  | 192.168.0.233 | 2c:cf:67:9b:3f:ce | 8GB  | Rev 1.0 (rev 21) | Gen 2  |
 | `raspberrypi-5-8gb-2`  | 192.168.0.239 | 2c:cf:67:7d:d2:c1 | 8GB  | Rev 1.0 (rev 21) | Gen 2  |
 | `raspberrypi-5-8gb-3`  | 192.168.0.103 | 2c:cf:67:66:d6:50 | 8GB  | Rev 1.0 (rev 21) | Gen 3  |
+
+`.103` is still Gen 3 only because it was unreachable when the fleet moved to
+Gen 2 — see [PCIe generation](#pcie-generation). Set it to Gen 2 on recovery.
 
 `.98` is a 16GB board, not 8GB, hence the different name. It is also a newer
 BCM2712 stepping (`rev 30`) than the other three (`rev 21`).
@@ -107,12 +110,18 @@ cannot disable PMIC over-voltage protection in software.
 
 ## PCIe generation
 
-`config.txt` carries `dtparam=pciex1_gen=3` on three nodes. **Gen 3 is not a
-certified Pi 5 configuration** — it works on most boards and fails on some.
+**Gen 3 is not a certified Pi 5 configuration** — it works on most boards and
+fails on some. The fleet is standardised on `dtparam=pciex1_gen=2` for that
+reason: stability over the roughly 2x sequential read Gen 3 buys.
 
-`raspberrypi-5-8gb-2` (.239) is the exception and is pinned to
-`dtparam=pciex1_gen=2`. At Gen 3, on the good supply, it dropped its NVMe
-controller roughly every 34 seconds under load:
+`.98` and `.233` were moved from Gen 3 to Gen 2 on 2026-08-14. The previous
+value is kept alongside as `config.txt.bak-gen3` on each node. `.103` was
+read-only and unreachable at the time and is still Gen 3; set it to Gen 2 when
+it is recovered.
+
+`raspberrypi-5-8gb-2` (.239) was the first node pinned to Gen 2, and is why.
+At Gen 3, on the good supply, it dropped its NVMe controller roughly every 34
+seconds under load:
 
 ```
 nvme nvme0: controller is down; will reset: CSTS=0x3, PCI_STATUS=0x10
@@ -126,14 +135,22 @@ nvme0n1: I/O Cmd(0x2) @ LBA 4953008, I/O Error (sct 0x3 / sc 0x71)
 | Weak supply  | dead within minutes         | passed, 438 MB/s          |
 | 40A supply   | failed, 8 resets in 4 min   | passed, 443 MB/s, 0 errors |
 
-PCIe generation is the deciding variable, not the supply. Its drive is fine
-(`media_errors: 0`, and the same model runs Gen 3 in three sibling boards), so
-the suspect is the M.2 HAT, the ribbon cable, or that board's PCIe routing. To
-chase it: swap the ribbon with a known-good Pi. If the fault follows the cable
-it is cheap; if it stays with the board it is the HAT or the Pi.
+PCIe generation is the deciding variable, not the supply. Its drive was fine
+(`media_errors: 0`, and the same model ran Gen 3 in the sibling boards), so the
+suspect is the M.2 HAT, the ribbon cable, or that board's PCIe routing. To chase
+it: swap the ribbon with a known-good Pi. If the fault follows the cable it is
+cheap; if it stays with the board it is the HAT or the Pi.
 
-Cost of leaving it: that node runs at roughly half the disk bandwidth of its
-siblings.
+Cost of the fleet-wide move: every node now runs at roughly half the sequential
+disk bandwidth Gen 3 gave it (~443 vs ~845 MB/s). Accepted deliberately — none
+of these nodes is disk-bandwidth bound, and a node that drops its rootfs costs
+far more than the throughput does.
+
+`.103` failing on 2026-08-14 is a second data point for the same suspect list.
+Unlike `.239`, it ran stable for roughly 42 hours before its rootfs went
+read-only, rather than dying within minutes — a timing signature that fits an
+intermittent physical connection (ribbon seating, thermal cycling) better than
+either a pure Gen 3 signal-margin fault or the APST bug below.
 
 ## NVMe APST
 
