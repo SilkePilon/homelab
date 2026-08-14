@@ -16,10 +16,9 @@ EEPROM. Re-apply it by hand after any reflash — see
 | `raspberrypi-5-16gb-1` | 192.168.0.98  | 2c:cf:67:d8:27:3e | 16GB | Rev 1.1 (rev 30) | Gen 2  |
 | `raspberrypi-5-8gb-1`  | 192.168.0.233 | 2c:cf:67:9b:3f:ce | 8GB  | Rev 1.0 (rev 21) | Gen 2  |
 | `raspberrypi-5-8gb-2`  | 192.168.0.239 | 2c:cf:67:7d:d2:c1 | 8GB  | Rev 1.0 (rev 21) | Gen 2  |
-| `raspberrypi-5-8gb-3`  | 192.168.0.103 | 2c:cf:67:66:d6:50 | 8GB  | Rev 1.0 (rev 21) | Gen 3  |
+| `raspberrypi-5-8gb-3`  | 192.168.0.103 | 2c:cf:67:66:d6:50 | 8GB  | Rev 1.0 (rev 21) | Gen 2  |
 
-`.103` is still Gen 3 only because it was unreachable when the fleet moved to
-Gen 2 — see [PCIe generation](#pcie-generation). Set it to Gen 2 on recovery.
+All four nodes run `dtparam=pciex1_gen=2` — see [PCIe generation](#pcie-generation).
 
 `.98` is a 16GB board, not 8GB, hence the different name. It is also a newer
 BCM2712 stepping (`rev 30`) than the other three (`rev 21`).
@@ -114,10 +113,17 @@ cannot disable PMIC over-voltage protection in software.
 fails on some. The fleet is standardised on `dtparam=pciex1_gen=2` for that
 reason: stability over the roughly 2x sequential read Gen 3 buys.
 
-`.98` and `.233` were moved from Gen 3 to Gen 2 on 2026-08-14. The previous
-value is kept alongside as `config.txt.bak-gen3` on each node. `.103` was
-read-only and unreachable at the time and is still Gen 3; set it to Gen 2 when
-it is recovered.
+`.98`, `.233` and `.103` were moved from Gen 3 to Gen 2 on 2026-08-15, rolling
+one node at a time (cordon, drain, reboot, uncordon, wait for Longhorn to return
+all volumes to `healthy` before starting the next). The previous file is kept
+alongside as `config.txt.bak-gen3` on each node. Verify the link actually
+downshifted — the config alone proves nothing until the node reboots:
+
+```bash
+cat /sys/bus/pci/devices/0001:01:00.0/current_link_speed   # expect 5.0 GT/s
+```
+
+`8.0 GT/s` is Gen 3, `5.0 GT/s` is Gen 2.
 
 `raspberrypi-5-8gb-2` (.239) was the first node pinned to Gen 2, and is why.
 At Gen 3, on the good supply, it dropped its NVMe controller roughly every 34
