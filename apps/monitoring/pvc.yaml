@@ -9,7 +9,9 @@ spec:
   storageClassName: longhorn
   resources:
     requests:
-      storage: 10Gi
+      # 20GB of TSDB retention plus headroom for the WAL, the head block, and
+      # the temporary second copy a compaction writes before it swaps blocks in.
+      storage: 30Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
