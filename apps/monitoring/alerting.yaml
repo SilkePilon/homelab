@@ -296,7 +296,11 @@ data:
             annotations:
               summary: "Node {{ $labels.node }} is not Ready"
               description: "Losing one node is survivable. Losing two of hp-elitedesk-800-g5-i7 / the two EliteDesks breaks etcd quorum and the cluster goes read-only."
-            noDataState: Alerting
+            # kube-state-metrics keeps exporting this series with value 0 for a
+            # node that is down, so a real outage still trips the threshold.
+            # Missing data means Prometheus itself is broken, not the cluster --
+            # Alerting here paged for all seven healthy nodes on 2026-08-17.
+            noDataState: NoData
             execErrState: Alerting
             data:
               - refId: A

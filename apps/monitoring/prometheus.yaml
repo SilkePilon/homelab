@@ -254,6 +254,10 @@ spec:
             - --config.file=/etc/prometheus/prometheus.yml
             - --storage.tsdb.path=/prometheus
             - --storage.tsdb.retention.time=15d
+            # Time-based retention alone cannot protect a fixed-size volume:
+            # whichever limit is hit first wins, and on 2026-08-16 the disk
+            # filled long before any block was 15d old.
+            - --storage.tsdb.retention.size=20GiB
             - --web.enable-lifecycle
             - --web.console.libraries=/etc/prometheus/console_libraries
             - --web.console.templates=/etc/prometheus/consoles
