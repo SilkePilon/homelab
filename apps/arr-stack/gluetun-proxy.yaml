@@ -4,8 +4,9 @@
 # Restarting that deployment causes gluetun to reconnect to a new randomly
 # selected ProtonVPN server, giving a fresh egress IP.
 #
-# The gluetun-proxy Service (also in flaresolverr.yaml) continues to expose
-# gluetun's HTTP proxy on port 8888 for Prowlarr — no Prowlarr config change needed.
+# There is no gluetun-proxy Service despite this file's name: gluetun runs with
+# HTTPPROXY=off, and its only consumer (Prowlarr) was replaced by ext-to-torznab,
+# which reaches FlareSolverr over the flaresolverr Service instead.
 #
 # ── RBAC for the IP-rotation CronJob ─────────────────────────────────────────
 apiVersion: v1
@@ -23,7 +24,10 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments"]
     resourceNames: ["flaresolverr"]
-    verbs: ["patch"]
+    # "get" is required as well as "patch": `kubectl rollout restart` reads the
+    # deployment before writing the restartedAt annotation. With patch alone
+    # every run died on "cannot get resource deployments" and the IP never rotated.
+    verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

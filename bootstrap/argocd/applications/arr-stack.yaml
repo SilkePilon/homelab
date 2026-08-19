@@ -13,6 +13,17 @@ spec:
     path: apps/arr-stack
   destination:
     server: https://kubernetes.default.svc
+  # The gluetun-rotate CronJob restarts flaresolverr every 6 hours by writing a
+  # kubectl.kubernetes.io/restartedAt annotation into the pod template. That
+  # annotation is not in git, so with selfHeal enabled Argo would immediately
+  # strip it back out — a second rollout, and a permanent OutOfSync flap.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: flaresolverr
+      namespace: arr-stack
+      jsonPointers:
+        - /spec/template/metadata/annotations/kubectl.kubernetes.io~1restartedAt
   syncPolicy:
     automated:
       prune: true

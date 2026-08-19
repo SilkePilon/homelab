@@ -3,9 +3,6 @@
 #
 # Gluetun runs as a sidecar so ALL of FlareSolverr's Chromium traffic exits
 # through ProtonVPN natively (shared network namespace — no HTTP_PROXY needed).
-# Gluetun also exposes an HTTP proxy on :8888, reachable cluster-wide via the
-# gluetun-proxy Service below, so other apps can route requests through
-# the same VPN tunnel.
 #
 # IP rotation: the gluetun-rotate CronJob (in gluetun-proxy.yaml) restarts
 # this deployment every 6 hours, causing Gluetun to pick a new random
@@ -13,6 +10,8 @@
 #
 # ext-to-torznab connects to FlareSolverr at http://flaresolverr:8191
 # (configured via the FLARESOLVERR_URL env var in ext-to-torznab.yaml).
+# Inbound cluster traffic is unaffected by the VPN — the Service targets the
+# pod IP and gluetun's firewall accepts established/related connections.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -32,16 +31,126 @@ spec:
       labels:
         app.kubernetes.io/name: flaresolverr
     spec:
-      # GLUETUN DISABLED FOR TESTING — FlareSolverr runs without VPN, direct
-      # internet access via cluster DNS. To re-enable gluetun, restore the
-      # dnsPolicy/dnsConfig block, initContainers, and gluetun container from git.
-      dnsPolicy: ClusterFirst
+      # Route DNS through gluetun's built-in resolver (127.0.0.1:53).
+      # CoreDNS (10.43.0.10) is blocked by gluetun's firewall once the VPN
+      # tunnel is up. Use IPv4 loopback — BLOCK_IPV6=on causes EAGAIN on
+      # UDP to [::1]:53. ndots=1: external hostnames go straight to an FQDN
+      # lookup instead of walking the cluster search domains, which gluetun
+      # cannot resolve anyway.
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+          - 127.0.0.1
+        options:
+          - name: ndots
+            value: "1"
       # Pin to x86-64 node — FlareSolverr's Chromium/Xvfb stack needs an x86
       # CPU (Intel iGPU for WebGL). The Raspberry Pi (aarch64) can't run the
       # non-headless Chromium session needed for Cloudflare Turnstile.
       nodeSelector:
         kubernetes.io/arch: amd64
+      initContainers:
+        # Ensure /dev/net/tun exists before gluetun starts
+        - name: init-tun
+          image: busybox:1.38.0
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /dev/net
+              [ -c /dev/net/tun ] || mknod /dev/net/tun c 10 200
+              chmod 0666 /dev/net/tun
+          securityContext:
+            privileged: true
       containers:
+        # ── gluetun: ProtonVPN WireGuard tunnel ──────────────────────────────
+        # Settings mirror the qbittorrent sidecar (the known-good reference in
+        # this namespace), minus port forwarding — FlareSolverr never listens
+        # on the VPN side, so PORT_FORWARD_ONLY is deliberately not set. That
+        # keeps the whole ProtonVPN WireGuard pool eligible, which is what
+        # makes the 6-hourly rotation actually produce different exit IPs.
+        - name: gluetun
+          image: ghcr.io/qdm12/gluetun:v3.41.3
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          lifecycle:
+            postStart:
+              exec:
+                # Clean up stale IP rules from previous pod exits (Kubernetes
+                # shares IP rules across the pod namespace). Fix from gluetun wiki:
+                # https://github.com/qdm12/gluetun-wiki/blob/main/setup/advanced/kubernetes.md
+                command: ["/bin/sh", "-c", "(ip rule del table 51820; ip -6 rule del table 51820) || true"]
+          env:
+            # Native ProtonVPN provider rather than a hardcoded endpoint. A
+            # Proton WireGuard private key is valid on every Proton server, so
+            # gluetun picks the server, its public key and endpoint from its
+            # own server list — a fresh random pick on every container start.
+            - name: VPN_SERVICE_PROVIDER
+              value: protonvpn
+            - name: VPN_TYPE
+              value: wireguard
+            - name: WIREGUARD_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: protonvpn-wg
+                  key: privateKey
+            - name: WIREGUARD_ADDRESSES
+              value: "10.2.0.2/32"
+            # Restrict to privacy-friendly jurisdictions. Wider than
+            # qbittorrent's single country on purpose: more servers in the
+            # pool means the rotation is less likely to land on the same IP.
+            - name: SERVER_COUNTRIES
+              value: "Netherlands,Switzerland,Sweden,Iceland"
+            - name: WIREGUARD_PERSISTENT_KEEPALIVE_INTERVAL
+              value: "25s"
+            # Lower MTU fixes TCP MSS clamping issues (ICMP works but TCP times out)
+            - name: WIREGUARD_MTU
+              value: "1280"
+            - name: WIREGUARD_ALLOWED_IPS
+              value: "0.0.0.0/0"
+            # FlareSolverr only makes outbound requests — no forwarded port needed.
+            - name: VPN_PORT_FORWARDING
+              value: "off"
+            - name: TZ
+              value: "Etc/UTC"
+            # Disable IPv6 — fixes "adding IPv6 rule: file exists" on Kubernetes
+            - name: BLOCK_IPV6
+              value: "on"
+            # DoH (port 443) instead of DoT (port 853) — ProtonVPN blocks TCP:853
+            # at exit nodes. Proven working on the qbittorrent sidecar at MTU 1280.
+            - name: DNS_UPSTREAM_RESOLVER_TYPE
+              value: "doh"
+            # Use IPs directly — the healthcheck resolves via /etc/resolv.conf,
+            # which points at gluetun itself and is unavailable until the tunnel
+            # is up, so a hostname target would deadlock startup.
+            - name: HEALTH_TARGET_ADDRESSES
+              value: "1.1.1.1:443,8.8.8.8:443"
+            # Disable unused proxy features
+            - name: HTTPPROXY
+              value: "off"
+            - name: SHADOWSOCKS
+              value: "off"
+            # Disable DNS block lists — they consume ~200MB RAM on download/parse
+            - name: BLOCK_MALICIOUS
+              value: "off"
+            - name: BLOCK_SURVEILLANCE
+              value: "off"
+            - name: BLOCK_ADS
+              value: "off"
+            # Suppress cosmetic error: GitHub API format changed and gluetun
+            # cannot unmarshal the version check response (no functional impact).
+            - name: VERSION_INFORMATION
+              value: "off"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
         # ── FlareSolverr ─────────────────────────────────────────────────────
         - name: flaresolverr
           image: ghcr.io/flaresolverr/flaresolverr:v3.5.0
@@ -51,7 +160,9 @@ spec:
               value: "info"
             - name: TZ
               value: "Etc/UTC"
-            # GLUETUN DISABLED: traffic goes direct (no VPN tunnel).
+            # No HTTP_PROXY / HTTPS_PROXY needed — all traffic from this container
+            # exits through the gluetun sidecar's WireGuard tunnel natively
+            # (shared pod network namespace).
           ports:
             - name: api
               containerPort: 8191
@@ -62,21 +173,30 @@ spec:
             limits:
               cpu: "2"
               memory: 2Gi
+          # Chromium cannot start until gluetun's tunnel and DNS are up, and a
+          # cold Proton handshake plus Xvfb boot can exceed two minutes. The
+          # startupProbe holds the liveness probe off for up to 5 minutes so a
+          # slow tunnel does not restart-loop the pod — this is what previously
+          # made the VPN setup look broken and got gluetun disabled.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: api
+            periodSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /health
               port: api
-            initialDelaySeconds: 20
             periodSeconds: 15
           livenessProbe:
             httpGet:
               path: /health
               port: api
-            initialDelaySeconds: 30
             periodSeconds: 30
       volumes: []
 ---
-# FlareSolverr API — used by Prowlarr to send challenge-solving requests
+# FlareSolverr API — used by ext-to-torznab to send challenge-solving requests
 apiVersion: v1
 kind: Service
 metadata:
@@ -92,4 +212,3 @@ spec:
     - name: api
       port: 8191
       targetPort: api
-
