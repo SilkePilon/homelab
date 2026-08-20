@@ -46,7 +46,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: n8n
-          image: docker.n8n.io/n8nio/n8n:2.36.0
+          image: docker.n8n.io/n8nio/n8n:2.36.3
           imagePullPolicy: Always
           ports:
             - name: http
