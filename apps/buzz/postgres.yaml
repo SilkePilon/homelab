@@ -1,0 +1,98 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# PostgreSQL 17 — Buzz's canonical event store, and its full-text search index.
+# Service DNS: buzz-db.buzz.svc.cluster.local (referenced as `buzz-db` inside
+# the namespace by DATABASE_URL in buzz-secret).
+#
+# Upstream pins 17 in deploy/compose/compose.yml. Do not downgrade.
+#
+# Schema migrations are embedded in the relay binary (sqlx::migrate!) and run
+# at relay startup with BUZZ_AUTO_MIGRATE=true, serialized behind a Postgres
+# advisory lock. There is no migration Job.
+#
+# POSTGRES_PASSWORD must match the password embedded in DATABASE_URL in
+# buzz-secret. Changing one without the other fails at relay startup, not at
+# apply time.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: buzz-db
+  namespace: buzz
+  labels:
+    app.kubernetes.io/name: buzz-db
+spec:
+  replicas: 1
+  # ReadWriteOnce PVC — only one writer at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: buzz-db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: buzz-db
+    spec:
+      # postgres:17-alpine starts as root then drops to the postgres user via
+      # its own entrypoint (it chowns PGDATA itself), so no securityContext.
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: buzz
+            - name: POSTGRES_DB
+              value: buzz
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: buzz-secret
+                  key: POSTGRES_PASSWORD
+            # Keep data out of the volume root so lost+found never collides.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "buzz", "-d", "buzz"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "buzz", "-d", "buzz"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: buzz-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: buzz-db
+  namespace: buzz
+  labels:
+    app.kubernetes.io/name: buzz-db
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: buzz-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
