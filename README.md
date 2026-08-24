@@ -52,6 +52,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | App | Namespace | What it is |
 | --- | --- | --- |
 | [arr-stack](apps/arr-stack) | `arr-stack` | Media automation: qBittorrent, Sonarr, Radarr, Lidarr, Scraparr, FlareSolverr behind a Gluetun/ProtonVPN sidecar |
+| [buzz](apps/buzz) | `buzz` | [Buzz](https://github.com/block/buzz) Nostr relay — a workspace shared by humans and AI agents, with its own Postgres, Redis and MinIO |
 | [cloudflared](apps/cloudflared) | `cloudflared` | Cloudflare Tunnel daemon (2 replicas) — the only way traffic gets in |
 | [hermes](apps/hermes) | `hermes` | [Hermes Agent](https://github.com/NousResearch/hermes-agent) + a `signal-cli` sidecar for the Signal channel |
 | [homeassistant](apps/homeassistant) | `homeassistant` | Home Assistant |
@@ -125,6 +126,7 @@ kubectl -n n8n create secret generic n8n-secret \
 | `smb-creds` | `arr-stack` | NAS username/password for the SMB media volume |
 | `protonvpn-wg` | `arr-stack` | WireGuard keys for the Gluetun sidecar |
 | `scraparr-api-keys` | `arr-stack` | Sonarr/Radarr/Lidarr API keys |
+| `buzz-secret` | `buzz` | Relay identity + git HMAC, Postgres/Redis URLs and passwords, MinIO credentials |
 | `grafana-admin-creds` | `monitoring` | Grafana admin login |
 | `n8n-secret` | `n8n` | n8n encryption key |
 | `open-webui-secret` | `open-webui` | Session signing key (`WEBUI_SECRET_KEY`) |
