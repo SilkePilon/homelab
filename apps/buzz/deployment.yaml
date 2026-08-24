@@ -1,0 +1,286 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Buzz relay — https://github.com/block/buzz
+# Image: ghcr.io/block/buzz:0.2.1   (multi-arch: amd64 + arm64)
+# Ports: 3000 WebSocket + REST + web UI
+#        8080 health (/_liveness, /_readiness)
+#        9102 Prometheus metrics
+# Data:  /var/lib/buzz/git   (PVC buzz-git-data)
+#
+# The relay runs closed: RELAY_OWNER_PUBKEY below is the operator identity and
+# BUZZ_REQUIRE_RELAY_MEMBERSHIP=true means only members the owner admits can
+# join. The pubkey is public — that is why it is a literal here and not in the
+# Secret. Its matching PRIVATE key must never enter the cluster.
+#
+# RELAY_OWNER_PUBKEY is deliberately not prefixed with BUZZ_. That is upstream's
+# naming, not a typo here.
+#
+# Secret keys consumed from buzz-secret:
+#   BUZZ_RELAY_PRIVATE_KEY     the relay's own Nostr identity — back it up,
+#                              rotating it makes federation peers see a
+#                              different relay
+#   BUZZ_GIT_HOOK_HMAC_SECRET  git hook signing
+#   DATABASE_URL               postgres://buzz:<pw>@buzz-db:5432/buzz
+#   REDIS_URL                  redis://:<pw>@buzz-redis:6379
+#   BUZZ_S3_ACCESS_KEY         also MinIO's root user
+#   BUZZ_S3_SECRET_KEY         also MinIO's root password
+#
+# Two initContainers exist to avoid CrashLoopBackOff, not for convenience: the
+# relay's S3 conformance probe and its DB connection are both startup-fatal, so
+# racing a cold Postgres or a missing bucket costs minutes of backoff.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: buzz
+  namespace: buzz
+  labels:
+    app.kubernetes.io/name: buzz
+spec:
+  replicas: 1
+  # ReadWriteOnce git PVC — only one writer at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: buzz
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: buzz
+      annotations:
+        # Picked up by the kubernetes-pods job in apps/monitoring/prometheus.yaml.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9102"
+        prometheus.io/path: "/metrics"
+    spec:
+      # The image is distroless-nonroot (UID 65532). fsGroup is what makes the
+      # git PVC writable on first mount.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      # The relay hard-drains WebSockets within 30s of SIGTERM.
+      terminationGracePeriodSeconds: 60
+      initContainers:
+        # Postgres is startup-fatal for the relay. Waiting here turns a
+        # crash-loop with growing backoff into a quiet hold.
+        - name: wait-for-postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          command: ["sh", "-c"]
+          args:
+            - |
+              until pg_isready -h buzz-db -p 5432 -U buzz; do
+                echo "waiting for buzz-db..."; sleep 2
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+        # Creates the media bucket if it is missing. Idempotent, so it re-runs
+        # harmlessly on every restart — unlike a Job, which Argo CD's selfHeal
+        # would keep trying to reconcile.
+        - name: create-bucket
+          image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            # mc writes its config to $MC_CONFIG_DIR; the default is $HOME,
+            # which UID 65532 does not own.
+            - name: MC_CONFIG_DIR
+              value: /tmp/.mc
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: buzz-secret
+                  key: BUZZ_S3_ACCESS_KEY
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: buzz-secret
+                  key: BUZZ_S3_SECRET_KEY
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              until mc alias set local http://buzz-minio:9000 "$S3_ACCESS_KEY" "$S3_SECRET_KEY" >/dev/null 2>&1; do
+                echo "waiting for buzz-minio..."; sleep 2
+              done
+              mc mb --ignore-existing local/buzz-media
+              mc anonymous set none local/buzz-media
+              echo "bucket buzz-media present"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      containers:
+        - name: relay
+          image: ghcr.io/block/buzz:0.2.1
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            # git writes need a writable repo path
+            readOnlyRootFilesystem: false
+          ports:
+            - name: http
+              containerPort: 3000
+            - name: health
+              containerPort: 8080
+            - name: metrics
+              containerPort: 9102
+          env:
+            - name: TZ
+              value: "Etc/UTC"
+
+            # ── Networking ───────────────────────────────────────────────────
+            - name: BUZZ_BIND_ADDR
+              value: "0.0.0.0:3000"
+            - name: BUZZ_HEALTH_PORT
+              value: "8080"
+            - name: BUZZ_METRICS_PORT
+              value: "9102"
+            # Advertised in the NIP-11 document and used for NIP-42 auth
+            # challenges. Must match the public hostname in ingress.yaml.
+            - name: RELAY_URL
+              value: "wss://relay.silkepilon.dev"
+            - name: BUZZ_MEDIA_BASE_URL
+              value: "https://relay.silkepilon.dev/media"
+            - name: BUZZ_CORS_ORIGINS
+              value: "https://relay.silkepilon.dev"
+
+            # ── Owner / access model ─────────────────────────────────────────
+            - name: RELAY_OWNER_PUBKEY
+              value: "bb38c6364cbca1e41b15a0ac299c0e7138e1407af62cfaa1bdf8d01b41f01c64"
+            - name: BUZZ_REQUIRE_AUTH_TOKEN
+              value: "true"
+            - name: BUZZ_REQUIRE_RELAY_MEMBERSHIP
+              value: "true"
+            - name: BUZZ_ALLOW_NIP_OA_AUTH
+              value: "true"
+
+            # ── Migrations ───────────────────────────────────────────────────
+            # Embedded in the binary via sqlx::migrate!, serialized behind a
+            # Postgres advisory lock.
+            - name: BUZZ_AUTO_MIGRATE
+              value: "true"
+
+            # ── Git ──────────────────────────────────────────────────────────
+            - name: BUZZ_GIT_REPO_PATH
+              value: "/var/lib/buzz/git"
+            - name: BUZZ_GIT_PACK_CACHE_PATH
+              value: "/var/cache/buzz/git-packs"
+            # Startup-fatal S3 reachability check. Left on deliberately: a
+            # silent misconfiguration would otherwise surface on first upload.
+            - name: BUZZ_GIT_CONFORMANCE_PROBE
+              value: "true"
+
+            # ── S3 (non-secret) ──────────────────────────────────────────────
+            - name: BUZZ_S3_ENDPOINT
+              value: "http://buzz-minio:9000"
+            - name: BUZZ_S3_BUCKET
+              value: "buzz-media"
+            - name: BUZZ_S3_REGION
+              value: "us-east-1"
+            # Cluster DNS resolves buzz-minio, not <bucket>.buzz-minio.
+            - name: BUZZ_S3_ADDRESSING_STYLE
+              value: "path"
+
+            # ── Misc ─────────────────────────────────────────────────────────
+            # Safe at one replica; upstream disables it above one until an SFU
+            # exists.
+            - name: BUZZ_HUDDLE_AUDIO_AVAILABLE
+              value: "true"
+            - name: RUST_LOG
+              value: "buzz_relay=info,buzz_db=info,buzz_auth=info,buzz_pubsub=info,tower_http=info"
+
+            # ── Secrets ──────────────────────────────────────────────────────
+            - name: BUZZ_RELAY_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: buzz-secret
+                  key: BUZZ_RELAY_PRIVATE_KEY
+            - name: BUZZ_GIT_HOOK_HMAC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: buzz-secret
+                  key: BUZZ_GIT_HOOK_HMAC_SECRET
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: buzz-secret
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: buzz-secret
+                  key: REDIS_URL
+            - name: BUZZ_S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: buzz-secret
+                  key: BUZZ_S3_ACCESS_KEY
+            - name: BUZZ_S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: buzz-secret
+                  key: BUZZ_S3_SECRET_KEY
+          volumeMounts:
+            - name: git-repos
+              mountPath: /var/lib/buzz/git
+            - name: git-pack-cache
+              mountPath: /var/cache/buzz/git-packs
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /_liveness
+              port: health
+            # 30 x 5s = 150s for first-boot migrations before giving up.
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /_readiness
+              port: health
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /_liveness
+              port: health
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: git-repos
+          persistentVolumeClaim:
+            claimName: buzz-git-data
+        - name: git-pack-cache
+          emptyDir:
+            sizeLimit: 7Gi
