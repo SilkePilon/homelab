@@ -46,7 +46,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: portfolio
-          image: ghcr.io/silkepilon/portfolio:1.0.0
+          image: ghcr.io/silkepilon/portfolio:1.0.1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
