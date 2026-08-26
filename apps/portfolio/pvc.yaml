@@ -1,0 +1,15 @@
+# ── portfolio PVC ─────────────────────────────────────────────────────────────
+# /data inside the container: the SQLite database (payload.db) and uploaded
+# media. Longhorn (not local-path) so the pod is free to move between the
+# amd64 nodes — the image is amd64-only, see deployment.yaml.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: portfolio-data
+  namespace: portfolio
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi

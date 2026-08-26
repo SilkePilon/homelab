@@ -1,0 +1,53 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: portfolio
+
+# ─────────────────────────────────────────────────────────────────────────────
+# portfolio — silkepilon.dev (Next.js + Payload CMS + SQLite, single pod).
+#
+# BEFORE applying this stack:
+#
+#  1. Create the namespace and the secret (NOT committed to git):
+#       kubectl create namespace portfolio
+#       kubectl create secret generic portfolio-secret -n portfolio \
+#         --from-literal=PAYLOAD_SECRET="$(openssl rand -hex 32)"
+#
+#  2. Add the Cloudflare Tunnel public hostnames (see ingress.yaml):
+#       silkepilon.dev and www.silkepilon.dev
+#       → HTTP http://traefik.kube-system.svc.cluster.local:80
+#
+#  3. Push to main; Argo CD syncs it. First visit to /admin creates the
+#     admin user.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - service.yaml
+  - deployment.yaml
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
+
+# Keep only 2 old ReplicaSets/ControllerRevisions per workload instead of the
+# Kubernetes default of 10. Without this the cluster accumulates dozens of
+# empty ReplicaSets, and each retained revision pins its container image on the
+# node — costly on the Pis, which have 28-58Gi disks.
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2
+  - target:
+      kind: DaemonSet
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2

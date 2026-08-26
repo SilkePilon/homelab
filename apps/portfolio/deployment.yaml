@@ -1,0 +1,95 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# portfolio Deployment — https://github.com/SilkePilon/portfolio
+# Image: ghcr.io/silkepilon/portfolio  (Next.js 16 + Payload CMS 3 + SQLite)
+# Port:  3000
+# Data:  /data  (PVC portfolio-data) — payload.db + media/
+#
+# BEFORE applying:
+#   1. Create the namespace:
+#        kubectl create namespace portfolio
+#   2. Create the secret (NOT committed to git). PAYLOAD_SECRET signs admin
+#      sessions; changing it logs everyone out but loses no data:
+#        kubectl create secret generic portfolio-secret -n portfolio \
+#          --from-literal=PAYLOAD_SECRET="$(openssl rand -hex 32)"
+#
+# The image is built for linux/amd64 only (see the repo's docker.yml
+# workflow), so the pod is restricted to the amd64 nodes. This is an
+# architecture constraint, not a host pin — any of the three minis will do.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portfolio
+  namespace: portfolio
+  labels:
+    app.kubernetes.io/name: portfolio
+spec:
+  replicas: 1
+  # Recreate: RWO volume and a single SQLite writer.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: portfolio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: portfolio
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      # The image runs as the built-in "node" user (UID 1000).
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsNonRoot: true
+      containers:
+        - name: portfolio
+          image: ghcr.io/silkepilon/portfolio:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+            # Public URL — used for absolute links in metadata / share images.
+            - name: SITE_URL
+              value: "https://silkepilon.dev"
+            # DATABASE_URI (file:/data/payload.db) and MEDIA_DIR (/data/media)
+            # are baked into the image and left at their defaults.
+            - name: PAYLOAD_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: portfolio-secret
+                  key: PAYLOAD_SECRET
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          # Same endpoint the image's own HEALTHCHECK uses.
+          readinessProbe:
+            httpGet:
+              path: /api/access
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /api/access
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 4
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: portfolio-data

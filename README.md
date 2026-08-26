@@ -59,6 +59,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | [n8n](apps/n8n) | `n8n` | n8n workflow automation |
 | [open-webui](apps/open-webui) | `open-webui` | Open WebUI (LLM chat front-end; providers configured in its admin UI) |
 | [pihole](apps/pihole) | `pihole` | Pi-hole DNS ad blocking, served on port 53 of every node |
+| [portfolio](apps/portfolio) | `portfolio` | [silkepilon.dev](https://silkepilon.dev) — Next.js + Payload CMS portfolio, SQLite on a Longhorn volume |
 | [twenty](apps/twenty) | `twenty` | Twenty CRM + its own Postgres and Redis |
 
 `apps/_template/` is a skeleton, not a deployed app.
@@ -129,6 +130,7 @@ kubectl -n n8n create secret generic n8n-secret \
 | `n8n-secret` | `n8n` | n8n encryption key |
 | `open-webui-secret` | `open-webui` | Session signing key (`WEBUI_SECRET_KEY`) |
 | `pihole-secret` | `pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
+| `portfolio-secret` | `portfolio` | Payload admin session signing key (`PAYLOAD_SECRET`) |
 | `twenty-secret` | `twenty` | Postgres URL/password, app secret, encryption key |
 | `hermes-secret` | `hermes` | LLM provider keys, dashboard basic auth, Signal account |
 
