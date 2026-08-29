@@ -110,6 +110,13 @@ The `plane-api-migrate-1` Job must reach `Completed` before the API answers.
   effect, the `plane-api` Deployment and `plane-minio` StatefulSet. Expect about
   a minute of API downtime per upgrade. PVCs are kept.
 
+- The admin image is stock nginx, so `GET /god-mode` without a trailing slash
+  gets nginx's directory redirect, which includes the container port:
+  `Location: https://plane.silkepilon.dev:3000/god-mode/`. Cloudflare does not
+  proxy `:3000`, so the browser hangs. `extraObjects` adds a Traefik
+  `redirectRegex` route for that exact path so Traefik answers
+  `/god-mode` → `/god-mode/` itself.
+
 ## Upgrading
 
 Bump `targetRevision` (chart) and `planeVersion` (app) together in the
