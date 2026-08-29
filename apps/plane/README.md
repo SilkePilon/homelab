@@ -117,6 +117,14 @@ The `plane-api-migrate-1` Job must reach `Completed` before the API answers.
   `redirectRegex` route for that exact path so Traefik answers
   `/god-mode` → `/god-mode/` itself.
 
+- `minio.env.minio_endpoint_ssl: true` even though MinIO itself is plain
+  http: the API builds presigned upload URLs from `request.scheme` unless
+  this is set, and behind Cloudflare Django sees `http`, so browsers blocked
+  `http://plane.silkepilon.dev/uploads` as mixed content. The setting only
+  changes the URL scheme. ConfigMap changes do not restart pods (the chart's
+  restart trigger is the `timestamp` annotation Argo CD ignores), so after
+  changing it: `kubectl -n plane rollout restart deploy/plane-api-wl deploy/plane-worker-wl deploy/plane-beat-worker-wl`.
+
 ## Upgrading
 
 Bump `targetRevision` (chart) and `planeVersion` (app) together in the

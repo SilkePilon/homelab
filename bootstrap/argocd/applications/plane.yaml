@@ -71,6 +71,13 @@ spec:
         minio:
           storageClass: longhorn
           volumeSize: 10Gi
+          env:
+            # Presigned upload URLs are built from request.scheme unless this
+            # is set, and Django sees plain http behind Cloudflare, so the
+            # browser blocked http://plane.silkepilon.dev/uploads as mixed
+            # content. Only changes the URL scheme; Traefik -> MinIO is still
+            # http in-cluster.
+            minio_endpoint_ssl: true
           # The bucket-creation Job is named after .Release.Revision, which is
           # always 1 under Argo CD, and Job specs are immutable. Force-replace
           # lets a version bump delete and recreate it. The annotation also
