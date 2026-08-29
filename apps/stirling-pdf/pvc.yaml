@@ -1,0 +1,15 @@
+# ── Stirling PDF PVC ──────────────────────────────────────────────────────────
+# Holds /configs (settings.yml, the embedded H2 user DB, API keys),
+# /customFiles, /pipeline and /storage — mounted via subPath from this one
+# volume. Temp files and logs are emptyDirs, not here.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stirling-pdf-data
+  namespace: stirling-pdf
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi

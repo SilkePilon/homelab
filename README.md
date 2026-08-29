@@ -60,6 +60,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | [open-webui](apps/open-webui) | `open-webui` | Open WebUI (LLM chat front-end; providers configured in its admin UI) |
 | [plane](apps/plane) | `plane` | Plane project management (Helm chart rendered by Argo CD) + its own Postgres, Valkey, RabbitMQ and MinIO |
 | [pihole](apps/pihole) | `pihole` | Pi-hole DNS ad blocking, served on port 53 of every node |
+| [stirling-pdf](apps/stirling-pdf) | `stirling-pdf` | [Stirling PDF](https://www.stirlingpdf.com) — PDF toolbox (merge, split, convert, OCR), login required |
 | [portfolio](apps/portfolio) | `portfolio` | [silkepilon.dev](https://silkepilon.dev) — Next.js + Payload CMS portfolio, SQLite on a Longhorn volume |
 | [twenty](apps/twenty) | `twenty` | Twenty CRM + its own Postgres and Redis |
 
@@ -133,6 +134,7 @@ kubectl -n n8n create secret generic n8n-secret \
 | `pihole-secret` | `pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
 | `portfolio-secret` | `portfolio` | Payload admin session signing key (`PAYLOAD_SECRET`) |
 | `plane-secret` | `plane` | Django/live signing keys, Postgres, RabbitMQ and MinIO credentials + connection URLs |
+| `stirling-pdf-secret` | `stirling-pdf` | First admin login (`SECURITY_INITIALLOGIN_USERNAME` / `_PASSWORD`), only read on an empty volume |
 | `twenty-secret` | `twenty` | Postgres URL/password, app secret, encryption key |
 | `hermes-secret` | `hermes` | LLM provider keys, dashboard basic auth, Signal account |
 

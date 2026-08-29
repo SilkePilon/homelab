@@ -1,0 +1,139 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Stirling PDF Deployment
+# Image: stirlingtools/stirling-pdf (standard flavor: LibreOffice + OCR, no
+#        Calibre/ML extras; multi-arch so it can run on the Pis)
+# Port:  8080
+# Data:  /configs, /customFiles, /pipeline, /storage  (PVC stirling-pdf-data)
+#
+# BEFORE applying:
+#   1. Create the namespace first:
+#        kubectl create namespace stirling-pdf
+#   2. Then create the first-admin secret (NOT committed to git):
+#        kubectl create secret generic stirling-pdf-secret -n stirling-pdf \
+#          --from-literal=SECURITY_INITIALLOGIN_USERNAME='admin' \
+#          --from-literal=SECURITY_INITIALLOGIN_PASSWORD="$(openssl rand -base64 24)"
+#
+# The initial login is only seeded on an empty /configs. After that, users
+# live in the embedded H2 database on the PVC; change passwords in the UI.
+#
+# The container starts as root: init.sh chowns the state dirs and then drops
+# to stirlingpdfuser (PUID/PGID 1000). Hence no runAsNonRoot here.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stirling-pdf
+  namespace: stirling-pdf
+  labels:
+    app.kubernetes.io/name: stirling-pdf
+spec:
+  replicas: 1
+  # Recreate: PVC is ReadWriteOnce; only one pod may write at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: stirling-pdf
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stirling-pdf
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: stirling-pdf
+          image: stirlingtools/stirling-pdf:2.14.3
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: SYSTEM_DEFAULTLOCALE
+              value: "en-GB"
+            # Public hostname → require login. Sign-up stays closed; add users
+            # from the admin settings page.
+            - name: SECURITY_ENABLELOGIN
+              value: "true"
+            - name: SECURITY_INITIALLOGIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: stirling-pdf-secret
+                  key: SECURITY_INITIALLOGIN_USERNAME
+            - name: SECURITY_INITIALLOGIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: stirling-pdf-secret
+                  key: SECURITY_INITIALLOGIN_PASSWORD
+            # MB. Cloudflare's free plan rejects request bodies above 100 MB
+            # anyway, so a bigger number here would only mislead.
+            - name: SYSTEM_MAXFILESIZE
+              value: "100"
+            # No telemetry, no "please fill in our survey" banner.
+            - name: SYSTEM_ENABLEANALYTICS
+              value: "false"
+            - name: SHOW_SURVEY
+              value: "false"
+            - name: SYSTEM_GOOGLEVISIBILITY
+              value: "false"
+            - name: DISABLE_ADDITIONAL_FEATURES
+              value: "true"
+          volumeMounts:
+            - name: data
+              mountPath: /configs
+              subPath: configs
+            - name: data
+              mountPath: /customFiles
+              subPath: customFiles
+            - name: data
+              mountPath: /pipeline
+              subPath: pipeline
+            - name: data
+              mountPath: /storage
+              subPath: storage
+            - name: logs
+              mountPath: /logs
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            # JVM + LibreOffice. Conversions of big documents spike well past
+            # the request; the limit is what keeps a runaway job from taking
+            # a Pi down with it.
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "4"
+              memory: 3Gi
+          readinessProbe:
+            httpGet:
+              path: /api/v1/info/status
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /api/v1/info/status
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 4
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: stirling-pdf-data
+        - name: logs
+          emptyDir: {}
+        # Working dir for conversions. Capped so one huge job cannot fill the
+        # node's root disk (the Pis have 28-58Gi).
+        - name: tmp
+          emptyDir:
+            sizeLimit: 4Gi

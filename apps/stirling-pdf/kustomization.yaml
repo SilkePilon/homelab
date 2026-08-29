@@ -1,0 +1,53 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: stirling-pdf
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stirling PDF — self-hosted PDF toolbox (merge, split, convert, OCR, sign…).
+#
+# BEFORE applying this stack:
+#
+#  1. Create the namespace and the first-admin secret (NOT committed to git):
+#       kubectl create namespace stirling-pdf
+#       kubectl create secret generic stirling-pdf-secret -n stirling-pdf \
+#         --from-literal=SECURITY_INITIALLOGIN_USERNAME='admin' \
+#         --from-literal=SECURITY_INITIALLOGIN_PASSWORD="$(openssl rand -base64 24)"
+#
+#  2. Add a Cloudflare Tunnel public hostname entry:
+#       Subdomain: pdf   Domain: silkepilon.dev
+#       Service:   HTTP  http://traefik.kube-system.svc.cluster.local:80
+#
+#  3. Commit and push; Argo CD syncs it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - service.yaml
+  - deployment.yaml
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
+
+# Keep only 2 old ReplicaSets/ControllerRevisions per workload instead of the
+# Kubernetes default of 10. Without this the cluster accumulates dozens of
+# empty ReplicaSets, and each retained revision pins its container image on the
+# node — costly on the Pis, which have 28-58Gi disks.
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2
+  - target:
+      kind: DaemonSet
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2
