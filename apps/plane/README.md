@@ -51,8 +51,14 @@ kubectl create secret generic plane-secret -n plane \
   --from-literal=AWS_SECRET_ACCESS_KEY="$MINIO_PASS" \
   --from-literal=AWS_S3_BUCKET_NAME=uploads \
   --from-literal=AWS_S3_ENDPOINT_URL="http://plane-minio.plane.svc.cluster.local:9000" \
-  --from-literal=FILE_SIZE_LIMIT=20971520
+  --from-literal=FILE_SIZE_LIMIT=20971520 \
+  --from-literal=CELERY_WORKER_CONCURRENCY=4
 ```
+
+`CELERY_WORKER_CONCURRENCY` is not a credential; it rides along in the Secret
+because the chart has no other hook for extra env. Without it Celery forks one
+child per CPU thread (16 on the HP minis) and the worker is OOM-killed at its
+1000Mi limit.
 
 > [!WARNING]
 > Back up `SECRET_KEY`. It encrypts the instance-configuration rows (SMTP

@@ -53,7 +53,10 @@ The chart's defaults put passwords in values (and therefore in git). Every
 `SECRET_KEY`, `LIVE_SERVER_SECRET_KEY`, `POSTGRES_{USER,PASSWORD,DB}`,
 `RABBITMQ_DEFAULT_{USER,PASS}`, `DATABASE_URL`, `AMQP_URL`, `REDIS_URL`, and the
 MinIO/S3 block (`USE_MINIO`, `MINIO_ROOT_*`, `AWS_*`, `FILE_SIZE_LIMIT`).
-`env.requireExplicitSecrets: true` makes the render fail rather than fall back
+The same Secret also carries `CELERY_WORKER_CONCURRENCY=4`: not a credential,
+but the chart offers no other way to inject env, and without it Celery forks
+one child per CPU thread (16 on the HP minis) and the worker is OOM-killed at
+its 1000Mi limit. `env.requireExplicitSecrets: true` makes the render fail rather than fall back
 to the chart's public example keys. The exact `kubectl create secret` is in
 `apps/plane/README.md`.
 
