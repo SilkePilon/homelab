@@ -1,0 +1,128 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: plane
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  # ───────────────────────────────────────────────────────────────────────────
+  # Plane (Community Edition) — project management. https://plane.so
+  #
+  # Helm-sourced, like tailscale and longhorn: upstream ships a chart that
+  # renders nine workloads plus Traefik IngressRoute CRs, so rendering it to
+  # static manifests would mean re-rendering on every bump.
+  #
+  # BEFORE this app can sync, see apps/plane/README.md. In short: create the
+  # namespace and the `plane-secret` Secret (NOT committed to git), then add
+  # plane.silkepilon.dev to the Cloudflare Tunnel public hostnames.
+  # ───────────────────────────────────────────────────────────────────────────
+  source:
+    repoURL: https://helm.plane.so/
+    chart: plane-ce
+    targetRevision: 1.8.0
+    helm:
+      releaseName: plane
+      values: |
+        planeVersion: v1.4.1
+
+        ingress:
+          enabled: true
+          appHost: plane.silkepilon.dev
+          # "traefik" makes the chart emit IngressRoute/Middleware CRs instead
+          # of a plain Ingress. k3s ships those CRDs.
+          ingressClass: traefik
+          traefik:
+            maxRequestBodyBytes: 20971520
+
+        ssl:
+          # Cloudflare terminates TLS and forwards cleartext to Traefik's `web`
+          # entrypoint. This makes the chart render WEB_URL as https:// while
+          # still binding the route to `web`.
+          externalTermination: true
+
+        env:
+          # Fail the render instead of falling back to the chart's PUBLIC
+          # example SECRET_KEY / LIVE_SERVER_SECRET_KEY.
+          requireExplicitSecrets: true
+
+        # Every credential the chart would otherwise render into a Secret from
+        # values (and therefore into git) comes from one pre-created Secret
+        # instead. Pointing all hooks at the same Secret is fine: the
+        # workloads use envFrom, so a superset of keys is harmless.
+        external_secrets:
+          app_keys_existingSecret: plane-secret
+          app_env_existingSecret: plane-secret
+          live_env_existingSecret: plane-secret
+          pgdb_existingSecret: plane-secret
+          rabbitmq_existingSecret: plane-secret
+          doc_store_existingSecret: plane-secret
+
+        postgres:
+          storageClass: longhorn
+          volumeSize: 5Gi
+        redis:
+          storageClass: longhorn
+          volumeSize: 256Mi
+        rabbitmq:
+          storageClass: longhorn
+          volumeSize: 1Gi
+        minio:
+          storageClass: longhorn
+          volumeSize: 10Gi
+          # The bucket-creation Job is named after .Release.Revision, which is
+          # always 1 under Argo CD, and Job specs are immutable. Force-replace
+          # lets a version bump delete and recreate it. The annotation also
+          # lands on the MinIO StatefulSet (PVC is kept).
+          annotations:
+            argocd.argoproj.io/sync-options: Replace=true,Force=true
+
+        # Chart default pullPolicy is Always; the tags are immutable and the
+        # Pis have small disks.
+        api:
+          pullPolicy: IfNotPresent
+          # Same story as minio above, for the migrate Job. Also recreates the
+          # api Deployment on real changes — about a minute of API downtime
+          # per upgrade.
+          annotations:
+            argocd.argoproj.io/sync-options: Replace=true,Force=true
+        web:
+          pullPolicy: IfNotPresent
+        space:
+          pullPolicy: IfNotPresent
+        admin:
+          pullPolicy: IfNotPresent
+        live:
+          pullPolicy: IfNotPresent
+        worker:
+          pullPolicy: IfNotPresent
+        beatworker:
+          pullPolicy: IfNotPresent
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: plane
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      # Without this a sync would still apply the ignored timestamp below and
+      # roll every pod.
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    # The chart stamps `timestamp: {{ now }}` on every pod template so that
+    # `helm upgrade` always restarts pods. Under Argo CD that is a permanent
+    # OutOfSync and a full rollout on every sync.
+    - group: apps
+      kind: Deployment
+      namespace: plane
+      jsonPointers:
+        - /spec/template/metadata/annotations/timestamp
+    - group: batch
+      kind: Job
+      namespace: plane
+      jsonPointers:
+        - /spec/template/metadata/annotations/timestamp
