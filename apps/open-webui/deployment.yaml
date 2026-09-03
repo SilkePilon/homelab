@@ -55,7 +55,7 @@ spec:
         runAsUser: 0
       containers:
         - name: open-webui
-          image: ghcr.io/open-webui/open-webui:v0.11.1
+          image: ghcr.io/open-webui/open-webui:v0.11.3
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
