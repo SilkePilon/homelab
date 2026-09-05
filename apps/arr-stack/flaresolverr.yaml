@@ -220,7 +220,7 @@ spec:
         # over loopback only when Cloudflare challenges. See ext-to-torznab.yaml
         # for the Service and the indexer setup notes.
         - name: ext-to-torznab
-          image: ghcr.io/silkepilon/ext-to-torznab:latest@sha256:99e4756f99f3203d230cda9c3d7f96b12028933b846f616fd391e1ba39760c37
+          image: ghcr.io/silkepilon/ext-to-torznab:latest@sha256:603853efd0f4a867fab88f53169034db55108ae5aa037bb06c4ca3cd507c159c
           imagePullPolicy: IfNotPresent
           env:
             - name: FLARESOLVERR_URL
@@ -235,8 +235,11 @@ spec:
               value: "5000"
             - name: HOST
               value: "0.0.0.0"
+            # A lone Turnstile solve through the ProtonVPN egress measured 27 s
+            # (ext.to) to 57 s (extto.com); 60 s left no margin and produced
+            # "Timeout after 60.0 seconds" on otherwise-successful solves.
             - name: FLARESOLVERR_TIMEOUT
-              value: "60000"
+              value: "120000"
             - name: FLARESOLVERR_TABS_TILL_VERIFY
               value: "3"
             # Release the Chromium session after 5 idle minutes and let
