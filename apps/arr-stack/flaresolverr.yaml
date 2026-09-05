@@ -1,17 +1,28 @@
-# ── FlareSolverr + Gluetun VPN sidecar ───────────────────────────────────────
-# WebUI/API: port 8191  (internal only — ext-to-torznab talks to it directly)
+# ── FlareSolverr + ext-to-torznab + Gluetun VPN sidecar ──────────────────────
+# FlareSolverr API: port 8191 (internal only)
+# ext-to-torznab Torznab API: port 5000 (Service in ext-to-torznab.yaml)
 #
-# Gluetun runs as a sidecar so ALL of FlareSolverr's Chromium traffic exits
-# through ProtonVPN natively (shared network namespace — no HTTP_PROXY needed).
+# Gluetun runs as a sidecar so ALL traffic from this pod — FlareSolverr's
+# Chromium AND ext-to-torznab's plain HTTP — exits through ProtonVPN natively
+# (shared network namespace — no HTTP_PROXY needed).
+#
+# Why ext-to-torznab lives in this pod: Cloudflare binds the cf_clearance
+# cookie that FlareSolverr earns to the IP that solved the challenge. When the
+# proxy ran in its own pod (egressing from the node, not the VPN) the imported
+# cookie was useless, every plain request was challenged again, and every
+# search and magnet lookup went through Chromium — 143 FlareSolverr fallbacks
+# and 27 browser sessions in one log window. Sharing the network namespace
+# makes the solved cookie valid for the proxy's own fast path, so FlareSolverr
+# is only used for the occasional re-solve and then released.
 #
 # IP rotation: the gluetun-rotate CronJob (in gluetun-proxy.yaml) restarts
 # this deployment every 6 hours, causing Gluetun to pick a new random
-# ProtonVPN server — giving a fresh egress IP.
+# ProtonVPN server — giving a fresh egress IP. ext-to-torznab is stateless and
+# restarts with it (a few seconds; caches are warm again after one search).
 #
-# ext-to-torznab connects to FlareSolverr at http://flaresolverr:8191
-# (configured via the FLARESOLVERR_URL env var in ext-to-torznab.yaml).
-# Inbound cluster traffic is unaffected by the VPN — the Service targets the
-# pod IP and gluetun's firewall accepts established/related connections.
+# ext-to-torznab reaches FlareSolverr over loopback (http://127.0.0.1:8191).
+# Inbound cluster traffic is unaffected by the VPN — the Services target the
+# pod IP and gluetun's firewall accepts the listed FIREWALL_INPUT_PORTS.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -114,6 +125,10 @@ spec:
             # FlareSolverr only makes outbound requests — no forwarded port needed.
             - name: VPN_PORT_FORWARDING
               value: "off"
+            # Ports other pods (and kubelet probes) must reach on the pod IP:
+            # FlareSolverr API and the ext-to-torznab Torznab API.
+            - name: FIREWALL_INPUT_PORTS
+              value: "8191,5000"
             - name: TZ
               value: "Etc/UTC"
             # Disable IPv6 — fixes "adding IPv6 rule: file exists" on Kubernetes
@@ -166,13 +181,19 @@ spec:
           ports:
             - name: api
               containerPort: 8191
+          # Measured: ~40 MiB with no browser session, ~350 MiB with one open
+          # session, ~100 MiB after it is destroyed. ext-to-torznab now destroys
+          # failed sessions, releases idle ones after FLARESOLVERR_SESSION_IDLE
+          # and asks for a server-side TTL, so the pod no longer accumulates
+          # ~300 MiB Chromiums until the 2Gi limit OOM-kills it. 1Gi leaves room
+          # for two live sessions plus a solve in flight.
           resources:
             requests:
               cpu: 100m
-              memory: 512Mi
+              memory: 256Mi
             limits:
               cpu: "2"
-              memory: 2Gi
+              memory: 1Gi
           # Chromium cannot start until gluetun's tunnel and DNS are up, and a
           # cold Proton handshake plus Xvfb boot can exceed two minutes. The
           # startupProbe holds the liveness probe off for up to 5 minutes so a
@@ -194,6 +215,78 @@ spec:
               path: /health
               port: api
             periodSeconds: 30
+        # ── ext-to-torznab: Torznab API proxy for ext.to ─────────────────────
+        # Plain HTTP first (through the VPN, same IP as Chromium), FlareSolverr
+        # over loopback only when Cloudflare challenges. See ext-to-torznab.yaml
+        # for the Service and the indexer setup notes.
+        - name: ext-to-torznab
+          image: ghcr.io/silkepilon/ext-to-torznab:latest@sha256:99e4756f99f3203d230cda9c3d7f96b12028933b846f616fd391e1ba39760c37
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FLARESOLVERR_URL
+              value: "http://127.0.0.1:8191"
+            # Tried first; the built-in mirror list (extto.com, ext.to, ext2.to)
+            # follows with automatic failover.
+            - name: EXT_TO_URL
+              value: "https://search.extto.com"
+            - name: API_KEY
+              value: ""
+            - name: PORT
+              value: "5000"
+            - name: HOST
+              value: "0.0.0.0"
+            - name: FLARESOLVERR_TIMEOUT
+              value: "60000"
+            - name: FLARESOLVERR_TABS_TILL_VERIFY
+              value: "3"
+            # Release the Chromium session after 5 idle minutes and let
+            # FlareSolverr expire it server-side after 60 in any case.
+            - name: FLARESOLVERR_SESSION_IDLE
+              value: "300"
+            - name: FLARESOLVERR_SESSION_TTL
+              value: "60"
+            # Answer a search after at most 5 s of magnet resolution; the rest
+            # resolve in the background or on grab.
+            - name: MAGNET_TIME_BUDGET
+              value: "5"
+            - name: INCLUDE_ADULT
+              value: "true"
+            - name: LOG_LEVEL
+              value: "INFO"
+          ports:
+            - name: torznab
+              containerPort: 5000
+          # Measured ~45 MiB idle, ~120 MiB under 8 concurrent searches with
+          # the image's MALLOC_ARENA_MAX=2 (was ~270 MiB and OOM-looping
+          # without it).
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          # Startup waits for gluetun's tunnel, same as FlareSolverr above.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: torznab
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: torznab
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: torznab
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes: []
 ---
 # FlareSolverr API — used by ext-to-torznab to send challenge-solving requests

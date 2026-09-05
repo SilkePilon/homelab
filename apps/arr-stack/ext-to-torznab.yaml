@@ -1,84 +1,21 @@
 # ── ext-to-torznab (Torznab API proxy for ext.to) ────────────────────────────
 # WebUI/API: port 5000  (kubectl port-forward -n arr-stack svc/ext-to-torznab 5000:5000)
 #
-# Exposes a standards-compliant Torznab feed by scraping ext.to through the
-# existing FlareSolverr instance (bypasses Cloudflare). Natively supports
-# Sonarr, Radarr, and Lidarr — add it as a Torznab indexer in each app:
+# Exposes a standards-compliant Torznab feed by scraping ext.to — plain HTTP
+# when the mirror allows it, FlareSolverr when Cloudflare challenges. Natively
+# supports Sonarr, Radarr, and Lidarr — add it as a Torznab indexer in each app:
 #
 #   Settings → Indexers → Add → Torznab
 #     URL:     http://ext-to-torznab:5000
-#     API Key: leave blank (or set API_KEY below and enter it here)
+#     API Key: leave blank (or set API_KEY in flaresolverr.yaml and enter it here)
+#
+# The container itself is defined in flaresolverr.yaml: it runs inside the
+# FlareSolverr pod so that it shares the gluetun VPN egress IP with Chromium.
+# Cloudflare binds the solved cf_clearance cookie to that IP, so this is what
+# lets the proxy use its fast plain-HTTP path instead of going through the
+# browser for every request. This file only keeps the stable Service name.
 #
 # This app is stateless — no PVC required.
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ext-to-torznab
-  namespace: arr-stack
-  labels:
-    app.kubernetes.io/name: ext-to-torznab
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: ext-to-torznab
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: ext-to-torznab
-    spec:
-      containers:
-        - name: ext-to-torznab
-          image: ghcr.io/silkepilon/ext-to-torznab:latest@sha256:f1f19627bfb33a78ac13c0292af0a9e5ae0257bb4cd1c2b428c1603d24042e0d
-          imagePullPolicy: Always
-          env:
-            - name: FLARESOLVERR_URL
-              value: "http://flaresolverr:8191"
-            - name: EXT_TO_URL
-              value: "https://search.extto.com"
-            - name: API_KEY
-              value: ""
-            - name: PORT
-              value: "5000"
-            - name: HOST
-              value: "0.0.0.0"
-            - name: FLARESOLVERR_TIMEOUT
-              value: "60000"
-            - name: INCLUDE_ADULT
-              value: "true"
-            - name: LOG_LEVEL
-              value: "INFO"
-            - name: FLARESOLVERR_TABS_TILL_VERIFY
-              value: "3"
-          ports:
-            - name: api
-              containerPort: 5000
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: "1"
-              memory: 256Mi
-          readinessProbe:
-            httpGet:
-              path: /healthz
-              port: api
-            initialDelaySeconds: 10
-            periodSeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 3
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: api
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 5
-            failureThreshold: 3
----
 apiVersion: v1
 kind: Service
 metadata:
@@ -89,8 +26,8 @@ metadata:
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: ext-to-torznab
+    app.kubernetes.io/name: flaresolverr
   ports:
     - name: api
       port: 5000
-      targetPort: api
+      targetPort: torznab
