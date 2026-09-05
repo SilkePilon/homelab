@@ -220,7 +220,7 @@ spec:
         # over loopback only when Cloudflare challenges. See ext-to-torznab.yaml
         # for the Service and the indexer setup notes.
         - name: ext-to-torznab
-          image: ghcr.io/silkepilon/ext-to-torznab:latest@sha256:603853efd0f4a867fab88f53169034db55108ae5aa037bb06c4ca3cd507c159c
+          image: ghcr.io/silkepilon/ext-to-torznab:latest@sha256:c306e911385b050800da0e340c013868f63fca6b5d2f1ff65bc76da0ad3e607e
           imagePullPolicy: IfNotPresent
           env:
             - name: FLARESOLVERR_URL
