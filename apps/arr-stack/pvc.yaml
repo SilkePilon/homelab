@@ -134,11 +134,10 @@ spec:
     requests:
       storage: 10Ti
 ---
-# gluetun state (/gluetun). Holds the refreshed servers.json: the Proton
-# server list baked into the image is release-bound (2025-11-18 in v3.41.3)
-# and the updater only fires UPDATER_PERIOD after container start, so without
-# persistence every 6-hourly rotation would boot on the stale list again —
-# which is where the "startup check failed" restart storms come from.
+# gluetun state (/gluetun). Holds the servers.json written by each pod's
+# init-servers initContainer (fresh Proton list from gluetun-servers); the
+# PVC keeps the last good copy for boots where GitHub is unreachable, so a
+# rotation never falls back to the stale list compiled into the image.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

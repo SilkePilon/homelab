@@ -85,6 +85,45 @@ spec:
               chmod 0666 /dev/net/tun
           securityContext:
             privileged: true
+        # Refresh the Proton server list before gluetun starts. The list
+        # compiled into gluetun v3.41.3 dates from 2025-11-18 and cannot be
+        # refreshed in-release: Proton login-walled its API (and answers the
+        # login with a CAPTCHA, gluetun #3022), and the credential-free
+        # UPDATER_PREFER_DIRECT_DOWNLOAD only exists on master (2026-05-19).
+        # Measured: 71 of the 800 IPs in the built-in list are gone from the
+        # current one, which is what the "startup check: all check tries
+        # failed" loops (28 of 29 servers rejected) were made of.
+        #
+        # gluetun reads /gluetun/servers.json at start and prefers a provider
+        # entry whose timestamp is newer than the built-in one (same schema
+        # version 4 on both sides, verified). The maintainer publishes fresh
+        # data at gluetun-servers; this fetches it and wraps it in the
+        # persisted-file shape. --doh-url because the pod's resolver is
+        # gluetun itself, which is not running yet. On any failure the file
+        # from the previous boot stays (PVC) and gluetun falls back to the
+        # built-in list.
+        - name: init-servers
+          image: curlimages/curl:8.22.0
+          command:
+            - sh
+            - -c
+            - |
+              set -u
+              url=https://raw.githubusercontent.com/qdm12/gluetun-servers/main/pkg/servers/protonvpn.json
+              if curl -fsSL --retry 3 --retry-delay 5 --max-time 90 \
+                   --doh-url https://1.1.1.1/dns-query "$url" -o /gluetun/protonvpn.json.tmp \
+                 && [ -s /gluetun/protonvpn.json.tmp ]; then
+                { printf '{"version":1,"protonvpn":'; cat /gluetun/protonvpn.json.tmp; printf '}'; } \
+                  > /gluetun/servers.json.tmp \
+                  && mv /gluetun/servers.json.tmp /gluetun/servers.json \
+                  && echo "servers.json refreshed from gluetun-servers"
+              else
+                echo "download failed; keeping existing servers.json (if any)" >&2
+              fi
+              rm -f /gluetun/protonvpn.json.tmp
+          volumeMounts:
+            - name: gluetun-state
+              mountPath: /gluetun
       containers:
         # ── gluetun: ProtonVPN WireGuard tunnel ──────────────────────────────
         # Settings mirror the qbittorrent sidecar (the known-good reference in
@@ -180,21 +219,9 @@ spec:
             # cannot unmarshal the version check response (no functional impact).
             - name: VERSION_INFORMATION
               value: "off"
-            # Fresh server data without a Proton login. Proton login-walled its
-            # server API, so the list compiled into v3.41.3 dates from
-            # 2025-11-18; stale entries are the maintainer-identified top cause
-            # of the startup restart loops seen here (28 of 29 servers failing
-            # "TLS handshake: EOF" before one connects). Direct download pulls
-            # the maintainer's published list from gluetun-servers on GitHub
-            # (2026-08-06 at the time of writing), never touching Proton's API
-            # or its CAPTCHA (gluetun #3022). The updater fires UPDATER_PERIOD
-            # after start, so 4h guarantees one run per 6-hourly rotation; the
-            # result lands in /gluetun/servers.json on the PVC below and is
-            # preferred over the built-in list at the next start.
-            - name: UPDATER_PREFER_DIRECT_DOWNLOAD
-              value: "yes"
-            - name: UPDATER_PERIOD
-              value: "4h"
+            # Server list freshness is handled by the init-servers initContainer
+            # (see initContainers). UPDATER_PREFER_DIRECT_DOWNLOAD replaces it
+            # once a gluetun release ships it (on master since 2026-05-19).
           resources:
             requests:
               cpu: 50m
