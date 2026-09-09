@@ -177,6 +177,16 @@ spec:
                 /bin/sh -c 'wget -O- -nv --retry-connrefused --tries=30 --waitretry=10
                 --post-data "json={\"listen_port\":0,\"current_network_interface\":\"lo\"}"
                 http://127.0.0.1:8080/api/v2/app/setPreferences'
+            # Fresh server data without a Proton login — same reasoning as the
+            # byparr sidecar (see byparr.yaml): the built-in Proton list is
+            # release-bound and stale, direct download pulls the maintainer's
+            # published list from GitHub, and the PVC keeps the result across
+            # the 6-hourly rotation. Matters more here: PORT_FORWARD_ONLY
+            # narrows the pool, so dead entries hurt the startup check most.
+            - name: UPDATER_PREFER_DIRECT_DOWNLOAD
+              value: "yes"
+            - name: UPDATER_PERIOD
+              value: "4h"
           ports:
             - name: gluetun-ctrl
               containerPort: 8000
@@ -187,6 +197,9 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+          volumeMounts:
+            - name: gluetun-state
+              mountPath: /gluetun
         # ── qBittorrent ───────────────────────────────────────────────────────
         - name: qbittorrent
           image: lscr.io/linuxserver/qbittorrent:5.2.3_v2.0.13-ls469
@@ -241,6 +254,9 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: arr-media
+        - name: gluetun-state
+          persistentVolumeClaim:
+            claimName: gluetun-qbittorrent
 ---
 apiVersion: v1
 kind: Service

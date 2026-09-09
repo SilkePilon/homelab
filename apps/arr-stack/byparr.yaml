@@ -180,6 +180,21 @@ spec:
             # cannot unmarshal the version check response (no functional impact).
             - name: VERSION_INFORMATION
               value: "off"
+            # Fresh server data without a Proton login. Proton login-walled its
+            # server API, so the list compiled into v3.41.3 dates from
+            # 2025-11-18; stale entries are the maintainer-identified top cause
+            # of the startup restart loops seen here (28 of 29 servers failing
+            # "TLS handshake: EOF" before one connects). Direct download pulls
+            # the maintainer's published list from gluetun-servers on GitHub
+            # (2026-08-06 at the time of writing), never touching Proton's API
+            # or its CAPTCHA (gluetun #3022). The updater fires UPDATER_PERIOD
+            # after start, so 4h guarantees one run per 6-hourly rotation; the
+            # result lands in /gluetun/servers.json on the PVC below and is
+            # preferred over the built-in list at the next start.
+            - name: UPDATER_PREFER_DIRECT_DOWNLOAD
+              value: "yes"
+            - name: UPDATER_PERIOD
+              value: "4h"
           resources:
             requests:
               cpu: 50m
@@ -187,6 +202,9 @@ spec:
             limits:
               cpu: "1"
               memory: 512Mi
+          volumeMounts:
+            - name: gluetun-state
+              mountPath: /gluetun
         # ── Byparr ───────────────────────────────────────────────────────────
         - name: byparr
           # Upstream tags carry no "v" prefix (3.0.4, not v3.0.4).
@@ -338,6 +356,9 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 512Mi
+        - name: gluetun-state
+          persistentVolumeClaim:
+            claimName: gluetun-byparr
 ---
 # Byparr API — used by ext-to-torznab over loopback; the Service exists for
 # port-forward debugging (http://localhost:8191/docs) and for any other
