@@ -103,3 +103,15 @@ Ignored in byparr mode: `FLARESOLVERR_TABS_TILL_VERIFY`,
   worker launched its own re-solve. 1.3.1 keeps cookie domains and
   single-flights the refresh; the manifest drops `EXT_TO_URL` so the proxy
   starts on `extto.com` directly.
+- gluetun's DoH upstream stalls through the ProtonVPN tunnel (2 s deadline
+  hits and TCP resets, 65 warnings per 30 min here, 131 on the qbittorrent
+  sidecar). Firefox does dozens of lookups per solve and the proxy's magnet
+  POSTs failed in bursts. The byparr pod now uses
+  `DNS_UPSTREAM_RESOLVER_TYPE=plain` with 1.1.1.1/1.0.0.1: zero DNS
+  warnings afterwards, searches answer in ~1 s with 8/8 magnets on the
+  direct transport. The qbittorrent sidecar still runs DoH; same change
+  recommended there (see `qbittorrent.yaml`).
+- The first Byparr solve after a pod start regularly times out (43-127 s,
+  cold Firefox plus tunnel warm-up); the proxy's retry then succeeds in
+  ~14 s. ext-to-torznab 1.3.2 logs direct-transport failure reasons at
+  INFO.
