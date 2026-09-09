@@ -250,10 +250,12 @@ spec:
         # loopback only when Cloudflare challenges. See ext-to-torznab.yaml
         # for the Service and the indexer setup notes.
         - name: ext-to-torznab
-          # 1.3.0 is the first release that knows the Byparr backend (no
-          # sessions.create, no request.post). Older images send
-          # sessions.create first, which Byparr answers with HTTP 502.
-          image: ghcr.io/silkepilon/ext-to-torznab:1.3.0
+          # 1.3.x knows the Byparr backend (no sessions.create, no
+          # request.post); older images send sessions.create first, which
+          # Byparr answers with HTTP 502. 1.3.1 keeps the solver's cookie
+          # domains, without which the solved cf_clearance never reached the
+          # direct transport.
+          image: ghcr.io/silkepilon/ext-to-torznab:1.3.1
           imagePullPolicy: IfNotPresent
           env:
             - name: FLARESOLVERR_URL
@@ -261,10 +263,12 @@ spec:
             # Skip the auto-probe; the neighbour is always Byparr.
             - name: FLARESOLVERR_BACKEND
               value: "byparr"
-            # Tried first; the built-in mirror list (extto.com, ext.to, ext2.to)
-            # follows with automatic failover.
-            - name: EXT_TO_URL
-              value: "https://search.extto.com"
+            # No EXT_TO_URL: the built-in mirror list (extto.com, ext.to,
+            # ext2.to) is used as-is. search.extto.com used to be listed first
+            # but it 301s to extto.com — Cloudflare scopes cf_clearance to the
+            # host that issued it, and requests turns a redirected POST into a
+            # GET, so magnet lookups through that hostname can never succeed.
+            # extto.com is challenged now as well, so the alias buys nothing.
             - name: API_KEY
               value: ""
             - name: PORT

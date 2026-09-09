@@ -91,3 +91,15 @@ Ignored in byparr mode: `FLARESOLVERR_TABS_TILL_VERIFY`,
 2. Then merge the homelab change. Deploying the manifests first would pair
    Byparr with a proxy that still calls `sessions.create` and every
    challenged fetch would fail.
+
+## Rollout findings (2026-09-09)
+
+- Byparr solved the Turnstile on `extto.com` in 9-36 s per page through the
+  ProtonVPN exit; one solve timed out at 120 s. Idle pod memory is ~250 MiB,
+  a solve peaks around 1.1 GiB.
+- `search.extto.com` 301s to `extto.com`. ext-to-torznab 1.3.0 re-homed the
+  returned `cf_clearance` (scoped to `.extto.com`) onto `search.extto.com`,
+  so the direct transport was challenged again immediately and every magnet
+  worker launched its own re-solve. 1.3.1 keeps cookie domains and
+  single-flights the refresh; the manifest drops `EXT_TO_URL` so the proxy
+  starts on `extto.com` directly.
