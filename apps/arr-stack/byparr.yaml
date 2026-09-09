@@ -146,10 +146,19 @@ spec:
             # Disable IPv6 — fixes "adding IPv6 rule: file exists" on Kubernetes
             - name: BLOCK_IPV6
               value: "on"
-            # DoH (port 443) instead of DoT (port 853) — ProtonVPN blocks TCP:853
-            # at exit nodes. Proven working on the qbittorrent sidecar at MTU 1280.
+            # Plain UDP DNS to public resolvers through the tunnel. DoT is out
+            # (ProtonVPN blocks TCP:853 at exit nodes) and DoH was measured
+            # failing constantly from this sidecar and qbittorrent's: 65 and
+            # 131 "context deadline exceeded / connection reset" warnings per
+            # 30 min, each a 2 s stall. Firefox in Byparr does dozens of
+            # lookups per solve and the proxy's magnet POSTs failed in bursts
+            # on name resolution. Plain UDP to 1.1.1.1 answered 3/3 in
+            # ~125 ms from the same pod. Queries stay inside WireGuard up to
+            # the exit, which already sees every destination anyway.
             - name: DNS_UPSTREAM_RESOLVER_TYPE
-              value: "doh"
+              value: "plain"
+            - name: DNS_UPSTREAM_PLAIN_ADDRESSES
+              value: "1.1.1.1:53,1.0.0.1:53"
             # Use IPs directly — the healthcheck resolves via /etc/resolv.conf,
             # which points at gluetun itself and is unavailable until the tunnel
             # is up, so a hostname target would deadlock startup.
@@ -255,7 +264,7 @@ spec:
           # Byparr answers with HTTP 502. 1.3.1 keeps the solver's cookie
           # domains, without which the solved cf_clearance never reached the
           # direct transport.
-          image: ghcr.io/silkepilon/ext-to-torznab:1.3.1
+          image: ghcr.io/silkepilon/ext-to-torznab:1.3.2
           imagePullPolicy: IfNotPresent
           env:
             - name: FLARESOLVERR_URL
