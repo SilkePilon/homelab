@@ -2,15 +2,15 @@
 # WebUI/API: port 5000  (kubectl port-forward -n arr-stack svc/ext-to-torznab 5000:5000)
 #
 # Exposes a standards-compliant Torznab feed by scraping ext.to — plain HTTP
-# when the mirror allows it, FlareSolverr when Cloudflare challenges. Natively
+# when the mirror allows it, Byparr when Cloudflare challenges. Natively
 # supports Sonarr, Radarr, and Lidarr — add it as a Torznab indexer in each app:
 #
 #   Settings → Indexers → Add → Torznab
 #     URL:     http://ext-to-torznab:5000
-#     API Key: leave blank (or set API_KEY in flaresolverr.yaml and enter it here)
+#     API Key: leave blank (or set API_KEY in byparr.yaml and enter it here)
 #
-# The container itself is defined in flaresolverr.yaml: it runs inside the
-# FlareSolverr pod so that it shares the gluetun VPN egress IP with Chromium.
+# The container itself is defined in byparr.yaml: it runs inside the Byparr
+# pod so that it shares the gluetun VPN egress IP with the solver's Firefox.
 # Cloudflare binds the solved cf_clearance cookie to that IP, so this is what
 # lets the proxy use its fast plain-HTTP path instead of going through the
 # browser for every request. This file only keeps the stable Service name.
@@ -26,7 +26,7 @@ metadata:
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: flaresolverr
+    app.kubernetes.io/name: byparr
   ports:
     - name: api
       port: 5000

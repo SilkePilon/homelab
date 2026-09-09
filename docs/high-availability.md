@@ -135,7 +135,8 @@ pins — each can still use any of the three amd64 nodes, so they stay HA:
 - **`signal-cli`** — its distribution bundles `libsignal-client` as an
   x86_64-only native library. On arm64 the JVM aborts with
   `no signal_jni in java.library.path`.
-- **`flaresolverr`** — no arm64 image published.
+- **`byparr`** — an arm64 image exists, but upstream calls ARM support
+  minimal; the camoufox/Firefox stack stays on x86 until it is proven on a Pi.
 
 `nousresearch/hermes-agent` publishes both architectures, so hermes itself runs
 anywhere.

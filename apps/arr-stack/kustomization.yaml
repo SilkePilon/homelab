@@ -62,7 +62,7 @@ resources:
   - radarr.yaml
   - lidarr.yaml
   - ext-to-torznab.yaml
-  - flaresolverr.yaml
+  - byparr.yaml
   - gluetun-proxy.yaml
   - scraparr.yaml
   - ingress.yaml
