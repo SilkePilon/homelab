@@ -131,10 +131,14 @@ spec:
       containers:
         # ── gluetun: ProtonVPN WireGuard tunnel ──────────────────────────────
         # Settings mirror the qbittorrent sidecar (the known-good reference in
-        # this namespace), minus port forwarding — Byparr never listens on the
-        # VPN side, so PORT_FORWARD_ONLY is deliberately not set. That keeps
-        # the whole ProtonVPN WireGuard pool eligible, which is what makes the
-        # 6-hourly rotation actually produce different exit IPs.
+        # this namespace). Port forwarding itself is off — Byparr never listens
+        # on the VPN side — but PORT_FORWARD_ONLY is on as a *server filter*:
+        # without it the pool includes Proton's FREE, Secure Core (SE-NL#1,
+        # CH-NL#2, IS-NL#1) and TOR entries, and measured on 2026-09-09 those
+        # accounted for 16 of 24 failed startup attempts and every one of the
+        # mid-session tunnel deaths (NL-FREE#129 twice, SE-NL#1, CH#18-TOR),
+        # while every stable stretch was on a plain P2P server. The filtered
+        # pool is still 24 servers across the four countries.
         - name: gluetun
           image: ghcr.io/qdm12/gluetun:v3.41.3
           imagePullPolicy: IfNotPresent
@@ -180,6 +184,10 @@ spec:
             # Byparr only makes outbound requests — no forwarded port needed.
             - name: VPN_PORT_FORWARDING
               value: "off"
+            # Server filter only (see the container comment above); gluetun
+            # accepts it on Proton independently of VPN_PORT_FORWARDING.
+            - name: PORT_FORWARD_ONLY
+              value: "on"
             # Ports other pods (and kubelet probes) must reach on the pod IP:
             # Byparr API and the ext-to-torznab Torznab API.
             - name: FIREWALL_INPUT_PORTS
