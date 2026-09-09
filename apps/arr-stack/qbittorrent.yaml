@@ -136,9 +136,16 @@ spec:
               value: "on"
             - name: WIREGUARD_ALLOWED_IPS
               value: "0.0.0.0/0"
-            # Use DoH (port 443) instead of DoT (port 853) — ProtonVPN blocks TCP:853 at exit nodes
+            # Plain UDP DNS to public resolvers through the tunnel. DoT is out
+            # (ProtonVPN blocks TCP:853 at exit nodes) and DoH was measured
+            # stalling constantly from this sidecar: 131 "context deadline
+            # exceeded / connection reset" warnings per 30 min, each a 2 s
+            # stall. Same fix as the byparr pod (see byparr.yaml); queries stay
+            # inside WireGuard up to the exit.
             - name: DNS_UPSTREAM_RESOLVER_TYPE
-              value: "doh"
+              value: "plain"
+            - name: DNS_UPSTREAM_PLAIN_ADDRESSES
+              value: "1.1.1.1:53,1.0.0.1:53"
             # Use IPs directly — healthcheck uses system /etc/resolv.conf (k8s CoreDNS 10.43.0.10)
             # which is blocked by gluetun's firewall once VPN is up, causing lookup timeouts
             - name: HEALTH_TARGET_ADDRESSES
