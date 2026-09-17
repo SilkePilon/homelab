@@ -81,14 +81,27 @@ scheduled it.
   is needed — the MySQL entrypoint tolerates a non-empty volume root and
   ignores `lost+found`.
 - Resources: requests 100m / 256Mi, limits 1 CPU / 1Gi — matching `twenty-db`.
-- A startup probe of `mysqladmin ping -h 127.0.0.1`, 10s period and a
-  failure threshold of 30, so first-boot initialisation of the data directory
-  on a fresh Longhorn volume gets up to five minutes without loosening the
-  liveness threshold afterwards. Readiness and liveness run the same command on
-  a 10s / 30s cadence, matching what `twenty-db` uses for `pg_isready`.
-- The password reaches `mysqladmin` through `MYSQL_PWD` rather than a `-p` flag,
-  both sourced from the same Secret key, so it never appears in the container's
-  process arguments.
+- **`MYSQL_PWD` must not be set.** The entrypoint starts a temporary server and
+  runs its own `mysql` client calls to create `root@'%'`, set the password and
+  create `MYSQL_DATABASE` — all while root still has an empty password. The
+  client reads `MYSQL_PWD` from the environment automatically, so setting it
+  makes those calls fail with `ERROR 1045 Access denied` and initialisation
+  aborts *after* the datadir is written. The container then restarts, skips
+  init because the datadir is populated, and serves a database with no
+  `root@'%'`, an empty-password `root@localhost` and no `school` schema. The
+  probe password therefore goes on the command line, which is harmless: the
+  container's own environment already holds it.
+- Startup probe: `mysqladmin ping -h 127.0.0.1`, 10s period, failure threshold
+  30. The temporary server listens on the socket only (`port: 0`), so a TCP
+  ping fails for the whole of initialisation — exactly the signal wanted — and
+  a fresh Longhorn volume gets five minutes to initialise.
+- Readiness probe: `mysql -h 127.0.0.1 -u root -p"$MYSQL_ROOT_PASSWORD" -e
+  'SELECT 1'`. It has to authenticate. `mysqladmin ping` replies "mysqld is
+  alive" even when credentials are rejected, so it reports Ready on a server
+  whose root account was never set up — which is precisely how the first
+  deployment attempt passed while being unusable.
+- Liveness probe: `mysqladmin ping -h 127.0.0.1` on a 30s period. Deliberately
+  credential-free, so rotating the root password cannot start killing the pod.
 
 No `my.cnf` ConfigMap. Server defaults are adequate for coursework, and an
 empty config file is unused surface that later readers have to check.

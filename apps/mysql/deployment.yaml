@@ -51,13 +51,6 @@ spec:
                 secretKeyRef:
                   name: mysql-secret
                   key: MYSQL_ROOT_PASSWORD
-            # Same value, read by mysqladmin in the probes below, so the
-            # password never lands in the container's process arguments.
-            - name: MYSQL_PWD
-              valueFrom:
-                secretKeyRef:
-                  name: mysql-secret
-                  key: MYSQL_ROOT_PASSWORD
             - name: MYSQL_DATABASE
               value: school
             # Already the image default; set explicitly because it is the most
@@ -74,30 +67,36 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+          # Do NOT set MYSQL_PWD here. The entrypoint runs its own mysql
+          # client calls against the temporary server while root still has an
+          # empty password; the client reads MYSQL_PWD automatically, so those
+          # calls fail with ERROR 1045 and initialisation aborts after the
+          # datadir is written but before root@'%' and MYSQL_DATABASE exist.
+          #
           # First boot initialises the data directory on a fresh Longhorn
-          # volume, which is slow. The startup probe gives that up to 5 minutes
-          # without a permissive liveness threshold afterwards.
+          # volume, which is slow, and the temporary server listens on the
+          # socket only (port 0). A TCP ping therefore fails for the whole of
+          # initialisation, which is exactly what the startup probe wants.
           startupProbe:
             exec:
-              command:
-                - sh
-                - -c
-                - mysqladmin ping -h 127.0.0.1 -u root --silent
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
             periodSeconds: 10
             failureThreshold: 30
+          # Readiness authenticates for real. `mysqladmin ping` answers "alive"
+          # even when the credentials are rejected, so it cannot tell a working
+          # server from one whose root account was never set up.
           readinessProbe:
             exec:
               command:
                 - sh
                 - -c
-                - mysqladmin ping -h 127.0.0.1 -u root --silent
+                - exec mysql -h 127.0.0.1 -u root -p"$MYSQL_ROOT_PASSWORD" -e 'SELECT 1' >/dev/null 2>&1
             periodSeconds: 10
+          # Liveness only asks whether the server still answers. It must not
+          # depend on credentials, or a password change would kill the pod.
           livenessProbe:
             exec:
-              command:
-                - sh
-                - -c
-                - mysqladmin ping -h 127.0.0.1 -u root --silent
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
             periodSeconds: 30
       volumes:
         - name: data
