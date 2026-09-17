@@ -1,0 +1,26 @@
+# ── MySQL on the tailnet ─────────────────────────────────────────────────────
+# Deliberately NOT on the Cloudflare tunnel. A tunnel public hostname carries
+# HTTP/HTTPS; the MySQL wire protocol is raw TCP, which a tunnel can only carry
+# if every client machine first runs `cloudflared access tcp`. The Tailscale
+# operator proxies L4 natively, so the client just connects.
+#
+# Same reasoning as the Pi-hole admin UI and the Longhorn UI.
+# Reachable at mysql.<tailnet>.ts.net:3306.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: mysql
+  labels:
+    app.kubernetes.io/name: mysql
+  annotations:
+    tailscale.com/expose: "true"
+    tailscale.com/hostname: mysql
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql

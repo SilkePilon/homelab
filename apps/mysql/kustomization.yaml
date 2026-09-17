@@ -1,0 +1,57 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: mysql
+
+# ─────────────────────────────────────────────────────────────────────────────
+# mysql — a standalone MySQL 8.4 server for schoolwork, on the tailnet only.
+#
+# BEFORE applying this stack:
+#
+#  1. Create the namespace:
+#       kubectl create namespace mysql
+#
+#  2. Create the secret (NOT committed to git). Read on first boot only:
+#       kubectl -n mysql create secret generic mysql-secret \
+#         --from-literal=MYSQL_ROOT_PASSWORD="..."
+#
+#  3. Make sure the tailnet policy lets your devices reach tag:k8s — the same
+#     grant the Pi-hole and Longhorn UIs already use.
+#
+#  There is no Cloudflare Tunnel hostname and no Ingress. This app is
+#  reachable over the tailnet and nowhere else.
+#
+#  4. Apply:
+#       kubectl apply -k apps/mysql/
+#     or let Argo CD sync automatically after merging to main.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
+
+# Keep only 2 old ReplicaSets/ControllerRevisions per workload instead of the
+# Kubernetes default of 10. Without this the cluster accumulates dozens of
+# empty ReplicaSets, and each retained revision pins its container image on the
+# node — costly on the Pis, which have 28-58Gi disks.
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2
+  - target:
+      kind: DaemonSet
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2

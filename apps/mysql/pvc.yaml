@@ -1,0 +1,15 @@
+---
+# MySQL data directory — the source of truth for the school database.
+# Longhorn rather than local-path so the volume is replicated and the pod is
+# not pinned to whichever node first scheduled it.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data
+  namespace: mysql
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi

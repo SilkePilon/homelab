@@ -1,0 +1,105 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MySQL 8.4 LTS — a standalone database for schoolwork. No cluster workload
+# consumes it; its only client is a laptop on the tailnet.
+#
+# Access is root@'%', deliberately. That makes the tailnet ACL the real
+# security boundary, not the MySQL grant table — any device that can reach
+# tag:k8s can also DROP DATABASE. See the design note in
+# docs/superpowers/specs/2026-09-17-mysql-design.md.
+#
+# Service DNS inside the cluster: mysql.mysql.svc.cluster.local:3306
+# From the tailnet:                mysql.<tailnet>.ts.net:3306
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: mysql
+  labels:
+    app.kubernetes.io/name: mysql
+spec:
+  replicas: 1
+  # ReadWriteOnce PVC — only one writer at a time, so never two pods at once.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mysql
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mysql
+    spec:
+      # The mysql:8.4 image publishes arm64, but the InnoDB buffer pool is a
+      # poor fit for a shared Pi. The three amd64 minis have the headroom.
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      # The image starts as root and drops to the mysql user via its own
+      # entrypoint (it chowns the datadir itself), so no custom securityContext.
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: mysql
+              containerPort: 3306
+          env:
+            # Read by the entrypoint ONLY on first boot, while the volume is
+            # empty. Changing the Secret afterwards does not rotate it.
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_ROOT_PASSWORD
+            # Same value, read by mysqladmin in the probes below, so the
+            # password never lands in the container's process arguments.
+            - name: MYSQL_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              value: school
+            # Already the image default; set explicitly because it is the most
+            # consequential property of this deployment.
+            - name: MYSQL_ROOT_HOST
+              value: "%"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          # First boot initialises the data directory on a fresh Longhorn
+          # volume, which is slow. The startup probe gives that up to 5 minutes
+          # without a permissive liveness threshold afterwards.
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -u root --silent
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -u root --silent
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -u root --silent
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mysql-data
