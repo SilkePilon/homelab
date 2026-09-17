@@ -56,6 +56,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | [hermes](apps/hermes) | `hermes` | [Hermes Agent](https://github.com/NousResearch/hermes-agent) + a `signal-cli` sidecar for the Signal channel |
 | [homeassistant](apps/homeassistant) | `homeassistant` | Home Assistant |
 | [monitoring](apps/monitoring) | `monitoring` | Prometheus, Grafana, Loki, Promtail, node-exporter, kube-state-metrics, NUT exporter |
+| [mysql](apps/mysql) | `mysql` | MySQL 8.4 for schoolwork — tailnet-only, no public hostname |
 | [n8n](apps/n8n) | `n8n` | n8n workflow automation |
 | [open-webui](apps/open-webui) | `open-webui` | Open WebUI (LLM chat front-end; providers configured in its admin UI) |
 | [plane](apps/plane) | `plane` | Plane project management (Helm chart rendered by Argo CD) + its own Postgres, Valkey, RabbitMQ and MinIO |
@@ -129,6 +130,7 @@ kubectl -n n8n create secret generic n8n-secret \
 | `protonvpn-wg` | `arr-stack` | WireGuard keys for the Gluetun sidecar |
 | `scraparr-api-keys` | `arr-stack` | Sonarr/Radarr/Lidarr API keys |
 | `grafana-admin-creds` | `monitoring` | Grafana admin login |
+| `mysql-secret` | `mysql` | MySQL root password (`MYSQL_ROOT_PASSWORD`), only read on an empty volume |
 | `n8n-secret` | `n8n` | n8n encryption key |
 | `open-webui-secret` | `open-webui` | Session signing key (`WEBUI_SECRET_KEY`) |
 | `pihole-secret` | `pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
