@@ -81,9 +81,14 @@ scheduled it.
   is needed — the MySQL entrypoint tolerates a non-empty volume root and
   ignores `lost+found`.
 - Resources: requests 100m / 256Mi, limits 1 CPU / 1Gi — matching `twenty-db`.
-- Readiness and liveness probes both `mysqladmin ping -h 127.0.0.1` with the
-  root password supplied from the environment, on the same 10s / 30s cadence
-  `twenty-db` uses for `pg_isready`.
+- A startup probe of `mysqladmin ping -h 127.0.0.1`, 10s period and a
+  failure threshold of 30, so first-boot initialisation of the data directory
+  on a fresh Longhorn volume gets up to five minutes without loosening the
+  liveness threshold afterwards. Readiness and liveness run the same command on
+  a 10s / 30s cadence, matching what `twenty-db` uses for `pg_isready`.
+- The password reaches `mysqladmin` through `MYSQL_PWD` rather than a `-p` flag,
+  both sourced from the same Secret key, so it never appears in the container's
+  process arguments.
 
 No `my.cnf` ConfigMap. Server defaults are adequate for coursework, and an
 empty config file is unused surface that later readers have to check.
