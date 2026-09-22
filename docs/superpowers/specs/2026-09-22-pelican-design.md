@@ -93,16 +93,21 @@ is mounted by exactly one pod.
   extra web server.
 - `replicas: 1`, `strategy: Recreate`, nodeSelector `kubernetes.io/arch: amd64`.
 - Env: `APP_URL=http://192.168.0.158:8088`, `APP_ENV=production`,
-  `APP_DEBUG=false`, `XDG_DATA_HOME=/pelican-data`, `MAIL_DRIVER=log`,
-  `TZ=Europe/Amsterdam`. `LE_EMAIL` is not set — no Let's Encrypt without a
-  public hostname.
+  `APP_DEBUG=false`, `BEHIND_PROXY=true`, `XDG_DATA_HOME=/pelican-data`,
+  `MAIL_DRIVER=log`, `TZ=Europe/Amsterdam`. `LE_EMAIL` is not set — no Let's
+  Encrypt without a public hostname.
+- `BEHIND_PROXY=true` matters. The image's Caddyfile uses `APP_URL` as its
+  site address, so without it Caddy would listen on `:8088` and answer only
+  `Host: 192.168.0.158`, and a probe against the pod IP would get an empty
+  reply. With it Caddy listens on `:80` for any Host, auto-HTTPS is off and
+  `ASSET_URL` is set from `APP_URL`. ServiceLB is, in effect, the proxy.
 - Volume `pelican-panel-data` at `/pelican-data`. The compose file also mounts
   a `plugins` subpath at `/var/www/html/plugins`; done here with `subPath`.
 - No SQLite/cache/session/queue env: the defaults (SQLite, filesystem,
   filesystem, database) are what the installer writes, and they suit one user.
 - Resources: requests 100m / 256Mi, limits 1 CPU / 1Gi.
-- Probes: `httpGet` on `/` port 80. Kubernetes treats any 2xx/3xx as success,
-  so the installer redirect passes.
+- Probes: `httpGet` on `/up` port 80, Laravel's health route and what the
+  image's own `HEALTHCHECK` uses.
 - First boot runs migrations, which is slow on a fresh Longhorn volume:
   startup probe with a generous failure threshold.
 
@@ -125,12 +130,15 @@ Secret is the source of truth; the emptyDir is a working copy.
 - Readiness/liveness: `tcpSocket` 8080. `/api/system` needs a bearer token,
   so an unauthenticated HTTP probe would read 401 as failure.
 
-**Container `dind`** — `docker:28-dind`, `privileged: true`.
+**Container `dind`** — `docker:28.5.2-dind`, `privileged: true`, run as a
+native sidecar (`initContainers` entry with `restartPolicy: Always`) so it is
+up and past its startup probe before Wings starts.
 
-- Args `dockerd --host=tcp://127.0.0.1:2375`. Bound to loopback on purpose:
-  the default dind listener is `0.0.0.0:2375`, which would offer an
-  unauthenticated, root-equivalent Docker API to every pod in the cluster on
-  the pod IP.
+- Args `dockerd --host=unix:///var/run/docker.sock --host=tcp://127.0.0.1:2375`.
+  Bound to loopback on purpose: the image entrypoint's default listener is
+  `0.0.0.0:2375`, which would offer an unauthenticated, root-equivalent Docker
+  API to every pod in the cluster on the pod IP. The entrypoint only injects
+  that default when the first argument is not `dockerd`.
 - Env `DOCKER_TLS_CERTDIR=""` so dind does not insist on TLS.
 - Mounts: PVC `pelican-docker` at `/var/lib/docker`, PVC `pelican-wings-data`
   at `/var/lib/pelican`, emptyDir `/tmp/pelican`.
