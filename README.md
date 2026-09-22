@@ -156,11 +156,14 @@ Nothing is port-forwarded on the router — `cloudflared` dials out to Cloudflar
 edge, and each public hostname in the tunnel config points back at
 `traefik.kube-system.svc.cluster.local:80`. TLS is terminated by Cloudflare.
 
-Two things deliberately skip that path. Admin UIs that control the whole
+Three things deliberately skip that path. Admin UIs that control the whole
 cluster — Longhorn and Pi-hole — are exposed on the tailnet instead, via the
 Tailscale operator. And [pihole](apps/pihole) serves DNS on the LAN through a
 `LoadBalancer`, so k3s ServiceLB claims port 53 on every node and any node IP
-works as a resolver.
+works as a resolver. And [pelican](apps/pelican)'s Panel, Wings and game
+ports are LAN `LoadBalancer` Services in the same way, because Minecraft is
+raw TCP the tunnel cannot carry; a router port-forward to a node IP for the
+game ports is the planned exception to "nothing is port-forwarded".
 
 ## Header Image
 

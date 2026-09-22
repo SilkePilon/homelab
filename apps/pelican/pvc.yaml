@@ -36,7 +36,11 @@ spec:
 # runtime images (ghcr.io/pelican/yolks, ~500Mi each) and container
 # scratch. Not precious — everything here is re-pullable — but without a
 # volume it lands on the node's overlay and is lost on every pod restart,
-# which means re-pulling every image.
+# which means re-pulling every image. Longhorn rather than local-path even
+# though the contents are re-pullable, because local-path would pin the
+# whole pod to one node (all three PVCs must attach to the same node) and
+# the point of Longhorn on the other two volumes is that the pod can move
+# between EliteDesks.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

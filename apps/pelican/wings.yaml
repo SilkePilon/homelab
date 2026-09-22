@@ -55,8 +55,11 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: amd64
-      # Give running Minecraft servers time to save worlds. Wings forwards
-      # SIGTERM as a stop to each server.
+      # Wings leaves game containers running when it exits (it reattaches on
+      # restart), so the pod, not Wings, has to stop them cleanly; the dind
+      # preStop hook sends every container SIGTERM with a 90s stop timeout,
+      # which Minecraft treats as a normal shutdown and saves the world;
+      # 120s leaves headroom for the hook plus dockerd's own exit.
       terminationGracePeriodSeconds: 120
       initContainers:
         # ── 1. Copy the Secret into a writable location ────────────────────
@@ -103,6 +106,10 @@ spec:
               value: ""
           securityContext:
             privileged: true
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "docker stop -t 90 $(docker ps -q) 2>/dev/null || true"]
           volumeMounts:
             - name: docker
               mountPath: /var/lib/docker
@@ -121,19 +128,17 @@ spec:
             limits:
               cpu: "6"
               memory: 8Gi
-          # `docker info` over the unix socket — proves dockerd is answering,
-          # not merely that the process exists.
+          # The startup probe gates the main containers on dockerd answering.
+          # There is deliberately no liveness probe: a liveness restart of
+          # dind kills every game container while wings stays Ready and the
+          # Panel keeps showing servers as running, and `docker info` under
+          # load can exceed any sane timeout.
           startupProbe:
             exec:
               command: ["docker", "info"]
             periodSeconds: 5
             timeoutSeconds: 10
             failureThreshold: 24
-          livenessProbe:
-            exec:
-              command: ["docker", "info"]
-            periodSeconds: 30
-            timeoutSeconds: 10
       containers:
         - name: wings
           image: ghcr.io/pelican/wings:v1.0.0-beta29

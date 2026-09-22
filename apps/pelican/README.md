@@ -33,6 +33,11 @@ Consequences worth knowing:
 - The dind container is `privileged`. The Docker API is bound to loopback
   so no other pod can reach it, but a container escape from a game server
   lands on the host. Stock Minecraft with friends: accepted.
+- A Panel admin can create an egg with any image and any mount, and dind
+  runs it privileged, so **Panel admin is equivalent to root on the node**.
+  The Panel is plain HTTP on the LAN with no rate limiting; never
+  port-forward 8088 to the internet. Only the game ports (25565-25569) are
+  meant to be forwarded.
 
 ## First-time setup
 
@@ -73,8 +78,17 @@ not found`) until step 4. That is expected.
    green heart in the Panel. Then **Servers → Create**: pick the Minecraft
    egg, a `0.0.0.0:25565` allocation, and install.
 
-If you ever recreate the Node in the Panel, delete and recreate the Secret,
-then `kubectl -n pelican rollout restart deploy/pelican-wings`.
+Any time the Panel pushes configuration to Wings — including a Node
+recreate or clicking "Reset daemon token" — the pod's copy is discarded on
+its next restart, because the init container re-copies `config.yml` from the
+Secret every time it starts. So after a token reset or Node recreate:
+
+```bash
+kubectl -n pelican delete secret pelican-wings-config
+kubectl -n pelican create secret generic pelican-wings-config \
+  --from-file=config.yml=./config.yml
+kubectl -n pelican rollout restart deploy/pelican-wings
+```
 
 ## Adding game ports
 

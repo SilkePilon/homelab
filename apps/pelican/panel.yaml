@@ -94,19 +94,29 @@ spec:
               port: http
             periodSeconds: 5
             failureThreshold: 60
+          # Readiness and liveness only begin once the startup probe has
+          # passed; php-fpm under the 1-CPU limit can take more than the 1s
+          # default to answer.
           readinessProbe:
             httpGet:
               path: /up
               port: http
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             httpGet:
               path: /up
               port: http
             periodSeconds: 30
+            timeoutSeconds: 5
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: pelican-panel-data
+        # The image's HEALTHCHECK and supervisord write to storage/logs,
+        # mirroring the upstream compose file's pelican-logs volume; an
+        # emptyDir is enough because these are pod-lifetime logs, kubectl
+        # logs has the rest. emptyDir is world-writable so php-fpm
+        # (www-data) can write under a root-owned mount.
         - name: logs
           emptyDir: {}
