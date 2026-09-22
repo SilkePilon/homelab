@@ -1,0 +1,112 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Pelican Panel — the web UI and API. https://pelican.dev
+# Image: ghcr.io/pelican/panel:v1.0.0-beta38
+# Port:  80 (Caddy + php-fpm inside the image)
+# Data:  /pelican-data (SQLite DB, .env with APP_KEY, avatars, plugins)
+#
+# Reached at http://192.168.0.158:8088 via the pelican-panel LoadBalancer
+# Service. No Ingress, no tunnel — see the design note in
+# docs/superpowers/specs/2026-09-22-pelican-design.md.
+#
+# First run: open http://192.168.0.158:8088/installer. Choose SQLite,
+# filesystem cache, filesystem session, database queue, and create the admin
+# user. Then create a Node — see README.md.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pelican-panel
+  namespace: pelican
+  labels:
+    app.kubernetes.io/name: pelican-panel
+spec:
+  replicas: 1
+  # ReadWriteOnce PVC and a SQLite file — never two pods at once.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pelican-panel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pelican-panel
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      # The image starts supervisord as root, which runs php-fpm as www-data
+      # and chowns /pelican-data itself. No custom securityContext.
+      containers:
+        - name: panel
+          image: ghcr.io/pelican/panel:v1.0.0-beta38
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+            # Every absolute URL the Panel generates (asset links, redirects,
+            # the Wings config it hands out) is built from this.
+            - name: APP_URL
+              value: "http://192.168.0.158:8088"
+            - name: APP_ENV
+              value: "production"
+            - name: APP_DEBUG
+              value: "false"
+            # Without this, Caddy reads its listen port AND Host match from
+            # APP_URL: it would listen on :8088 and answer only
+            # Host: 192.168.0.158, so a probe against the pod IP gets nothing.
+            # With it Caddy listens on :80 for any Host, auto-HTTPS is off and
+            # ASSET_URL is set to APP_URL. ServiceLB is, in effect, the proxy.
+            - name: BEHIND_PROXY
+              value: "true"
+            # Where the image keeps state. Its entrypoint writes .env and the
+            # SQLite file under here.
+            - name: XDG_DATA_HOME
+              value: "/pelican-data"
+            # No mail server. Password resets land in the log instead.
+            - name: MAIL_DRIVER
+              value: "log"
+          volumeMounts:
+            - name: data
+              mountPath: /pelican-data
+            # Mirrors the upstream compose file: plugins live on the data
+            # volume but the app expects them at this path.
+            - name: data
+              mountPath: /var/www/html/plugins
+              subPath: plugins
+            - name: logs
+              mountPath: /var/www/html/storage/logs
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          # /up is Laravel's health route; the image's own HEALTHCHECK uses it.
+          # First boot runs migrations and Filament optimisation on a fresh
+          # Longhorn volume, which takes minutes — hence the startup probe.
+          startupProbe:
+            httpGet:
+              path: /up
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: http
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pelican-panel-data
+        - name: logs
+          emptyDir: {}

@@ -1,0 +1,50 @@
+---
+# ── Panel state ──────────────────────────────────────────────────────────────
+# SQLite database, .env (holds APP_KEY, the encryption key for everything the
+# Panel stores), uploaded avatars and plugins. Small, but losing it means
+# losing every server definition and API key.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pelican-panel-data
+  namespace: pelican
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi
+---
+# ── Wings data ───────────────────────────────────────────────────────────────
+# /var/lib/pelican: one directory per game server under volumes/ (the actual
+# Minecraft worlds), plus backups/ and archives/. Mounted by BOTH the wings
+# and dind containers at the same path — see wings.yaml for why.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pelican-wings-data
+  namespace: pelican
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 50Gi
+---
+# ── Docker-in-Docker storage ─────────────────────────────────────────────────
+# /var/lib/docker inside the dind sidecar: image layers for the game server
+# runtime images (ghcr.io/pelican/yolks, ~500Mi each) and container
+# scratch. Not precious — everything here is re-pullable — but without a
+# volume it lands on the node's overlay and is lost on every pod restart,
+# which means re-pulling every image.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pelican-docker
+  namespace: pelican
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 20Gi
