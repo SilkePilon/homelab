@@ -127,6 +127,7 @@ spec:
             exec:
               command: ["docker", "info"]
             periodSeconds: 5
+            timeoutSeconds: 10
             failureThreshold: 24
           livenessProbe:
             exec:
@@ -196,6 +197,7 @@ spec:
         # Install scripts are written here by Wings and bind-mounted into the
         # install container by dind. Shared by both, lifetime of the pod.
         - name: tmp
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: 2Gi
         - name: logs
           emptyDir: {}
