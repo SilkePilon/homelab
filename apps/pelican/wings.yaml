@@ -56,10 +56,13 @@ spec:
       nodeSelector:
         kubernetes.io/arch: amd64
       # Wings leaves game containers running when it exits (it reattaches on
-      # restart), so the pod, not Wings, has to stop them cleanly; the dind
-      # preStop hook sends every container SIGTERM with a 90s stop timeout,
-      # which Minecraft treats as a normal shutdown and saves the world;
-      # 120s leaves headroom for the hook plus dockerd's own exit.
+      # restart), so the pod, not Wings, has to stop them cleanly. The dind
+      # preStop hook gives every container SIGTERM with a 60s stop timeout.
+      # Whether the server saves on that depends on the egg's entrypoint
+      # forwarding the signal to java; Pelican's yolks run the start command
+      # under bash, which may swallow it. Stop servers in the Panel before
+      # rolling the pod if the world matters. The 120s budget covers wings
+      # exiting, the 60s hook, and dockerd's own shutdown.
       terminationGracePeriodSeconds: 120
       initContainers:
         # ── 1. Copy the Secret into a writable location ────────────────────
@@ -109,7 +112,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["sh", "-c", "docker stop -t 90 $(docker ps -q) 2>/dev/null || true"]
+                command: ["sh", "-c", "docker stop -t 60 $(docker ps -q) 2>/dev/null || true"]
           volumeMounts:
             - name: docker
               mountPath: /var/lib/docker

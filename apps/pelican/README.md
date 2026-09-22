@@ -35,7 +35,8 @@ Consequences worth knowing:
   lands on the host. Stock Minecraft with friends: accepted.
 - A Panel admin can create an egg with any image and any mount, and dind
   runs it privileged, so **Panel admin is equivalent to root on the node**.
-  The Panel is plain HTTP on the LAN with no rate limiting; never
+  The Panel is plain HTTP on the LAN, so admin credentials cross it in
+  cleartext; never
   port-forward 8088 to the internet. Only the game ports (25565-25569) are
   meant to be forwarded.
 

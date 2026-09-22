@@ -38,8 +38,8 @@ spec:
 # volume it lands on the node's overlay and is lost on every pod restart,
 # which means re-pulling every image. Longhorn rather than local-path even
 # though the contents are re-pullable, because local-path would pin the
-# whole pod to one node (all three PVCs must attach to the same node) and
-# the point of Longhorn on the other two volumes is that the pod can move
+# wings pod to one node (this and pelican-wings-data attach to the same pod)
+# and the point of Longhorn on pelican-wings-data is that the pod can move
 # between EliteDesks.
 apiVersion: v1
 kind: PersistentVolumeClaim

@@ -113,10 +113,10 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: pelican-panel-data
-        # The image's HEALTHCHECK and supervisord write to storage/logs,
-        # mirroring the upstream compose file's pelican-logs volume; an
-        # emptyDir is enough because these are pod-lifetime logs, kubectl
-        # logs has the rest. emptyDir is world-writable so php-fpm
-        # (www-data) can write under a root-owned mount.
+        # Laravel writes storage/logs/laravel.log here (the upstream compose
+        # file gives it a pelican-logs volume). An emptyDir is enough: these
+        # are pod-lifetime logs, kubectl logs has the rest. emptyDir is
+        # world-writable so php-fpm (www-data) can write under a root-owned
+        # mount.
         - name: logs
           emptyDir: {}
