@@ -31,7 +31,7 @@
 #   kubectl -n pelican create secret generic pelican-wings-config \
 #     --from-file=config.yml=./config.yml
 #
-# Until it exists the pod sits in Init:CreateContainerConfigError. Expected.
+# Until it exists the pod sits in Init:0/2 with a FailedMount event. Expected.
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment

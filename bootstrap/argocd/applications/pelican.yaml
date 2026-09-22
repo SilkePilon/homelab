@@ -6,7 +6,8 @@
 # The Panel syncs and runs on its own. The Wings pod waits on a Secret that
 # can only be produced AFTER the Panel is installed and a Node exists in its
 # UI — see apps/pelican/README.md. Until then the wings pod shows
-# Init:CreateContainerConfigError, and the Application shows Progressing.
+# Init:0/2 with a FailedMount event ("secret \"pelican-wings-config\" not
+# found"), and the Application shows Progressing.
 # That is the expected first-sync state, not a failure.
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: argoproj.io/v1alpha1
