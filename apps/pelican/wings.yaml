@@ -92,7 +92,7 @@ spec:
         # before they begin, and is restarted if it dies. So Wings never
         # starts against a daemon that is not there yet.
         - name: dind
-          image: docker:28.5.2-dind
+          image: docker:29.8.1-dind
           imagePullPolicy: IfNotPresent
           restartPolicy: Always
           # Explicit --host flags. The image entrypoint only adds its own
