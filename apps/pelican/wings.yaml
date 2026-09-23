@@ -70,7 +70,7 @@ spec:
         # Panel pushes an updated configuration. The Wings image is distroless
         # (no shell), so busybox does the copy.
         - name: config
-          image: busybox:1.37
+          image: busybox:1.38
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c", "cp /secret/config.yml /etc/pelican/config.yml"]
           volumeMounts:
