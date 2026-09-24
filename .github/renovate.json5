@@ -23,6 +23,16 @@
       "/^bootstrap/.+\\.ya?ml$/",
     ],
   },
+  customManagers: [
+    {
+      description: "Version ARGs annotated with a `# renovate:` comment in image Dockerfiles",
+      customType: "regex",
+      managerFilePatterns: ["/^images/.+/Dockerfile$/"],
+      matchStrings: [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+ARG \\w+=(?<currentValue>\\S+)",
+      ],
+    },
+  ],
   packageRules: [
     {
       description: "Group all linuxserver.io images",
@@ -54,6 +64,12 @@
       matchUpdateTypes: ["major"],
       automerge: false,
       labels: ["major-update"],
+    },
+    {
+      description: "t3code rollouts kill running agent turns; merge by hand when idle",
+      matchDatasources: ["docker"],
+      matchPackageNames: ["ghcr.io/silkepilon/t3code"],
+      automerge: false,
     },
   ],
 }
