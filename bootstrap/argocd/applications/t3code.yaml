@@ -1,0 +1,33 @@
+# ── Argo CD Application — t3code ─────────────────────────────────────────────
+# A headless T3 Code server for Claude Code agents, reachable over the tailnet
+# at https://t3.<tailnet>.ts.net and nowhere else.
+#
+# No Secret is needed to sync. After the first sync, log the agent in to
+# Claude and GitHub once and pair a client; see apps/t3code/README.md.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: t3code
+  namespace: argocd
+  # Argo CD will delete its own Application resource if the file is removed
+  # from Git. It will NOT delete the deployed resources unless prune: true
+  # is also set. Leave this in place for normal operation.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/SilkePilon/homelab
+    targetRevision: main
+    path: apps/t3code
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: t3code
+  syncPolicy:
+    automated:
+      prune: true       # delete K8s resources removed from Git
+      selfHeal: true    # re-apply if someone manually modifies the cluster
+    syncOptions:
+      - CreateNamespace=true    # creates the namespace if it doesn't exist
+      - ServerSideApply=true    # avoids annotation-size limits on large CRDs

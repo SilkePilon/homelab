@@ -64,6 +64,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | [pihole](apps/pihole) | `pihole` | Pi-hole DNS ad blocking, served on port 53 of every node |
 | [stirling-pdf](apps/stirling-pdf) | `stirling-pdf` | [Stirling PDF](https://www.stirlingpdf.com) — PDF toolbox (merge, split, convert, OCR), login required |
 | [portfolio](apps/portfolio) | `portfolio` | [silkepilon.dev](https://silkepilon.dev) — Next.js + Payload CMS portfolio, SQLite on a Longhorn volume |
+| [t3code](apps/t3code) | `t3code` | Headless [T3 Code](https://github.com/pingdotgg/t3code) server with Claude Code, so agents keep running while the desktop is off — tailnet only |
 | [twenty](apps/twenty) | `twenty` | Twenty CRM + its own Postgres and Redis |
 
 `apps/_template/` is a skeleton, not a deployed app.
@@ -78,6 +79,7 @@ bootstrap/argocd/
   root.yaml                  # app-of-apps — apply once, by hand
   applications/              # one Argo CD Application per app
     _template.yaml.tpl       #   .tpl so the root app never applies it
+images/<name>/Dockerfile     # custom images, built to ghcr.io by .github/workflows/
 docs/                        # design notes
 .github/media/               # README header + the script that regenerates it
 ```
@@ -158,7 +160,8 @@ edge, and each public hostname in the tunnel config points back at
 
 Three things deliberately skip that path. Admin UIs that control the whole
 cluster — Longhorn and Pi-hole — are exposed on the tailnet instead, via the
-Tailscale operator. And [pihole](apps/pihole) serves DNS on the LAN through a
+Tailscale operator, and so is [t3code](apps/t3code), whose agents run shell
+commands with GitHub and Claude logins. And [pihole](apps/pihole) serves DNS on the LAN through a
 `LoadBalancer`, so k3s ServiceLB claims port 53 on every node and any node IP
 works as a resolver. And [pelican](apps/pelican)'s Panel, Wings and game
 ports are LAN `LoadBalancer` Services in the same way, because Minecraft is

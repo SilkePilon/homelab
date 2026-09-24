@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: t3code
+
+# ─────────────────────────────────────────────────────────────────────────────
+# t3code — a headless T3 Code server so Claude Code agents keep running while
+# the desktop is off. Tailnet only.
+#
+# No Secret to create. The logins live on the PVC and are made once, by hand,
+# after the first sync. See apps/t3code/README.md.
+#
+#  1. Make sure the tailnet has HTTPS certificates enabled (DNS page of the
+#     Tailscale admin console) — the Ingress needs them.
+#
+#  2. Apply:
+#       kubectl apply -k apps/t3code/
+#     or let Argo CD sync automatically after merging to main.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
+
+# Keep only 2 old ReplicaSets per workload instead of the Kubernetes default
+# of 10; each retained revision pins its image on the node.
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2

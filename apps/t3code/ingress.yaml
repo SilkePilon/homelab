@@ -1,0 +1,25 @@
+# ── T3 Code on the tailnet ───────────────────────────────────────────────────
+# A Tailscale Ingress rather than the `tailscale.com/expose` annotation the
+# Longhorn and Pi-hole UIs use: the Ingress terminates HTTPS with a real
+# Let's Encrypt cert for t3.<tailnet>.ts.net. The web client needs a secure
+# context for its WebCrypto pairing and clipboard, and wss for the socket.
+#
+# Deliberately NOT on the Cloudflare tunnel. Whoever reaches this server can
+# run shell commands with the agent's GitHub and Claude logins.
+#
+# Reachable at https://t3.<tailnet>.ts.net.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: t3code
+  namespace: t3code
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: t3code
+      port:
+        name: http
+  tls:
+    - hosts:
+        - t3

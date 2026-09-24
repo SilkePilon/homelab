@@ -1,0 +1,14 @@
+# The agent's whole $HOME: T3 userdata (threads, pairing sessions), the Claude
+# Code and gh logins, git config, and every cloned repo with its node_modules.
+# Longhorn so the pod can move to another EliteDesk and keep all of it.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: t3code-home
+  namespace: t3code
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 50Gi

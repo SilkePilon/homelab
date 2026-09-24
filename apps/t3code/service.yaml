@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: t3code
+  namespace: t3code
+  labels:
+    app.kubernetes.io/name: t3code
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: t3code
+  ports:
+    - name: http
+      port: 3773
+      targetPort: http

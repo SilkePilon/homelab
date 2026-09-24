@@ -1,0 +1,107 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# T3 Code — one headless `t3 serve`, so Claude Code agents keep running while
+# the desktop is off. The desktop app, laptop or phone connects over the
+# tailnet at https://t3.<tailnet>.ts.net and pairs with a one-time token.
+#
+# One server runs any number of projects and threads in parallel, so there is
+# one replica. Everything stateful is in $HOME on the t3code-home PVC.
+#
+# A pod restart (node drain, image rollout) kills any agent turn that is
+# running at that moment. Threads and their history survive.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: t3code
+  namespace: t3code
+  labels:
+    app.kubernetes.io/name: t3code
+spec:
+  replicas: 1
+  # ReadWriteOnce PVC, and T3's SQLite state must never have two writers.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: t3code
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: t3code
+    spec:
+      # Agents run arbitrary shell commands. Without a token they cannot talk
+      # to the Kubernetes API as this pod.
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # The image is amd64-only, and builds want the EliteDesks' cores.
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      affinity:
+        nodeAffinity:
+          # The 16-core i7 is the least loaded mini; Pelican leans on the
+          # other two. Preferred, not required, so a drain still moves it.
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values: [hp-elitedesk-800-g6-i7]
+      securityContext:
+        runAsUser: 1000   # the image's `node` user
+        runAsGroup: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
+        # The volume fills up with node_modules. A recursive chown of that on
+        # every start would take minutes.
+        fsGroupChangePolicy: OnRootMismatch
+      # Gives the server time to close sessions and flush SQLite on SIGTERM.
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: t3code
+          image: ghcr.io/silkepilon/t3code:latest@sha256:17cd88bbbcf43ce34e1fde5a2cb6e02686984caed38be4aa8d27cf66b2e12810
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3773
+          env:
+            - name: HOME
+              value: /home/node
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: home
+              mountPath: /home/node
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            # No CPU limit: a build may burst across every core, and
+            # throttling it only makes the agent wait longer.
+            limits:
+              memory: 6Gi
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          # Lenient on purpose. A liveness restart kills every running agent.
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+      volumes:
+        - name: home
+          persistentVolumeClaim:
+            claimName: t3code-home
