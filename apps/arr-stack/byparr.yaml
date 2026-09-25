@@ -72,6 +72,24 @@ spec:
       # on the x86 nodes; the Pis stay for the light workloads.
       nodeSelector:
         kubernetes.io/arch: amd64
+      # Byparr#416: before every browser launch Byparr's browser library
+      # looks up its own public IP (api.ipify.org -> icanhazip.com ->
+      # checkip.amazonaws.com, 10 s timeout each, ~35 s budget). Through a
+      # VPN exit that stalls this alone costs 25-46 s per solve while the
+      # solve itself takes 3-7 s - the 27-57 s "Turnstile solves" measured
+      # here. Resolving all three to loopback makes the lookup fail at once
+      # (connection refused) and Byparr falls back to TZ / BROWSER_LOCALE.
+      # All three, not one: with only the first black-holed the lookup
+      # succeeds on the second host and solves got slower (63-73 s).
+      # Must go if Byparr ever gets PROXY_SERVER: that path raises instead.
+      # Nothing else in the pod talks to these hosts (gluetun's public-IP
+      # check uses ipinfo.io).
+      hostAliases:
+        - ip: "127.0.0.1"
+          hostnames:
+            - api.ipify.org
+            - icanhazip.com
+            - checkip.amazonaws.com
       initContainers:
         # Ensure /dev/net/tun exists before gluetun starts
         - name: init-tun
@@ -252,12 +270,17 @@ spec:
           env:
             - name: LOG_LEVEL
               value: "info"
+            # With the IP lookup disabled (hostAliases above) the browser's
+            # timezone and locale come from here instead of the egress IP.
+            # SERVER_COUNTRIES are NL/CH/SE/IS; the first three share this
+            # offset, so it matches the exit most of the time.
             - name: TZ
-              value: "Etc/UTC"
+              value: "Europe/Amsterdam"
+            - name: BROWSER_LOCALE
+              value: "en-US"
             # No PROXY_SERVER — all traffic from this container exits through
             # the gluetun sidecar's WireGuard tunnel natively (shared pod
-            # network namespace). BROWSER_LOCALE stays unset so Byparr derives
-            # it from the VPN egress country, matching the exit IP.
+            # network namespace).
           ports:
             - name: api
               containerPort: 8191
@@ -320,8 +343,10 @@ spec:
           # request.post); older images send sessions.create first, which
           # Byparr answers with HTTP 502. 1.3.1 keeps the solver's cookie
           # domains, without which the solved cf_clearance never reached the
-          # direct transport.
-          image: ghcr.io/silkepilon/ext-to-torznab:1.3.2
+          # direct transport. 1.4.0 answers within SEARCH_DEADLINE from a
+          # (stale) cache and keeps feeds + clearance warm in the background,
+          # so a solve never runs inside an *arr request.
+          image: ghcr.io/silkepilon/ext-to-torznab:1.4.0
           imagePullPolicy: IfNotPresent
           env:
             - name: FLARESOLVERR_URL
@@ -341,17 +366,29 @@ spec:
               value: "5000"
             - name: HOST
               value: "0.0.0.0"
-            # A lone Turnstile solve through the ProtonVPN egress measured 27 s
-            # (ext.to) to 57 s (extto.com) on FlareSolverr; Byparr adds a
-            # browser launch on top. 60 s left no margin, so keep 120 s.
+            # Solves measured 27-57 s here, almost all of it Byparr's IP lookup
+            # (see hostAliases); without it a solve is 3-7 s. 60 s is ample,
+            # and a stuck solve no longer holds up searches, which stop
+            # waiting at SEARCH_DEADLINE anyway.
             - name: FLARESOLVERR_TIMEOUT
-              value: "120000"
+              value: "60000"
             # FLARESOLVERR_SESSION_IDLE / _TTL / _TABS_TILL_VERIFY are
             # FlareSolverr-only knobs; Byparr has no sessions to expire.
             # Answer a search after at most 5 s of magnet resolution; the rest
             # resolve in the background or on grab.
             - name: MAGNET_TIME_BUDGET
               value: "5"
+            # Longest a search waits on the site before answering from the
+            # cache (stale if need be) while the fetch finishes in the
+            # background. *arr apps time out at 100 s and back the indexer
+            # off after every timeout; an empty answer costs nothing.
+            - name: SEARCH_DEADLINE
+              value: "25"
+            # Background refresh of the feeds the *arr apps poll (RSS sync,
+            # connection test); re-solves an expired cf_clearance - e.g.
+            # after the 6-hourly VPN rotation - before a search needs it.
+            - name: KEEPALIVE_INTERVAL
+              value: "600"
             - name: INCLUDE_ADULT
               value: "true"
             - name: LOG_LEVEL
