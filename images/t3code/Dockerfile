@@ -11,6 +11,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
 FROM node:24-bookworm
 
+# Only the bootstrapper. t3-supervisor.sh runs the newest build on
+# $T3_CHANNEL from the PVC and keeps it updated; this one runs only if the
+# registry is unreachable on a fresh volume.
 # renovate: datasource=npm depName=t3
 ARG T3_VERSION=0.0.42
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
@@ -45,6 +48,8 @@ ENV DISABLE_AUTOUPDATER=1 \
     NPM_CONFIG_PREFIX=/home/node/.local \
     PATH=/home/node/.local/bin:$PATH
 
+COPY t3-supervisor.sh /usr/local/bin/t3-supervisor
+
 USER node
 WORKDIR /home/node
 
@@ -53,6 +58,4 @@ EXPOSE 3773
 # tini reaps the agent, shell and build processes T3 spawns and forwards
 # SIGTERM so the server shuts down cleanly on pod stop.
 ENTRYPOINT ["/usr/bin/tini", "--"]
-# ~/code is the default cwd for provider sessions; on a fresh PVC it does not
-# exist yet.
-CMD ["sh", "-c", "mkdir -p /home/node/code && exec t3 serve --host 0.0.0.0 --port 3773 --base-dir /home/node/.t3 /home/node/code"]
+CMD ["t3-supervisor"]
