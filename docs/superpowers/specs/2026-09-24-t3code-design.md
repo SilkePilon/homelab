@@ -30,8 +30,15 @@ while the desktop is off. Clients connect over the tailnet only.
 - **amd64 only, prefer the 16-core i7.** Builds want the cores; Pelican leans
   on the other two minis.
 
+- **T3 follows the nightly channel, updated in place.** The image's `t3` is
+  only a bootstrapper. `t3-supervisor` installs the channel's newest build
+  onto the PVC with `t3 update`, checks npm every 2h, and restarts the server
+  process (its own process group, since the npm launcher does not forward
+  SIGTERM) on a new version. Rebuilding the image every 2h via CI was
+  rejected: a pod rollout re-pulls ~660MB and needs a digest PR each time.
+
 ## Accepted limits
 
-- A pod restart kills running agent turns (threads survive). Liveness is
+- A pod restart or a T3 update kills running agent turns (threads survive). Liveness is
   lenient, and Renovate never automerges the image digest.
 - A client without Tailscale gets nothing.

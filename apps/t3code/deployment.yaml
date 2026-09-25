@@ -6,8 +6,10 @@
 # One server runs any number of projects and threads in parallel, so there is
 # one replica. Everything stateful is in $HOME on the t3code-home PVC.
 #
-# A pod restart (node drain, image rollout) kills any agent turn that is
-# running at that moment. Threads and their history survive.
+# T3 itself follows the nightly channel: t3-supervisor (in the image) checks
+# npm every 2h and restarts the server in place on a new build. That restart,
+# like a pod restart, kills any agent turn running at that moment. Threads
+# and their history survive.
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -59,7 +61,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: t3code
-          image: ghcr.io/silkepilon/t3code:latest@sha256:17cd88bbbcf43ce34e1fde5a2cb6e02686984caed38be4aa8d27cf66b2e12810
+          image: ghcr.io/silkepilon/t3code:latest@sha256:7bc48cb047ec6fc73957721bf0cfcc6a70677b29a5dd407a313be7740f4cbbc5
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -67,6 +69,11 @@ spec:
           env:
             - name: HOME
               value: /home/node
+            # stable | nightly | preview
+            - name: T3_CHANNEL
+              value: nightly
+            - name: T3_UPDATE_INTERVAL
+              value: "7200"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -82,6 +89,7 @@ spec:
             # throttling it only makes the agent wait longer.
             limits:
               memory: 6Gi
+          # A fresh volume downloads the channel's build before it listens.
           startupProbe:
             httpGet:
               path: /

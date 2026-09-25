@@ -7,9 +7,10 @@ client on the tailnet connects to `https://t3.<tailnet>.ts.net`.
 - **Image:** `ghcr.io/silkepilon/t3code`, built from
   [`images/t3code/`](../../images/t3code/Dockerfile) by
   [`.github/workflows/t3code-image.yaml`](../../.github/workflows/t3code-image.yaml).
-  It holds `t3`, Claude Code, `gh`, git, node 24, bun, python3,
-  build-essential and ripgrep. Versions are pinned as `ARG`s and bumped by
-  Renovate.
+  It holds Claude Code, `gh`, git, node 24, bun, python3, build-essential and
+  ripgrep, pinned as `ARG`s and bumped by Renovate.
+- **T3 itself:** follows the **nightly** channel, independent of the image.
+  See [Updates](#updates).
 - **State:** the `t3code-home` Longhorn PVC is mounted as `$HOME`
   (`/home/node`). It holds T3's threads and paired sessions, the Claude and
   `gh` logins, git config, and cloned repos in `~/code`.
@@ -66,8 +67,25 @@ own pairing. The pod has no Kubernetes service-account token, runs as uid
 
 ## Updates
 
-Pods do not roll on their own. Renovate opens a PR for each `ARG` bump in the
-Dockerfile, CI builds a new `latest` on merge, and Renovate then opens a
-second PR moving the digest in `deployment.yaml`. That second PR is never
-automerged, because a rollout kills every agent turn running at that moment.
-Merge it when nothing is running.
+**T3** updates itself. The image runs
+[`t3-supervisor`](../../images/t3code/t3-supervisor.sh) instead of `t3 serve`
+directly. On boot and then every 2 hours it asks npm for the newest version on
+`T3_CHANNEL` (`nightly`), downloads it with `t3 update` into
+`~/.t3/runtime/versions/` on the PVC, and restarts the server in place. The
+pod does not roll. The last 3 versions are kept. If the registry is down, the
+newest version already on the PVC keeps running.
+
+A restart kills every agent turn running at that moment, so a new nightly can
+cut one off mid-turn. Threads survive; resend the message. To follow a
+different channel or interval, change `T3_CHANNEL` / `T3_UPDATE_INTERVAL` in
+`deployment.yaml`.
+
+```bash
+kubectl -n t3code logs deploy/t3code | grep t3-supervisor   # update history
+```
+
+**The image** (Claude Code, gh, toolchain) does not roll on its own. Renovate
+opens a PR for each `ARG` bump in the Dockerfile, CI builds a new `latest` on
+merge, and Renovate then opens a second PR moving the digest in
+`deployment.yaml`. That second PR is never automerged, because a rollout kills
+every agent turn running at that moment. Merge it when nothing is running.
