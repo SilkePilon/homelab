@@ -70,7 +70,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: rotate
-              image: registry.k8s.io/kubectl:v1.37.0
+              image: registry.k8s.io/kubectl:v1.37.1
               imagePullPolicy: IfNotPresent
               # entrypoint is /bin/kubectl — pass subcommand via args
               args:

@@ -237,7 +237,7 @@ spec:
               mountPath: /gluetun
         # ── qBittorrent ───────────────────────────────────────────────────────
         - name: qbittorrent
-          image: lscr.io/linuxserver/qbittorrent:5.2.3_v2.0.13-ls469
+          image: lscr.io/linuxserver/qbittorrent:5.2.3_v2.0.14-ls477
           imagePullPolicy: IfNotPresent
           env:
             - name: PUID

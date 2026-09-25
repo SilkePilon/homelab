@@ -41,7 +41,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: radarr
-          image: lscr.io/linuxserver/radarr:6.3.0.10514-ls312
+          image: lscr.io/linuxserver/radarr:6.4.4.10685-ls318
           imagePullPolicy: IfNotPresent
           env:
             - name: PUID
