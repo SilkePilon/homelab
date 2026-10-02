@@ -225,6 +225,25 @@ spec:
           ports:
             - name: gluetun-ctrl
               containerPort: 8000
+            - name: gluetun-health
+              containerPort: 9999
+          # gluetun's internal VPN restart loop can wedge in "stopping" (seen
+          # 2026-09-29: tun0 down for 2.5 days, /v1/vpn/status "stopping",
+          # qBittorrent bound to lo, every torrent stuck on metadata). The
+          # health server on :9999 answers 500 while the tunnel is down, so
+          # restart the container once it has been unhealthy for ~10 minutes.
+          # Long window on purpose: gluetun's own restarts recover in seconds
+          # to a few minutes and must not be cut short. Restarting the
+          # container reruns VPN_PORT_FORWARDING_UP_COMMAND, which rebinds
+          # qBittorrent to tun0.
+          livenessProbe:
+            httpGet:
+              path: /
+              port: gluetun-health
+            initialDelaySeconds: 120
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 10
           resources:
             requests:
               cpu: 100m
