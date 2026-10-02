@@ -252,6 +252,18 @@ spec:
             # Server list freshness is handled by the init-servers initContainer
             # (see initContainers). UPDATER_PREFER_DIRECT_DOWNLOAD replaces it
             # once a gluetun release ships it (on master since 2026-05-19).
+          # Restart gluetun if its VPN loop wedges (tunnel down, :9999 answers
+          # 500) for ~10 minutes. Same probe and reasoning as qbittorrent.yaml;
+          # the 6-hourly gluetun-rotate restart would recover it too, but only
+          # after up to 6 hours of failed solves.
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9999
+            initialDelaySeconds: 120
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 10
           resources:
             requests:
               cpu: 50m
