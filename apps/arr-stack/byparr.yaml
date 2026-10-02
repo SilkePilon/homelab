@@ -257,9 +257,10 @@ spec:
           # the 6-hourly gluetun-rotate restart would recover it too, but only
           # after up to 6 hours of failed solves.
           livenessProbe:
-            httpGet:
-              path: /
-              port: 9999
+            # exec, not httpGet: the health server binds 127.0.0.1:9999 only,
+            # and kubelet probes the pod IP. wget exits 1 on the 500 answer.
+            exec:
+              command: ["wget", "-q", "-O", "/dev/null", "-T", "5", "http://127.0.0.1:9999/"]
             initialDelaySeconds: 120
             periodSeconds: 60
             timeoutSeconds: 10

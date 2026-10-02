@@ -225,8 +225,6 @@ spec:
           ports:
             - name: gluetun-ctrl
               containerPort: 8000
-            - name: gluetun-health
-              containerPort: 9999
           # gluetun's internal VPN restart loop can wedge in "stopping" (seen
           # 2026-09-29: tun0 down for 2.5 days, /v1/vpn/status "stopping",
           # qBittorrent bound to lo, every torrent stuck on metadata). The
@@ -237,9 +235,10 @@ spec:
           # container reruns VPN_PORT_FORWARDING_UP_COMMAND, which rebinds
           # qBittorrent to tun0.
           livenessProbe:
-            httpGet:
-              path: /
-              port: gluetun-health
+            # exec, not httpGet: the health server binds 127.0.0.1:9999 only,
+            # and kubelet probes the pod IP. wget exits 1 on the 500 answer.
+            exec:
+              command: ["wget", "-q", "-O", "/dev/null", "-T", "5", "http://127.0.0.1:9999/"]
             initialDelaySeconds: 120
             periodSeconds: 60
             timeoutSeconds: 10
