@@ -359,7 +359,7 @@ spec:
           # direct transport. 1.4.0 answers within SEARCH_DEADLINE from a
           # (stale) cache and keeps feeds + clearance warm in the background,
           # so a solve never runs inside an *arr request.
-          image: ghcr.io/silkepilon/ext-to-torznab:1.4.0
+          image: ghcr.io/silkepilon/ext-to-torznab:1.5.0
           imagePullPolicy: IfNotPresent
           env:
             - name: FLARESOLVERR_URL
