@@ -17,7 +17,7 @@ FROM node:24-bookworm
 # renovate: datasource=npm depName=t3
 ARG T3_VERSION=0.0.42
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
-ARG CLAUDE_CODE_VERSION=2.1.281
+ARG CLAUDE_CODE_VERSION=2.1.296
 # renovate: datasource=npm depName=bun
 ARG BUN_VERSION=1.4.2
 
