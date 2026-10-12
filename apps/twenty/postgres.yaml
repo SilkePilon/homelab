@@ -29,7 +29,7 @@ spec:
       # entrypoint (it chowns PGDATA itself), so no custom securityContext.
       containers:
         - name: postgres
-          image: postgres:16
+          image: postgres:18
           imagePullPolicy: IfNotPresent
           ports:
             - name: postgres
