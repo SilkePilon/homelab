@@ -6,9 +6,10 @@
 #   8082  Web UI + API: used by the Jotihunt server (TRACCAR_API_URL) and
 #         reachable on the tailnet only (ingress-tailnet.yaml). Never public.
 #
-# replicas: 0 until the laptop's H2 database is copied onto traccar-data
-# (see the cutover runbook). A Traccar that starts on an empty volume creates
-# a fresh database where the first visitor becomes admin.
+# Went live with a FRESH database (2026-10-12, no laptop data). The admin was
+# created right after first start (credentials in the hand-made Secret
+# jotihunt-traccar-admin, not in git) and registration is off. The UI/API is
+# tailnet-only, so nobody else could claim the first account.
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -18,7 +19,7 @@ metadata:
   labels:
     app.kubernetes.io/name: traccar
 spec:
-  replicas: 0
+  replicas: 1
   # ReadWriteOnce PVC and a single H2 writer.
   strategy:
     type: Recreate
