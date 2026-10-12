@@ -1,0 +1,75 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: jotihunt
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Jotihunt 2026 tracker — web app + API, MongoDB, Traccar. Game weekend:
+# Sat 17 Oct 10:00 – Sun 18 Oct 12:00 CEST.
+#
+# Topology:
+#   client    Deployment  web app (vite preview)        jotihunt.silkepilon.dev/
+#   server    Deployment  API + in-process crons        jotihunt.silkepilon.dev/api
+#   mongodb   Deployment  MongoDB 8.3 (no auth, NetworkPolicy)
+#   traccar   Deployment  Traccar 6 (H2)  OsmAnd → jotihunt-gps.silkepilon.dev,
+#                                         UI → tailnet only
+#   mongodump CronJob     every 30 min → jotihunt-backups PVC
+#
+# BEFORE server/traccar go to replicas: 1:
+#
+#  1. Create the namespace and the secret `jotihunt-secret` (NOT in git) —
+#     see the header of server.yaml for the keys and the command.
+#
+#  2. Add the two Cloudflare Tunnel public hostnames (see ingress.yaml).
+#     Cloudflare zone: Bot Fight Mode off; for both hostnames Browser
+#     Integrity Check off and a Cache Rule "bypass cache".
+#
+#  3. Load the data (MongoDB dump, Traccar H2 database, uploads) from the
+#     laptop while server/traccar are at replicas: 0. Traccar must never
+#     start on an empty volume while it is exposed.
+#
+# server.env and client.env are PUBLIC (this repo is public): no secrets.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - mongodb.yaml
+  - traccar.yaml
+  - server.yaml
+  - client.yaml
+  - ingress.yaml
+  - ingress-tailnet.yaml
+  - backup.yaml
+  - networkpolicy.yaml
+
+# Hash-suffixed names, so an env change rolls the pods (Argo prunes the old
+# ConfigMap).
+configMapGenerator:
+  - name: jotihunt-server-env
+    envs:
+      - server.env
+  - name: jotihunt-client-env
+    envs:
+      - client.env
+  - name: traccar-config
+    files:
+      - traccar.xml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
+
+# Keep only 2 old ReplicaSets/ControllerRevisions per workload instead of the
+# Kubernetes default of 10. Without this the cluster accumulates dozens of
+# empty ReplicaSets, and each retained revision pins its container image on the
+# node — costly on the Pis, which have 28-58Gi disks.
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2

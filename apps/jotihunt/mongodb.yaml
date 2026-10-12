@@ -1,0 +1,88 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# MongoDB for the Jotihunt server.
+# Service DNS: mongodb.jotihunt.svc.cluster.local (MONGO_URI in server.env).
+#
+# No auth: only pods in this namespace may connect (networkpolicy.yaml).
+# Pinned to 8.3.x: the laptop data is FCV 8.3; keep it identical for the game.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: jotihunt
+  labels:
+    app.kubernetes.io/name: mongodb
+spec:
+  replicas: 1
+  # ReadWriteOnce PVC — only one writer at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mongodb
+    spec:
+      # Keep the whole stack on the amd64 EliteDesks (the server image is
+      # amd64-only). Architecture constraint, not a host pin.
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: mongodb
+          image: mongo:8.3.11@sha256:d731d77bfd7afd66bd487bdf627b5bf7ce4c3602ec461d635977021db529ebbc
+          imagePullPolicy: IfNotPresent
+          args: ["--wiredTigerCacheSizeGB", "0.25"]
+          ports:
+            - name: mongodb
+              containerPort: 27017
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+              # Keep lost+found out of the dbpath.
+              subPath: db
+          resources:
+            requests:
+              cpu: 100m
+              memory: 384Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 4
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mongodb-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: jotihunt
+  labels:
+    app.kubernetes.io/name: mongodb
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mongodb
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: mongodb
