@@ -1,0 +1,21 @@
+# ── Traccar admin UI on the tailnet ──────────────────────────────────────────
+# Same pattern as apps/t3code/ingress.yaml: a Tailscale Ingress with a real
+# Let's Encrypt cert at https://jotihunt-traccar.<tailnet>.ts.net.
+#
+# Deliberately NOT on the Cloudflare tunnel: the Traccar UI/API (8082) holds
+# every hunter's position history and the admin login.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: traccar-tailnet
+  namespace: jotihunt
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: traccar
+      port:
+        name: web
+  tls:
+    - hosts:
+        - jotihunt-traccar

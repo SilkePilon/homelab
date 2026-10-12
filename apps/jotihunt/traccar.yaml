@@ -1,0 +1,102 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Traccar 6 — GPS position server for the hunters' phones.
+#   5055  OsmAnd protocol: public at https://jotihunt-gps.silkepilon.dev
+#         (ingress.yaml). Unknown device ids are rejected (registration off).
+#   8082  Web UI + API: used by the Jotihunt server (TRACCAR_API_URL) and
+#         reachable on the tailnet only (ingress-tailnet.yaml). Never public.
+#
+# replicas: 0 until the laptop's H2 database is copied onto traccar-data
+# (see the cutover runbook). A Traccar that starts on an empty volume creates
+# a fresh database where the first visitor becomes admin.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traccar
+  namespace: jotihunt
+  labels:
+    app.kubernetes.io/name: traccar
+spec:
+  replicas: 0
+  # ReadWriteOnce PVC and a single H2 writer.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traccar
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: traccar
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: traccar
+          image: traccar/traccar:6.16.0@sha256:03ebb7ed2b219d4f25c326873bd022f5062f80bcae622a9d9422846b51951eda
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: web
+              containerPort: 8082
+            - name: osmand
+              containerPort: 5055
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+            # Size the heap from the container limit
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=60"
+          volumeMounts:
+            - name: data
+              mountPath: /opt/traccar/data
+            - name: config
+              mountPath: /opt/traccar/conf/traccar.xml
+              subPath: traccar.xml
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            # Public server info, no login needed
+            httpGet:
+              path: /api/server
+              port: web
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            tcpSocket:
+              port: osmand
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 4
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: traccar-data
+        - name: config
+          configMap:
+            name: traccar-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traccar
+  namespace: jotihunt
+  labels:
+    app.kubernetes.io/name: traccar
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: traccar
+  ports:
+    - name: web
+      port: 8082
+      targetPort: web
+    - name: osmand
+      port: 5055
+      targetPort: osmand

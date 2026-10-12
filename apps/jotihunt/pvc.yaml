@@ -1,0 +1,57 @@
+---
+# MongoDB data: users, hunts, markers, hints, predictions. The game's source
+# of truth (backed up every 30 min by backup.yaml).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-data
+  namespace: jotihunt
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Traccar's H2 database (devices, groups, positions, the server's API token).
+# Loaded from the laptop before traccar is scaled up: a fresh Traccar on an
+# empty volume lets the first visitor create the admin account.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: traccar-data
+  namespace: jotihunt
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi
+---
+# Server files: uploads/ (hunt photos, team logos) and app-releases/ (the
+# Android APK + latest.json served at /api/app/...).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jotihunt-server-data
+  namespace: jotihunt
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi
+---
+# mongodump archives written by the CronJob in backup.yaml (48 h kept).
+# A separate volume so a broken MongoDB volume doesn't take its backups along.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jotihunt-backups
+  namespace: jotihunt
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi

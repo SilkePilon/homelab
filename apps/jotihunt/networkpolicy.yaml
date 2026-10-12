@@ -1,0 +1,22 @@
+# ── MongoDB: same namespace only ─────────────────────────────────────────────
+# MongoDB has no auth, so only pods in this namespace (server, mongodump) may
+# connect. Without this, any pod in the cluster (including the agent
+# workloads with shell access) could reach mongodb.jotihunt:27017.
+# `kubectl exec` into the mongodb pod (restore) is not affected.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mongodb-same-namespace
+  namespace: jotihunt
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - port: 27017
+          protocol: TCP

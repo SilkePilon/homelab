@@ -71,5 +71,10 @@
       matchPackageNames: ["ghcr.io/silkepilon/t3code"],
       automerge: false,
     },
+    {
+      description: "Jotihunt: no automerge (a mongo/traccar rollout mid-game is an outage); merge by hand outside 17–18 Oct",
+      matchFileNames: ["apps/jotihunt/**"],
+      automerge: false,
+    },
   ],
 }

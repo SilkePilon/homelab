@@ -1,0 +1,110 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Jotihunt tracker server — https://github.com/SilkePilon/jotihunt-tracker-server
+# Image: ghcr.io/silkepilon/jotihunt-tracker-server (bun + chromium for the
+#        scraper/sticker photos; built by the repo's deploy-image.yml, amd64)
+# Port:  3000, public as https://jotihunt.silkepilon.dev/api (ingress.yaml
+#        strips the /api prefix)
+# Data:  /data (PVC jotihunt-server-data) — uploads/ + app-releases/
+#
+# Config: non-secret env in server.env (ConfigMap jotihunt-server-env, public
+# repo!), secrets from the hand-made Secret `jotihunt-secret` (NOT in git):
+#   JWT_SECRET          signs web + device sessions (keep the laptop value so
+#                       sessions survive the move)
+#   TRACCAR_API_TOKEN   Traccar API token (lives in Traccar's H2 database)
+#   GEMINI_API_KEY      Gemini (OCR, summaries, predictions)
+#   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT   web push
+#   optional: JOTIHUNT_WEB_USERNAME / JOTIHUNT_WEB_PASSWORD (site scraper),
+#             ORS_API_KEY (routing)
+# Create it from the laptop .env without printing values:
+#   grep -E '^(JWT_SECRET|TRACCAR_API_TOKEN|GEMINI_API_KEY|VAPID_PUBLIC_KEY|VAPID_PRIVATE_KEY|VAPID_SUBJECT|JOTIHUNT_WEB_USERNAME|JOTIHUNT_WEB_PASSWORD|ORS_API_KEY)=.+' .env > /tmp/jh-secret.env
+#   kubectl -n jotihunt create secret generic jotihunt-secret --from-env-file=/tmp/jh-secret.env
+#   shred -u /tmp/jh-secret.env
+#
+# Exactly ONE instance may run anywhere (the crons — Jotihunt API/scraper,
+# push, predictions — run in-process), hence replicas: 1 + Recreate. It stays
+# at replicas: 0 until the data is loaded (see the cutover runbook).
+#
+# The image is built for linux/amd64 only, so the pod is restricted to the
+# amd64 nodes. Architecture constraint, not a host pin.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server
+  namespace: jotihunt
+  labels:
+    app.kubernetes.io/name: server
+spec:
+  replicas: 0
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: server
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: server
+          image: ghcr.io/silkepilon/jotihunt-tracker-server:sha-244185c@sha256:269b06ac2e7075d5b9b80a214fc1ba56a6a748e9e9592cc9ff6a340fe7444e3b
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: jotihunt-server-env
+            - secretRef:
+                name: jotihunt-secret
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            # Chromium (puppeteer) for the scraper and sticker photos needs headroom
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          readinessProbe:
+            # Unauthenticated, answers without a database round trip
+            httpGet:
+              path: /push/vapid-key
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            # TCP, not HTTP: a running demo-mode switch holds HTTP requests
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 4
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: jotihunt-server-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: server
+  namespace: jotihunt
+  labels:
+    app.kubernetes.io/name: server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: server
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
