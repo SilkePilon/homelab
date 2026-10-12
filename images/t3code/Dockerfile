@@ -15,7 +15,7 @@ FROM node:24-bookworm
 # $T3_CHANNEL from the PVC and keeps it updated; this one runs only if the
 # registry is unreachable on a fresh volume.
 # renovate: datasource=npm depName=t3
-ARG T3_VERSION=0.0.42
+ARG T3_VERSION=0.0.45
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
 ARG CLAUDE_CODE_VERSION=2.1.296
 # renovate: datasource=npm depName=bun
