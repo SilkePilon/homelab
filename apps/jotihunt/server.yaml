@@ -9,9 +9,9 @@
 #
 # Config: non-secret env in server.env (ConfigMap jotihunt-server-env, public
 # repo!), secrets from the hand-made Secret `jotihunt-secret` (NOT in git):
-#   JWT_SECRET          signs web + device sessions (keep the laptop value so
-#                       sessions survive the move)
-#   TRACCAR_API_TOKEN   Traccar API token (lives in Traccar's H2 database)
+#   JWT_SECRET          signs web + device sessions
+#   TRACCAR_API_TOKEN   Traccar admin API token (POST /api/session/token as
+#                       the admin in Secret jotihunt-traccar-admin)
 #   GEMINI_API_KEY      Gemini (OCR, summaries, predictions)
 #   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT   web push
 #   optional: JOTIHUNT_WEB_USERNAME / JOTIHUNT_WEB_PASSWORD (site scraper),
@@ -22,8 +22,8 @@
 #   shred -u /tmp/jh-secret.env
 #
 # Exactly ONE instance may run anywhere (the crons — Jotihunt API/scraper,
-# push, predictions — run in-process), hence replicas: 1 + Recreate. It stays
-# at replicas: 0 until the data is loaded (see the cutover runbook).
+# push, predictions — run in-process), hence replicas: 1 + Recreate. The
+# laptop server must stay stopped. Went live on a fresh database 2026-10-12.
 #
 # The image is built for linux/amd64 only, so the pod is restricted to the
 # amd64 nodes. Architecture constraint, not a host pin.
@@ -36,7 +36,7 @@ metadata:
   labels:
     app.kubernetes.io/name: server
 spec:
-  replicas: 0
+  replicas: 1
   strategy:
     type: Recreate
   selector:

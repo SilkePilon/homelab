@@ -41,7 +41,7 @@ spec:
                 - |
                   set -e
                   f=/backups/jotihunt-$(date +%Y%m%dT%H%M).archive.gz
-                  mongodump --uri=mongodb://mongodb:27017 --nsInclude='jotihunt.*' --archive="$f.tmp" --gzip
+                  mongodump --uri=mongodb://mongodb:27017/jotihunt --archive="$f.tmp" --gzip
                   mv "$f.tmp" "$f"
                   find /backups -name 'jotihunt-*.archive.gz*' -mmin +2880 -delete
                   ls -la /backups | tail -3
