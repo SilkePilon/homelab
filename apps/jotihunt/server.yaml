@@ -14,6 +14,9 @@
 #                       the admin in Secret jotihunt-traccar-admin)
 #   GEMINI_API_KEY      Gemini (OCR, summaries, predictions)
 #   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT   web push
+#   TELEGRAM_API_ID / TELEGRAM_API_HASH / TELEGRAM_SESSION_KEY   Telegram link
+#   LIFE360_SESSION_KEY base64 of 32 random bytes; encrypts the Life360 token
+#                       (openssl rand -base64 32; without it Life360 is off)
 #   optional: JOTIHUNT_WEB_USERNAME / JOTIHUNT_WEB_PASSWORD (site scraper),
 #             ORS_API_KEY (routing)
 # Create it from the laptop .env without printing values:
@@ -51,7 +54,7 @@ spec:
         kubernetes.io/arch: amd64
       containers:
         - name: server
-          image: ghcr.io/silkepilon/jotihunt-tracker-server:sha-6a07fd6@sha256:f5034a0fc4272c41ba30bad974372541db8fc7dfd8137b991760b57823fffd6f
+          image: ghcr.io/silkepilon/jotihunt-tracker-server:sha-267b375@sha256:748c0ff9f6498cbda67a6d3b3ad9cd4c218eb546cd358525dcb17d99bbe43fd7
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
