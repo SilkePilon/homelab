@@ -27,7 +27,7 @@ spec:
         kubernetes.io/arch: amd64
       containers:
         - name: client
-          image: ghcr.io/silkepilon/jotihunt-tracker-client:sha-11c5049@sha256:1a2f179eaa9159ad63dde427a6d7ba949ee389e849f35797b966f326b6139c67
+          image: ghcr.io/silkepilon/jotihunt-tracker-client:sha-29a5329@sha256:d71a4f3149dce9acac6a6de6f5e1825a7088886d2bf73c9abf858a327c2b53c3
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
