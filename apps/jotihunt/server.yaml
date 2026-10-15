@@ -17,6 +17,9 @@
 #   TELEGRAM_API_ID / TELEGRAM_API_HASH / TELEGRAM_SESSION_KEY   Telegram link
 #   LIFE360_SESSION_KEY base64 of 32 random bytes; encrypts the Life360 token
 #                       (openssl rand -base64 32; without it Life360 is off)
+#   JOTIBOARD_SESSION_KEY base64 of 32 random bytes; encrypts the Jotiboard
+#                       refresh token (openssl rand -base64 32; without it the
+#                       Jotiboard sync is off)
 #   optional: JOTIHUNT_WEB_USERNAME / JOTIHUNT_WEB_PASSWORD (site scraper),
 #             ORS_API_KEY (routing)
 # Create it from the laptop .env without printing values:
@@ -54,7 +57,7 @@ spec:
         kubernetes.io/arch: amd64
       containers:
         - name: server
-          image: ghcr.io/silkepilon/jotihunt-tracker-server:sha-8ca12e1@sha256:bddd9d83c70945701038ba31db2761e43690b690fdad604ff6dcdaf0f3e009f8
+          image: ghcr.io/silkepilon/jotihunt-tracker-server:sha-f6e2f85@sha256:723efd55ad894128d86bc200b41f9473c5e1ce2be8cdb0ff52b02e6c3c87481c
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
