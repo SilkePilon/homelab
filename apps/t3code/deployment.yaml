@@ -40,8 +40,8 @@ spec:
         kubernetes.io/arch: amd64
       affinity:
         nodeAffinity:
-          # The 16-core i7 is the least loaded mini; Pelican leans on the
-          # other two. Preferred, not required, so a drain still moves it.
+          # The 16-core i7 has the most headroom. Preferred, not required,
+          # so a drain still moves it.
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 50
               preference:

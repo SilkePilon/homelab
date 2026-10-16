@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for a hung e1000e NIC every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

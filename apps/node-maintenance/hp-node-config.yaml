@@ -1,0 +1,84 @@
+# ── Host config for the HP EliteDesks ─────────────────────────────────────────
+# On 2026-10-16 kured rebooted hp-elitedesk-800-g5-i7 for a kernel update. The
+# box came back up, but its onboard Intel I219 NIC (e1000e) logged "Detected
+# Hardware Unit Hang" five seconds after boot and never passed a packet again.
+# k3s exited with "no default routes found" on every restart for eight hours
+# until someone power-cycled it. All three EliteDesks have the same NIC.
+#
+# This DaemonSet writes host config onto every amd64 node (the EliteDesks; the
+# Pis are arm64) and makes systemd pick it up. What it installs keeps working
+# when k3s is down — that is the point — so it lives in systemd, not in a pod:
+#
+#   1. TSO/GSO offload off on e1000e NICs, via the NetworkManager profile so it
+#      is applied at every activation. Segmentation offload is the usual
+#      trigger for I219 unit hangs.
+#   2. nic-watchdog.timer: if the kernel has logged an e1000e unit hang this
+#      boot AND the default gateway does not answer, reload the driver; if that
+#      does not bring the link back within 5 minutes, reboot. At most 3 reboots
+#      in a row, so a dead switch cannot cause an endless reboot loop. Gateway
+#      loss without a NIC hang (router down) is left alone.
+#   3. systemd hardware watchdog (iTCO_wdt) at 30s, so a frozen kernel resets
+#      itself instead of sitting dead until someone notices.
+#   4. journald capped at 1G (g5 had 4G of journal).
+#
+# The container re-applies on every start and only touches systemd when a file
+# actually changed, then sleeps. Removing this DaemonSet does NOT undo the host
+# config; delete the files listed in hp-node-config/install.sh by hand for that.
+#
+# The scripts and units live in hp-node-config/ and become a hashed ConfigMap
+# (kustomization.yaml), so editing any of them rolls this DaemonSet.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hp-node-config
+  namespace: node-maintenance
+spec:
+  selector:
+    matchLabels:
+      app: hp-node-config
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: hp-node-config
+    spec:
+      # The EliteDesks are the only amd64 nodes; the Pis have a different NIC
+      # and their own setup (docs/raspberry-pi-5-nodes.md).
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      tolerations:
+        - operator: Exists
+      hostPID: true
+      containers:
+        - name: apply
+          image: busybox:1.38.0
+          command: ["sh", "-c", "sh /config/install.sh && exec sleep 2147483647"]
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            # Writes host files and runs systemctl/nmcli in the host namespaces.
+            privileged: true
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: host
+              mountPath: /host
+          resources:
+            requests:
+              cpu: 5m
+              memory: 8Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+      volumes:
+        - name: config
+          configMap:
+            name: hp-node-config
+        - name: host
+          hostPath:
+            path: /
+            type: Directory
