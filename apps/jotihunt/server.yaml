@@ -10,6 +10,8 @@
 # Config: non-secret env in server.env (ConfigMap jotihunt-server-env, public
 # repo!), secrets from the hand-made Secret `jotihunt-secret` (NOT in git):
 #   JWT_SECRET          signs web + device sessions
+#   SETTINGS_KEY        base64 of 32 random bytes; encrypts keys/passwords saved
+#                       in Beheer (Gemini key, Jotihunt login, Telegram app hash)
 #   TRACCAR_API_TOKEN   Traccar admin API token (POST /api/session/token as
 #                       the admin in Secret jotihunt-traccar-admin)
 #   GEMINI_API_KEY      Gemini (OCR, summaries, predictions)
@@ -57,7 +59,7 @@ spec:
         kubernetes.io/arch: amd64
       containers:
         - name: server
-          image: ghcr.io/silkepilon/jotihunt-tracker-server:sha-51cd62a@sha256:68f0c5ee5f7379d912d617eadc77546841fce1e91a7391c51fcd5b51e4a7051e
+          image: ghcr.io/silkepilon/jotihunt-tracker-server:sha-355c2c0@sha256:df877cb1af14aa000cf495f949393a8adcb5ae62a0f181f752d26d86ad266b59
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
