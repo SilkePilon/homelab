@@ -1,0 +1,43 @@
+#!/bin/bash
+# Managed by k8s node-maintenance/hp-node-config. See the comment there.
+set -u
+STATE=/var/lib/nic-watchdog     # survives reboots: consecutive reboot count
+RUN=/run/nic-watchdog           # this boot only: fail count, reload marker
+MAX_REBOOTS=3
+mkdir -p "$STATE" "$RUN"
+log() { echo "nic-watchdog: $*"; }
+
+gw=$(ip -4 route show default | awk '{print $3; exit}')
+if [ -n "$gw" ] && ping -c 3 -W 2 -q "$gw" >/dev/null 2>&1; then
+  rm -f "$RUN/fails" "$STATE/reboots"
+  exit 0
+fi
+
+# Only act on the failure we know about. A router outage also kills the
+# gateway, and rebooting every node for that would make things worse.
+if ! journalctl -k -b -q --no-pager | grep -q 'e1000e.*Detected Hardware Unit Hang'; then
+  log "gateway ${gw:-<none>} unreachable, but no e1000e hang this boot; leaving it"
+  exit 0
+fi
+
+fails=$(( $(cat "$RUN/fails" 2>/dev/null || echo 0) + 1 ))
+echo "$fails" > "$RUN/fails"
+log "e1000e hang logged and gateway ${gw:-<none>} unreachable (check $fails)"
+
+if [ "$fails" -ge 2 ] && [ ! -e "$RUN/reloaded" ]; then
+  touch "$RUN/reloaded"
+  log "reloading e1000e"
+  modprobe -r e1000e && modprobe e1000e
+  exit 0
+fi
+
+if [ "$fails" -ge 7 ]; then
+  reboots=$(cat "$STATE/reboots" 2>/dev/null || echo 0)
+  if [ "$reboots" -ge "$MAX_REBOOTS" ]; then
+    log "still down after $reboots reboots; giving up until the link recovers"
+    exit 0
+  fi
+  echo $(( reboots + 1 )) > "$STATE/reboots"
+  log "driver reload did not help; rebooting (attempt $(( reboots + 1 ))/$MAX_REBOOTS)"
+  systemctl reboot
+fi

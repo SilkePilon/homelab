@@ -1,0 +1,6 @@
+[Unit]
+Description=Recover a hung e1000e NIC (managed by k8s node-maintenance/hp-node-config)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nic-watchdog

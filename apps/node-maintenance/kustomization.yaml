@@ -6,6 +6,17 @@ namespace: node-maintenance
 resources:
   - namespace.yaml
   - image-gc.yaml
+  - hp-node-config.yaml
+
+configMapGenerator:
+  - name: hp-node-config
+    files:
+      - hp-node-config/90-watchdog.conf
+      - hp-node-config/90-size.conf
+      - hp-node-config/nic-watchdog
+      - hp-node-config/nic-watchdog.service
+      - hp-node-config/nic-watchdog.timer
+      - hp-node-config/install.sh
 
 patches:
   - target:

@@ -28,6 +28,13 @@ data:
         repeat_interval: 4h
 
   rules.yaml: |
+    # execErrState: KeepLast on every rule except cl-target-down. When the
+    # Prometheus query itself fails (Prometheus restarting, its volume
+    # re-attaching after a node loss), Alerting turned that into a page per
+    # series: on 2026-10-16 every node got "CPU critically hot" at 34-53°C and
+    # "Node not ready" while all were fine. KeepLast holds the previous state
+    # instead. cl-target-down still alerts on errors, so a dead Prometheus is
+    # not silent.
     apiVersion: 1
     groups:
       # ── Hardware health ───────────────────────────────────────────────────
@@ -45,7 +52,7 @@ data:
               summary: "NVMe on {{ $labels.node }} at {{ $values.A }}°C"
               description: "Sustained above 70°C. Mixed fleet (PM981a, Patriot, Kioxia on the EliteDesks; DRAM-less PM991a on the Pis) in a stacked rack; check airflow before it throttles. sensor=temp1 is Composite, the only sensor the drive throttles on — do not use max across sensors, some drives expose a controller sensor that idles 20°C higher."
             noDataState: OK
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 300, to: 0}
@@ -72,7 +79,7 @@ data:
               summary: "NVMe on {{ $labels.node }} at {{ $values.A }}°C"
               description: "Above 78°C. The drive will throttle and may drop off the PCIe bus. Act now."
             noDataState: OK
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 300, to: 0}
@@ -99,7 +106,7 @@ data:
               summary: "CPU on {{ $labels.node }} at {{ $values.A }}°C"
               description: "Pi 5 begins throttling at 80°C. chip matches coretemp on amd64 and thermal_zone0 on arm64."
             noDataState: OK
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 300, to: 0}
@@ -125,7 +132,7 @@ data:
             annotations:
               summary: "CPU on {{ $labels.node }} at {{ $values.A }}°C"
             noDataState: OK
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 300, to: 0}
@@ -152,7 +159,7 @@ data:
               summary: "Fan on {{ $labels.node }} reads 0 rpm"
               description: "The fan curve keeps these permanently spinning (~4000 rpm at idle), so 0 rpm means a failed fan or unplugged connector. The Pis are stacked with little airflow."
             noDataState: OK
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 600, to: 0}
@@ -185,7 +192,7 @@ data:
               summary: "{{ $labels.node }} memory {{ $values.A }}% used"
               description: "Note the three amd64 nodes each reserve 2Gi as hugepages for Longhorn V2, so their usable total is lower than the sticker figure."
             noDataState: OK
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 600, to: 0}
@@ -212,7 +219,7 @@ data:
               summary: "{{ $labels.node }} root filesystem {{ $values.A }}% full"
               description: "Longhorn stores replicas on the root filesystem on every node. Passing its 25% reserve makes the node unschedulable for new replicas."
             noDataState: OK
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 600, to: 0}
@@ -238,7 +245,7 @@ data:
             annotations:
               summary: "PVC {{ $labels.persistentvolumeclaim }} is {{ $values.A }}% full"
             noDataState: OK
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 600, to: 0}
@@ -264,7 +271,7 @@ data:
             annotations:
               summary: "Longhorn storage on {{ $labels.node }} is {{ $values.A }}% used"
             noDataState: OK
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 600, to: 0}
@@ -301,7 +308,7 @@ data:
             # Missing data means Prometheus itself is broken, not the cluster --
             # Alerting here paged for all seven healthy nodes on 2026-08-17.
             noDataState: NoData
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 300, to: 0}
@@ -328,7 +335,7 @@ data:
               summary: "Volume {{ $labels.volume }} is not healthy"
               description: "robustness 2 = degraded (rebuilding), 3 = faulted. A short degraded window after a node reboot is normal; 15m or more is not."
             noDataState: OK
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 900, to: 0}
@@ -354,7 +361,7 @@ data:
             annotations:
               summary: "{{ $labels.namespace }}/{{ $labels.pod }} restarted {{ $values.A }} times in 15m"
             noDataState: OK
-            execErrState: Alerting
+            execErrState: KeepLast
             data:
               - refId: A
                 relativeTimeRange: {from: 900, to: 0}

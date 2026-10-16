@@ -186,3 +186,38 @@ kubectl -n longhorn-system get volumes.longhorn.io \
 ```
 
 Test on a Pi first, not on one of the three etcd members.
+
+## Unattended reboots and the EliteDesk NIC
+
+[kured](../bootstrap/argocd/applications/kured.yaml) reboots one node at a
+time for kernel updates, between 03:00 and 06:00.
+
+On 2026-10-16 it rebooted `hp-elitedesk-800-g5-i7`. The box booted, but the
+onboard Intel I219 NIC (`e1000e`) logged `Detected Hardware Unit Hang` five
+seconds later and never carried a packet again. k3s died on every start with
+`no default routes found`. The node was unreachable and NotReady for eight
+hours until it was power-cycled. With the kured lock TTL at 30m the lock had
+expired long before that, so kured could have rebooted a second etcd member
+and lost quorum.
+
+What is in place now, on all three EliteDesks:
+
+- **kured lock never expires.** A node that does not come back keeps the lock,
+  so no other node reboots until a human has looked at it.
+- **[hp-node-config](../apps/node-maintenance/hp-node-config.yaml)** (DaemonSet,
+  amd64 nodes only) installs host config that keeps working with k3s down:
+  - TSO/GSO offload off on the `e1000e` NIC (NetworkManager profile + live).
+  - `nic-watchdog.timer`: hang logged + gateway unreachable means reload
+    `e1000e` once, then reboot after 5 more minutes, at most 3 reboots in a
+    row. A router outage on its own does not trigger it.
+  - systemd hardware watchdog (`iTCO_wdt`) at 30s for a frozen kernel.
+  - journald capped at 1G.
+
+To check a node: `journalctl -u nic-watchdog` and
+`systemctl show -p RuntimeWatchdogUSec`.
+
+If a node still stays down after a reboot: power-cycle it, then
+`journalctl -b -1` on it shows what the failed boot did. If it was cordoned by
+kured and stays `SchedulingDisabled`, run
+`kubectl uncordon <node>` and remove the `weave.works/kured-reboot-in-progress`
+annotation.

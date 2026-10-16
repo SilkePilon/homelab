@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kured
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  # ───────────────────────────────────────────────────────────────────────────
+  # kured — reboots nodes one at a time when the OS flags /var/run/reboot-required
+  # (kernel updates), inside a 03:00-06:00 window.
+  #
+  # Installed by hand with `helm install` on 2026-09-05 and adopted into Argo
+  # CD on 2026-10-16 with the same values plus the lockTtl change below.
+  #
+  # lockTtl is deliberately unset (0 = the lock never expires). It used to be
+  # 30m. On 2026-10-16 hp-elitedesk-800-g5-i7 rebooted and came back with a
+  # hung NIC; its kured pod never started again, so it never released the
+  # lock. With a 30m TTL the lock expired anyway and kured was free to reboot
+  # a second control-plane node while the first was still dead, which would
+  # have lost etcd quorum. Now a node that does not come back holds the lock
+  # until someone looks at it. See docs/high-availability.md.
+  # ───────────────────────────────────────────────────────────────────────────
+  source:
+    repoURL: https://kubereboot.github.io/charts
+    chart: kured
+    targetRevision: 6.1.0
+    helm:
+      releaseName: kured
+      values: |
+        configuration:
+          annotateNodes: true
+          drainTimeout: 15m
+          period: 10m
+          rebootDays: [mo, tu, we, th, fr, sa, su]
+          rebootSentinel: /var/run/reboot-required
+          startTime: "03:00"
+          endTime: "06:00"
+          timeZone: Europe/Amsterdam
+        tolerations:
+          - operator: Exists
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kured
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
