@@ -14,18 +14,18 @@
 #                       in Beheer (Gemini key, Jotihunt login, Telegram app hash)
 #   TRACCAR_API_TOKEN   Traccar admin API token (POST /api/session/token as
 #                       the admin in Secret jotihunt-traccar-admin)
-#   GEMINI_API_KEY      Gemini (OCR, summaries, predictions)
 #   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT   web push
-#   TELEGRAM_API_ID / TELEGRAM_API_HASH / TELEGRAM_SESSION_KEY   Telegram link
+#   TELEGRAM_SESSION_KEY   encrypts the Telegram session (app ID/hash are set in Beheer)
 #   LIFE360_SESSION_KEY base64 of 32 random bytes; encrypts the Life360 token
 #                       (openssl rand -base64 32; without it Life360 is off)
 #   JOTIBOARD_SESSION_KEY base64 of 32 random bytes; encrypts the Jotiboard
 #                       refresh token (openssl rand -base64 32; without it the
 #                       Jotiboard sync is off)
-#   optional: JOTIHUNT_WEB_USERNAME / JOTIHUNT_WEB_PASSWORD (site scraper),
-#             ORS_API_KEY (routing)
+#   optional: ORS_API_KEY (routing), NS_API_KEY (OV in the Intel chat)
+#   Gemini key + models, Jotihunt site login and Telegram app ID/hash are set in
+#   Beheer and stored encrypted in the database (SETTINGS_KEY).
 # Create it from the laptop .env without printing values:
-#   grep -E '^(JWT_SECRET|TRACCAR_API_TOKEN|GEMINI_API_KEY|VAPID_PUBLIC_KEY|VAPID_PRIVATE_KEY|VAPID_SUBJECT|JOTIHUNT_WEB_USERNAME|JOTIHUNT_WEB_PASSWORD|ORS_API_KEY)=.+' .env > /tmp/jh-secret.env
+#   grep -E '^(JWT_SECRET|SETTINGS_KEY|TRACCAR_API_TOKEN|VAPID_PUBLIC_KEY|VAPID_PRIVATE_KEY|VAPID_SUBJECT|ORS_API_KEY)=.+' .env > /tmp/jh-secret.env
 #   kubectl -n jotihunt create secret generic jotihunt-secret --from-env-file=/tmp/jh-secret.env
 #   shred -u /tmp/jh-secret.env
 #
