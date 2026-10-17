@@ -1,8 +1,8 @@
 ---
 # ─────────────────────────────────────────────────────────────────────────────
 # Jotihunt tracker server — https://github.com/SilkePilon/jotihunt-tracker-server
-# Image: ghcr.io/silkepilon/jotihunt-tracker-server (bun + chromium for the
-#        scraper/sticker photos; built by the repo's deploy-image.yml, amd64)
+# Image: ghcr.io/silkepilon/jotihunt-tracker-server (bun; jotihunt.nl is read over
+#        plain HTTP since 0abc179; built by the repo's deploy-image.yml, amd64)
 # Port:  3000, public as https://jotihunt.silkepilon.dev/api (ingress.yaml
 #        strips the /api prefix)
 # Data:  /data (PVC jotihunt-server-data) — uploads/ + app-releases/
@@ -59,7 +59,7 @@ spec:
         kubernetes.io/arch: amd64
       containers:
         - name: server
-          image: ghcr.io/silkepilon/jotihunt-tracker-server:sha-355c2c0@sha256:df877cb1af14aa000cf495f949393a8adcb5ae62a0f181f752d26d86ad266b59
+          image: ghcr.io/silkepilon/jotihunt-tracker-server:sha-0abc179@sha256:02f15389bd7a1a9438565f6ce14f9e76431c197879fd94f61018b1c13f4fc34d
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -73,7 +73,7 @@ spec:
             - name: data
               mountPath: /data
           resources:
-            # Chromium (puppeteer) for the scraper and sticker photos needs headroom
+            # Headroom for the AI/photo work (no Chromium since 0abc179)
             requests:
               cpu: 200m
               memory: 512Mi
