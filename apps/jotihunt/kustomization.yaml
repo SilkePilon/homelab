@@ -38,6 +38,7 @@ resources:
   - mongodb.yaml
   - traccar.yaml
   - server.yaml
+  - router.yaml
   - client.yaml
   - ingress.yaml
   - ingress-tailnet.yaml

@@ -20,3 +20,28 @@ spec:
       ports:
         - port: 27017
           protocol: TCP
+---
+# ── GraphHopper router: server only ──────────────────────────────────────────
+# The router's admin port (8990, POST /rebuild downloads ~1.3 GB and swaps the
+# graph) has no auth, so only the server pod may reach the router at all.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: graphhopper-server-only
+  namespace: jotihunt
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: graphhopper
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: server
+      ports:
+        - port: 8989
+          protocol: TCP
+        - port: 8990
+          protocol: TCP

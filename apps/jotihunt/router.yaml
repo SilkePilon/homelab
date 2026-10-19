@@ -1,0 +1,70 @@
+# GraphHopper router for routed fox trails (walking routes that avoid night-closed woods, car route for the big move).
+# Image: ghcr.io/silkepilon/jotihunt-router, built from jotihunt-tracker-server/router by router-image.yml (amd64).
+# First start downloads the Geofabrik NL extract (~1.3 GB), cuts Gelderland + 10 km, runs the night-path prepare
+# step and imports the graph (~15-30 min); until then the site draws straight trail lines. The supervisor rebuilds
+# weekly (Monday 03:00) in-process and keeps the old graph serving meanwhile; peak RAM during a rebuild is ~4.4 GiB.
+# Port 8989 = GraphHopper, 8990 = supervisor admin (GET /status, POST /rebuild; no auth -> networkpolicy: server only).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: graphhopper
+  namespace: jotihunt
+  labels:
+    app.kubernetes.io/name: graphhopper
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: graphhopper
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: graphhopper
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: graphhopper
+          image: ghcr.io/silkepilon/jotihunt-router:sha-1052ebf@sha256:f76b4415b65bc953f35cd0ba122d1f91de4fa995bf9ba9058170385458227288
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: TZ, value: "Europe/Amsterdam"}
+            - {name: SERVE_HEAP, value: "1g"}
+            - {name: IMPORT_HEAP, value: "2g"}
+          ports:
+            - {name: http, containerPort: 8989}
+            - {name: admin, containerPort: 8990}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+          resources:
+            requests: {cpu: 200m, memory: 1536Mi}
+            limits: {cpu: "2", memory: 5Gi}
+          readinessProbe:
+            httpGet: {path: /status, port: admin}
+            periodSeconds: 15
+          livenessProbe:
+            tcpSocket: {port: admin}
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 4
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: jotihunt-router-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphhopper
+  namespace: jotihunt
+  labels:
+    app.kubernetes.io/name: graphhopper
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: graphhopper
+  ports:
+    - {name: http, port: 8989, targetPort: http}
+    - {name: admin, port: 8990, targetPort: admin}
