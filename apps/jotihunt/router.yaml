@@ -27,7 +27,7 @@ spec:
         kubernetes.io/arch: amd64
       containers:
         - name: graphhopper
-          image: ghcr.io/silkepilon/jotihunt-router:sha-1052ebf@sha256:f76b4415b65bc953f35cd0ba122d1f91de4fa995bf9ba9058170385458227288
+          image: ghcr.io/silkepilon/jotihunt-router:sha-14b8def@sha256:fdb2c9e86d82a596c15b0f50191797676ad67b10e4a9db09ddc09541d9a162eb
           imagePullPolicy: IfNotPresent
           env:
             - {name: TZ, value: "Europe/Amsterdam"}
