@@ -9,6 +9,8 @@
 #   kubectl create secret generic protonvpn-wg -n arr-stack \
 #     --from-literal=privateKey=<PrivateKey>
 #   (Get PrivateKey from https://account.proton.me/vpn/wireguard → create WireGuard key → P2P config)
+#   byparr uses its own key (secret protonvpn-wg-byparr); never share one key
+#   between the two tunnels.
 #
 # After first login, enable in qBittorrent → Options → Web UI:
 #   "Bypass authentication for clients on localhost" — required for VPN_PORT_FORWARDING_UP_COMMAND
@@ -215,11 +217,13 @@ spec:
                 /bin/sh -c 'wget -O- -nv --retry-connrefused --tries=30 --waitretry=10
                 --post-data "json={\"listen_port\":{{PORT}},\"current_network_interface\":\"{{VPN_INTERFACE}}\",\"random_port\":false,\"upnp\":false}"
                 http://127.0.0.1:8080/api/v2/app/setPreferences'
-            - name: VPN_PORT_FORWARDING_DOWN_COMMAND
-              value: >-
-                /bin/sh -c 'wget -O- -nv --retry-connrefused --tries=30 --waitretry=10
-                --post-data "json={\"listen_port\":0,\"current_network_interface\":\"lo\"}"
-                http://127.0.0.1:8080/api/v2/app/setPreferences'
+            # No VPN_PORT_FORWARDING_DOWN_COMMAND. It used to bind qBittorrent to
+            # lo, which ran on every forwarded-port change (every 1-2 min on
+            # Proton) and dropped all peers each time. Worse, when the next port
+            # forward failed (2026-10-20) the UP command never ran and
+            # qBittorrent sat on lo with no network. gluetun's firewall already
+            # blocks anything outside tun0, so staying bound to tun0 leaks
+            # nothing.
             # Server list freshness is handled by the init-servers initContainer
             # (see initContainers and byparr.yaml for the full reasoning).
           ports:
@@ -234,11 +238,19 @@ spec:
           # to a few minutes and must not be cut short. Restarting the
           # container reruns VPN_PORT_FORWARDING_UP_COMMAND, which rebinds
           # qBittorrent to tun0.
+          #
+          # Also fail while no port is forwarded: gluetun gives up after the
+          # first port-forward attempt on a server fails and never retries,
+          # while the tunnel itself stays healthy (seen 2026-10-20). An empty
+          # forwarded_port file means the UP command never ran.
           livenessProbe:
             # exec, not httpGet: the health server binds 127.0.0.1:9999 only,
             # and kubelet probes the pod IP. wget exits 1 on the 500 answer.
             exec:
-              command: ["wget", "-q", "-O", "/dev/null", "-T", "5", "http://127.0.0.1:9999/"]
+              command:
+                - /bin/sh
+                - -c
+                - wget -q -O /dev/null -T 5 http://127.0.0.1:9999/ && [ -s /tmp/gluetun/forwarded_port ]
             initialDelaySeconds: 120
             periodSeconds: 60
             timeoutSeconds: 10

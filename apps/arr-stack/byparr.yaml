@@ -176,6 +176,9 @@ spec:
             # Proton WireGuard private key is valid on every Proton server, so
             # gluetun picks the server, its public key and endpoint from its
             # own server list — a fresh random pick on every container start.
+            # Own key, not qbittorrent's protonvpn-wg: two tunnels sharing one
+            # key clash when they land on the same server (Proton sees one
+            # device roaming), dropping qbittorrent's port forward.
             - name: VPN_SERVICE_PROVIDER
               value: protonvpn
             - name: VPN_TYPE
@@ -183,7 +186,7 @@ spec:
             - name: WIREGUARD_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
-                  name: protonvpn-wg
+                  name: protonvpn-wg-byparr
                   key: privateKey
             - name: WIREGUARD_ADDRESSES
               value: "10.2.0.2/32"
