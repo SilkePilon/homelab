@@ -130,7 +130,8 @@ kubectl -n n8n create secret generic n8n-secret \
 | --- | --- | --- |
 | `cloudflared-token` | `cloudflared` | Tunnel token from the Cloudflare Zero Trust dashboard |
 | `smb-creds` | `arr-stack` | NAS username/password for the SMB media volume |
-| `protonvpn-wg` | `arr-stack` | WireGuard keys for the Gluetun sidecar |
+| `protonvpn-wg` | `arr-stack` | WireGuard key for the qbittorrent Gluetun sidecar |
+| `protonvpn-wg-byparr` | `arr-stack` | WireGuard key for the byparr Gluetun sidecar |
 | `scraparr-api-keys` | `arr-stack` | Sonarr/Radarr/Lidarr API keys |
 | `grafana-admin-creds` | `monitoring` | Grafana admin login |
 | `jotihunt-secret` | `jotihunt` | JWT secret, Traccar API token, Gemini key, VAPID keys, Telegram + Life360 session keys (+ optional Jotihunt site login, ORS key) |
