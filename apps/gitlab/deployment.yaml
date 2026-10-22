@@ -1,0 +1,146 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# GitLab Community Edition — Omnibus image, everything in one pod: nginx,
+# Puma, Sidekiq, Gitaly, bundled Postgres and Redis, all supervised by runit.
+#
+# Image: gitlab/gitlab-ce:19.5.1-ce.0
+#   Upgrades MUST follow the required upgrade path, one stop at a time:
+#   https://docs.gitlab.com/update/upgrade_paths/
+#   Wait for Admin → Monitoring → Background migrations to finish before the
+#   next bump.
+#
+# Secret: gitlab-secret (see kustomization.yaml)
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab
+  namespace: gitlab
+  labels:
+    app.kubernetes.io/name: gitlab
+spec:
+  replicas: 1
+  # RWO volumes and a bundled Postgres: never two pods at once.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gitlab
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitlab
+    spec:
+      # The image is multi-arch, but GitLab wants 4+ GiB. Only the EliteDesks
+      # have that headroom; the 8 GiB Pis do not.
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      # Gives runit time to stop Postgres cleanly.
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: gitlab
+          image: gitlab/gitlab-ce:19.5.1-ce.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+            # Only read on first boot, when /var/opt/gitlab is empty. After
+            # that, change the root password in the UI.
+            - name: GITLAB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gitlab-secret
+                  key: GITLAB_ROOT_PASSWORD
+            # Evaluated as gitlab.rb on every start. No secrets in here.
+            - name: GITLAB_OMNIBUS_CONFIG
+              value: |
+                external_url 'https://gitlab.silkepilon.dev'
+                gitlab_rails['time_zone'] = 'Europe/Amsterdam'
+
+                # Cloudflare terminates TLS; Traefik forwards plain HTTP.
+                letsencrypt['enable'] = false
+                gitlab_rails['nginx']['listen_port'] = 80
+                gitlab_rails['nginx']['listen_https'] = false
+                gitlab_rails['nginx']['proxy_set_headers'] = {
+                  'X-Forwarded-Proto' => 'https',
+                  'X-Forwarded-Ssl' => 'on'
+                }
+                # Real client IP for logs and rate limiting. Traefik rewrites
+                # X-Forwarded-For to the cloudflared pod IP, so use the header
+                # Cloudflare always sets instead. 10.42.0.0/16 is the k3s pod
+                # CIDR Traefik connects from.
+                gitlab_rails['nginx']['real_ip_header'] = 'CF-Connecting-IP'
+                gitlab_rails['nginx']['real_ip_trusted_addresses'] = ['10.42.0.0/16']
+                gitlab_rails['trusted_proxies'] = ['10.42.0.0/16']
+
+                # Health endpoints answer only these. Kubelet probes arrive
+                # from the node (192.168.0.0/24) or the CNI bridge (10.42.x.1).
+                gitlab_rails['monitoring_whitelist'] = ['127.0.0.0/8', '10.42.0.0/16', '192.168.0.0/24']
+
+                # Features we do not use. SSH is off too: git is HTTPS only.
+                registry['enable'] = false
+                gitlab_rails['registry_enabled'] = false
+                gitlab_pages['enable'] = false
+                gitlab_kas['enable'] = false
+                gitlab_rails['gitlab_kas_enabled'] = false
+                gitlab_sshd['enable'] = false
+                prometheus_monitoring['enable'] = false
+
+                # Memory trim for a single-user instance.
+                puma['worker_processes'] = 2
+                sidekiq['concurrency'] = 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/gitlab
+            - name: data
+              mountPath: /var/opt/gitlab
+            - name: logs
+              mountPath: /var/log/gitlab
+            - name: shm
+              mountPath: /dev/shm
+          resources:
+            requests:
+              cpu: 500m
+              memory: 3Gi
+            limits:
+              cpu: "4"
+              memory: 6Gi
+          # First boot runs reconfigure + every DB migration; give it ~11 min.
+          startupProbe:
+            httpGet:
+              path: /-/readiness
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /-/readiness
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 4
+          livenessProbe:
+            httpGet:
+              path: /-/liveness
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: gitlab-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: gitlab-data
+        - name: logs
+          emptyDir: {}
+        # Puma and Sidekiq keep metrics in /dev/shm; the 64Mi container
+        # default is too small.
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi

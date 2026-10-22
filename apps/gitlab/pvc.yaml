@@ -1,0 +1,33 @@
+# ── GitLab PVCs ───────────────────────────────────────────────────────────────
+# Longhorn, so the pod is not tied to one node's disk and the data volume can
+# be expanded later (`allowVolumeExpansion: true`).
+---
+# /etc/gitlab — gitlab.rb (unused, config comes from GITLAB_OMNIBUS_CONFIG)
+# and gitlab-secrets.json. That JSON holds the keys that encrypt CI variables,
+# 2FA seeds and tokens in the database. Losing it while keeping the data makes
+# all of those unreadable — back it up with the data.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitlab-config
+  namespace: gitlab
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+---
+# /var/opt/gitlab — repositories, bundled Postgres + Redis, uploads, CI
+# artifacts. The bulk of everything.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitlab-data
+  namespace: gitlab
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 30Gi
