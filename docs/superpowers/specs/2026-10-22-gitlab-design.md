@@ -29,9 +29,13 @@ in-cluster GitLab Runner so CI pipelines actually run.
   | `shm` | `emptyDir` (Memory, 256Mi) | `/dev/shm` | Puma/Sidekiq metrics need more than the 64Mi default. |
 - `GITLAB_OMNIBUS_CONFIG` (plain env, no secrets in it):
   - `external_url 'https://gitlab.silkepilon.dev'`
-  - nginx: `listen_port 80`, `listen_https false`, `proxy_set_headers`
-    `X-Forwarded-Proto https` / `X-Forwarded-Ssl on`, `real_ip_trusted_addresses`
-    = `10.42.0.0/16` (k3s pod CIDR — Traefik connects from there), `real_ip_header X-Forwarded-For`.
+  - nginx (`gitlab_rails['nginx'][...]`; plain `nginx[...]` is deprecated in 19.x): `listen_port 80`, `listen_https false`, `proxy_set_headers`
+    `X-Forwarded-Proto https` / `X-Forwarded-Ssl on`. Client IP comes from
+    `real_ip_header CF-Connecting-IP` with `real_ip_trusted_addresses`
+    `10.42.0.0/16` (k3s pod CIDR — Traefik connects from there). Traefik
+    rewrites `X-Forwarded-For` to the cloudflared pod IP, so that header is
+    useless for rate limiting; Cloudflare always sets `CF-Connecting-IP`.
+    `gitlab_rails['trusted_proxies']` = `10.42.0.0/16` to match.
   - `letsencrypt['enable'] = false`
   - Off: `registry`, `gitlab_pages`, `gitlab_kas`, `prometheus_monitoring`
     (and with it the bundled exporters), `gitlab_sshd`; `gitlab_rails['gitlab_shell_ssh_port']`
@@ -79,7 +83,8 @@ Cloudflare's free plan caps a request body at 100 MB, so a single HTTPS push
   (`runner-token` = token, `runner-registration-token` = empty) and referenced
   via `runners.secret`. Not committed.
 - `concurrent: 4`, `rbac.create: true`, Kubernetes executor in namespace
-  `gitlab-runner`.
+  `gitlab-runner`. `unregisterRunners: false`: the token is created in the UI,
+  so a pod restart must not deregister anything.
 - Job pods: default `node_selector` `kubernetes.io/arch: amd64` (many CI images
   are amd64-only; avoids `exec format error` on the Pis).
   `node_selector_overwrite_allowed: "kubernetes.io/arch=.*"` so a job can set
