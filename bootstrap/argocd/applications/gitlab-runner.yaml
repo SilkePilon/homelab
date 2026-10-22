@@ -51,6 +51,9 @@ spec:
             [[runners]]
               # Jobs clone from here instead of external_url.
               clone_url = "http://gitlab.gitlab.svc.cluster.local"
+              # More than 1 so a long-polling job request does not block the
+              # next one while jobs are queued (runner warns otherwise).
+              request_concurrency = 4
               [runners.kubernetes]
                 namespace = "{{ .Release.Namespace }}"
                 image = "alpine:3.22"
