@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab
+  namespace: gitlab
+  labels:
+    app.kubernetes.io/name: gitlab
+spec:
+  # ClusterIP only. The web UI and HTTPS git go through the Ingress; the
+  # runner in `gitlab-runner` talks to http://gitlab.gitlab.svc.cluster.local.
+  # Port 22 is deliberately not exposed — git over SSH is off.
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: gitlab
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

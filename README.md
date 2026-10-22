@@ -53,6 +53,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | --- | --- | --- |
 | [arr-stack](apps/arr-stack) | `arr-stack` | Media automation: qBittorrent, Sonarr, Radarr, Lidarr, Scraparr, Byparr behind a Gluetun/ProtonVPN sidecar |
 | [cloudflared](apps/cloudflared) | `cloudflared` | Cloudflare Tunnel daemon (2 replicas) — the only way traffic gets in |
+| [gitlab](apps/gitlab) | `gitlab` | GitLab CE (Omnibus, one pod), HTTPS git only; CI via the `gitlab-runner` Helm app in `gitlab-runner` |
 | [hermes](apps/hermes) | `hermes` | [Hermes Agent](https://github.com/NousResearch/hermes-agent) + a `signal-cli` sidecar for the Signal channel |
 | [homeassistant](apps/homeassistant) | `homeassistant` | Home Assistant |
 | [jotihunt](apps/jotihunt) | `jotihunt` | Jotihunt 2026 tracker: web app + API, MongoDB, Traccar (OsmAnd ingest public, UI tailnet-only) |
@@ -133,6 +134,8 @@ kubectl -n n8n create secret generic n8n-secret \
 | `protonvpn-wg` | `arr-stack` | WireGuard key for the qbittorrent Gluetun sidecar |
 | `protonvpn-wg-byparr` | `arr-stack` | WireGuard key for the byparr Gluetun sidecar |
 | `scraparr-api-keys` | `arr-stack` | Sonarr/Radarr/Lidarr API keys |
+| `gitlab-secret` | `gitlab` | GitLab root password (`GITLAB_ROOT_PASSWORD`), only read on an empty volume |
+| `gitlab-runner-secret` | `gitlab-runner` | Instance runner token (`runner-token`, plus empty `runner-registration-token`) |
 | `grafana-admin-creds` | `monitoring` | Grafana admin login |
 | `jotihunt-secret` | `jotihunt` | JWT secret, Traccar API token, Gemini key, VAPID keys, Telegram + Life360 session keys (+ optional Jotihunt site login, ORS key) |
 | `mysql-secret` | `mysql` | MySQL root password (`MYSQL_ROOT_PASSWORD`), only read on an empty volume |

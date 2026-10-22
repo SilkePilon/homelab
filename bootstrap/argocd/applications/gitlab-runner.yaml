@@ -1,0 +1,80 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitlab-runner
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  # ───────────────────────────────────────────────────────────────────────────
+  # GitLab Runner for the in-cluster GitLab (apps/gitlab). Kubernetes
+  # executor: every CI job is a pod in the `gitlab-runner` namespace.
+  #
+  # Helm-sourced, like tailscale/longhorn/plane: upstream ships the runner as
+  # a chart with its own RBAC and entrypoint scripts.
+  #
+  # BEFORE this app can sync cleanly, see apps/gitlab/README.md. In short:
+  # create an instance runner in the GitLab UI (Admin → CI/CD → Runners →
+  # New instance runner) and store its glrt-… token (NOT committed to git):
+  #   kubectl create namespace gitlab-runner
+  #   kubectl -n gitlab-runner create secret generic gitlab-runner-secret \
+  #     --from-literal=runner-token='glrt-...' \
+  #     --from-literal=runner-registration-token=''
+  # Until that Secret exists the runner pod fails to start.
+  # ───────────────────────────────────────────────────────────────────────────
+  source:
+    repoURL: https://charts.gitlab.io
+    chart: gitlab-runner
+    # Keep roughly in step with the GitLab image tag in apps/gitlab.
+    targetRevision: 0.94.0
+    helm:
+      releaseName: gitlab-runner
+      values: |
+        # In-cluster Service, so polling and job traffic never loop out
+        # through Cloudflare (and its 100 MB body limit).
+        gitlabUrl: http://gitlab.gitlab.svc.cluster.local/
+
+        concurrent: 4
+        checkInterval: 10
+
+        # The runner is created in the UI. A pod restart must not deregister
+        # anything on the GitLab side.
+        unregisterRunners: false
+
+        rbac:
+          create: true
+
+        runners:
+          secret: gitlab-runner-secret
+          config: |
+            [[runners]]
+              # Jobs clone from here instead of external_url.
+              clone_url = "http://gitlab.gitlab.svc.cluster.local"
+              [runners.kubernetes]
+                namespace = "{{ .Release.Namespace }}"
+                image = "alpine:3.22"
+                privileged = false
+                cpu_request = "500m"
+                cpu_limit = "2"
+                memory_request = "1Gi"
+                memory_limit = "4Gi"
+                helper_cpu_request = "100m"
+                helper_memory_request = "128Mi"
+                # Many CI images are amd64-only, so jobs default to the
+                # EliteDesks. A job can opt into the Pis with
+                #   variables:
+                #     KUBERNETES_NODE_SELECTOR_ARCH: "kubernetes.io/arch=arm64"
+                node_selector_overwrite_allowed = "kubernetes.io/arch=.*"
+                [runners.kubernetes.node_selector]
+                  "kubernetes.io/arch" = "amd64"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitlab-runner
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
