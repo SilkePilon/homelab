@@ -121,7 +121,7 @@ spec:
         # from the previous boot stays (PVC) and gluetun falls back to the
         # built-in list.
         - name: init-servers
-          image: curlimages/curl:8.22.0
+          image: curlimages/curl:8.23.0
           # The image runs as uid 100; the PVC root is root-owned and gluetun
           # itself runs as root, so write the file as root too.
           securityContext:
