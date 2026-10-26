@@ -74,6 +74,16 @@ spec:
               value: nightly
             - name: T3_UPDATE_INTERVAL
               value: "7200"
+            # Long-lived token from `claude setup-token`. The stored OAuth
+            # login drops when a refresh fails, which leaves agents logged
+            # out. Secret created by hand, kept out of git:
+            #   kubectl -n t3code create secret generic claude-oauth \
+            #     --from-literal=CLAUDE_CODE_OAUTH_TOKEN=<token>
+            - name: CLAUDE_CODE_OAUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: claude-oauth
+                  key: CLAUDE_CODE_OAUTH_TOKEN
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
