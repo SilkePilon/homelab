@@ -1,0 +1,51 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: windesheim-readers
+
+# ─────────────────────────────────────────────────────────────────────────────
+# windesheim-readers — learn.silkepilon.dev (study app for course readers:
+# AI lessons, flashcards, quizzes, audio lessons, live quiz battles).
+#
+# BEFORE applying this stack:
+#
+#  1. Create the namespace and the secret (NOT committed to git), see the
+#     header of deployment.yaml for the keys.
+#
+#  2. Add the Cloudflare Tunnel public hostname (see ingress.yaml):
+#       learn.silkepilon.dev → HTTP http://traefik.kube-system.svc.cluster.local:80
+#
+#  3. Push to main; Argo CD syncs it. Sign in with the ADMIN_EMAILS address,
+#     then add an AI key under Admin → AI settings and upload a reader.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - service.yaml
+  - deployment.yaml
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
+
+# Keep only 2 old ReplicaSets/ControllerRevisions per workload instead of the
+# Kubernetes default of 10. Without this the cluster accumulates dozens of
+# empty ReplicaSets, and each retained revision pins its container image on the
+# node — costly on the Pis, which have 28-58Gi disks.
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2
+  - target:
+      kind: DaemonSet
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2
