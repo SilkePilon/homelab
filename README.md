@@ -67,6 +67,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | [portfolio](apps/portfolio) | `portfolio` | [silkepilon.dev](https://silkepilon.dev) — Next.js + Payload CMS portfolio, SQLite on a Longhorn volume |
 | [t3code](apps/t3code) | `t3code` | Headless [T3 Code](https://github.com/pingdotgg/t3code) server with Claude Code, so agents keep running while the desktop is off — tailnet only |
 | [twenty](apps/twenty) | `twenty` | Twenty CRM + its own Postgres and Redis |
+| [windesheim-readers](apps/windesheim-readers) | `windesheim-readers` | [learn.silkepilon.dev](https://learn.silkepilon.dev) — [Windesheim Readers](https://github.com/SilkePilon/windesheim-readers) study app (Bun + SQLite on a Longhorn volume) |
 
 `apps/_template/` is a skeleton, not a deployed app.
 
@@ -147,6 +148,7 @@ kubectl -n n8n create secret generic n8n-secret \
 | `stirling-pdf-secret` | `stirling-pdf` | First admin login (`SECURITY_INITIALLOGIN_USERNAME` / `_PASSWORD`), only read on an empty volume |
 | `twenty-secret` | `twenty` | Postgres URL/password, app secret, encryption key |
 | `hermes-secret` | `hermes` | LLM provider keys, dashboard basic auth, Signal account |
+| `windesheim-readers-secret` | `windesheim-readers` | Session/encryption key (`APP_SECRET`, never change it), Resend key + sender for sign-in emails |
 
 The exact keys each secret needs are documented in the header comment of the
 manifest that consumes it.

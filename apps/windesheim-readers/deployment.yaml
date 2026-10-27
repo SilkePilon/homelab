@@ -1,0 +1,127 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# windesheim-readers Deployment — https://github.com/SilkePilon/windesheim-readers
+# Image: ghcr.io/silkepilon/windesheim-readers  (Bun + Hono + SQLite, amd64/arm64)
+# Port:  3000
+# Data:  /app/data  (PVC windesheim-readers-data) — app.db + uploads/
+#
+# BEFORE syncing, create the secret (NOT committed to git):
+#   kubectl create namespace windesheim-readers
+#   kubectl create secret generic windesheim-readers-secret -n windesheim-readers \
+#     --from-literal=APP_SECRET="$(openssl rand -base64 32)" \
+#     --from-literal=RESEND_API_KEY='re_...' \
+#     --from-literal=EMAIL_FROM='Windesheim Readers <noreply@your-verified-domain>'
+#
+#   APP_SECRET      signs sessions AND encrypts the AI keys stored in the DB.
+#                   Never change it: stored AI keys become unreadable.
+#   RESEND_API_KEY  sends the magic-link sign-in emails. Without it the links
+#                   only appear in the pod log.
+#   EMAIL_FROM      sender; must be on a domain verified in Resend.
+#
+# AI provider keys are entered in the app (Admin → AI settings), not here.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: windesheim-readers
+  namespace: windesheim-readers
+  labels:
+    app.kubernetes.io/name: windesheim-readers
+spec:
+  # One pod only: SQLite on an RWO volume, and live battles + AI jobs are kept
+  # in memory. Recreate so the old pod lets go of the volume first.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: windesheim-readers
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: windesheim-readers
+    spec:
+      # The image runs as the built-in "bun" user (UID 1000).
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: windesheim-readers
+          image: ghcr.io/silkepilon/windesheim-readers:latest@sha256:ff7a9fb62d3fe3dd29df914da51579a58a336153deeec7a412411da09918d074
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+            # Public URL — used in the magic-link emails.
+            - name: APP_URL
+              value: "https://learn.silkepilon.dev"
+            # Admin on sign-in. Sign-up is limited to the domains below.
+            - name: ADMIN_EMAILS
+              value: "silke.pilon@windesheim.nl"
+            - name: ALLOWED_EMAIL_DOMAINS
+              value: "windesheim.nl,student.windesheim.nl"
+            # DATABASE_PATH (/app/data/app.db) and UPLOAD_DIR (/app/data/uploads)
+            # are baked into the image and left at their defaults.
+            - name: APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: windesheim-readers-secret
+                  key: APP_SECRET
+            - name: RESEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: windesheim-readers-secret
+                  key: RESEND_API_KEY
+                  optional: true
+            - name: EMAIL_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: windesheim-readers-secret
+                  key: EMAIL_FROM
+                  optional: true
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          # Same endpoint the image's own HEALTHCHECK uses (checks the DB too).
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 2
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            # Explicit: the 1 s default can trip on SQLite contention during AI jobs.
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 4
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: windesheim-readers-data
