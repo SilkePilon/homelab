@@ -49,7 +49,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: windesheim-readers
-          image: ghcr.io/silkepilon/windesheim-readers:latest@sha256:ff7a9fb62d3fe3dd29df914da51579a58a336153deeec7a412411da09918d074
+          image: ghcr.io/silkepilon/windesheim-readers:latest@sha256:4ea758ab2cb8c2c664733ae0678ccf1a0910c2bd2246ae89f52d55b30960ad1a
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -65,6 +65,16 @@ spec:
               value: "silke.pilon@windesheim.nl"
             - name: ALLOWED_EMAIL_DOMAINS
               value: "windesheim.nl,student.windesheim.nl"
+            # Real visitor IP for the rate limits. Cloudflare sets this header and
+            # overwrites any client-sent value; without it every visitor would
+            # share Traefik's pod IP and one rate-limit budget.
+            - name: CLIENT_IP_HEADER
+              value: "cf-connecting-ip"
+            # Hard caps on sign-in emails across all users (Resend free tier: 100/day).
+            - name: EMAIL_LIMIT_HOURLY
+              value: "30"
+            - name: EMAIL_LIMIT_DAILY
+              value: "100"
             # DATABASE_PATH (/app/data/app.db) and UPLOAD_DIR (/app/data/uploads)
             # are baked into the image and left at their defaults.
             - name: APP_SECRET
