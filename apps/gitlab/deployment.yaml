@@ -38,7 +38,7 @@ spec:
       terminationGracePeriodSeconds: 120
       containers:
         - name: gitlab
-          image: gitlab/gitlab-ce:19.5.1-ce.0
+          image: gitlab/gitlab-ce:19.5.3-ce.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
