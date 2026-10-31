@@ -9,7 +9,7 @@
 # image puts there. So every tool is installed system-wide, and only state
 # (logins, repos, T3 userdata) lives in $HOME.
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:24-bookworm
+FROM node:26-bookworm
 
 # Only the bootstrapper. t3-supervisor.sh runs the newest build on
 # $T3_CHANNEL from the PVC and keeps it updated; this one runs only if the
