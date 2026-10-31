@@ -51,7 +51,7 @@ spec:
           - 9.9.9.9
       containers:
         - name: pihole
-          image: pihole/pihole:2026.10.0
+          image: pihole/pihole:2026.10.1
           ports:
             - name: dns-udp
               containerPort: 53
