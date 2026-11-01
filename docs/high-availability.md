@@ -128,18 +128,12 @@ waiting for a volume the old pod still holds.
 
 ## Architecture constraints
 
-Two workloads cannot run on the arm64 Pis and pin on
-`kubernetes.io/arch: amd64`. These are architecture constraints, **not** host
-pins — each can still use any of the three amd64 nodes, so they stay HA:
+One workload cannot run on the arm64 Pis and pins on
+`kubernetes.io/arch: amd64`. This is an architecture constraint, **not** a host
+pin — it can still use any of the three amd64 nodes, so it stays HA:
 
-- **`signal-cli`** — its distribution bundles `libsignal-client` as an
-  x86_64-only native library. On arm64 the JVM aborts with
-  `no signal_jni in java.library.path`.
 - **`byparr`** — an arm64 image exists, but upstream calls ARM support
   minimal; the camoufox/Firefox stack stays on x86 until it is proven on a Pi.
-
-`nousresearch/hermes-agent` publishes both architectures, so hermes itself runs
-anywhere.
 
 When adding an app, check the image is multi-arch before assuming it can
 schedule on a Pi:

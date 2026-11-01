@@ -1,0 +1,60 @@
+# ── Seed config ──────────────────────────────────────────────────────────────
+# Copied to the PVC only when /home/node/.openclaw/openclaw.json is missing.
+# After first boot the PVC copy wins, so changes made in the Control UI
+# survive restarts. Editing this ConfigMap therefore does NOTHING to a running
+# install until you reseed:
+#
+#   kubectl -n openclaw exec deploy/openclaw -- rm /home/node/.openclaw/openclaw.json
+#   kubectl -n openclaw rollout restart deploy/openclaw
+#
+# Network model:
+#   bind "lan"           listen on the pod IP so the Tailscale proxy can reach
+#                        it. Nothing else routes here: ClusterIP Service only,
+#                        no Traefik/Cloudflare ingress.
+#   auth "token"         every browser still needs OPENCLAW_GATEWAY_TOKEN, plus
+#                        one-time device pairing (see kustomization.yaml).
+#   trustedProxies       the Tailscale proxy pod adds X-Forwarded-For; without
+#                        its source trusted the gateway rejects every request
+#                        with proxy_attribution_required. Pod IPs are not
+#                        stable, so this is the whole k3s pod CIDR. It only
+#                        affects client-IP attribution — token auth still
+#                        applies to every request.
+#   allowedOrigins       the tailnet HTTPS origin of tailscale-ingress.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openclaw-config
+  namespace: openclaw
+data:
+  openclaw.json: |
+    {
+      "gateway": {
+        "mode": "local",
+        "bind": "lan",
+        "port": 18789,
+        "trustedProxies": ["10.42.0.0/16"],
+        "auth": {
+          "mode": "token"
+        },
+        "controlUi": {
+          "enabled": true,
+          "allowedOrigins": ["https://openclaw.tailac6043.ts.net"]
+        }
+      },
+      "agents": {
+        "defaults": {
+          "workspace": "~/.openclaw/workspace"
+        },
+        "entries": {
+          "default": {
+            "name": "OpenClaw Assistant",
+            "workspace": "~/.openclaw/workspace"
+          }
+        }
+      },
+      "cron": { "enabled": true }
+    }
+  AGENTS.md: |
+    # OpenClaw Assistant
+
+    You are a helpful AI assistant running in a homelab Kubernetes cluster.

@@ -54,13 +54,11 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | [arr-stack](apps/arr-stack) | `arr-stack` | Media automation: qBittorrent, Sonarr, Radarr, Lidarr, Scraparr, Byparr behind a Gluetun/ProtonVPN sidecar |
 | [cloudflared](apps/cloudflared) | `cloudflared` | Cloudflare Tunnel daemon (2 replicas) — the only way traffic gets in |
 | [gitlab](apps/gitlab) | `gitlab` | GitLab CE (Omnibus, one pod), HTTPS git only; CI via the `gitlab-runner` Helm app in `gitlab-runner` |
-| [hermes](apps/hermes) | `hermes` | [Hermes Agent](https://github.com/NousResearch/hermes-agent) + a `signal-cli` sidecar for the Signal channel |
 | [homeassistant](apps/homeassistant) | `homeassistant` | Home Assistant |
 | [jotihunt](apps/jotihunt) | `jotihunt` | Jotihunt 2026 tracker: web app + API, MongoDB, Traccar (OsmAnd ingest public, UI tailnet-only) |
 | [monitoring](apps/monitoring) | `monitoring` | Prometheus, Grafana, Loki, Promtail, node-exporter, kube-state-metrics, NUT exporter |
-| [mysql](apps/mysql) | `mysql` | MySQL 8.4 for schoolwork — tailnet-only, no public hostname |
 | [n8n](apps/n8n) | `n8n` | n8n workflow automation |
-| [open-webui](apps/open-webui) | `open-webui` | Open WebUI (LLM chat front-end; providers configured in its admin UI) |
+| [openclaw](apps/openclaw) | `openclaw` | [OpenClaw](https://github.com/openclaw/openclaw) AI agent gateway + Control UI — tailnet-only at `openclaw.<tailnet>.ts.net` |
 | [plane](apps/plane) | `plane` | Plane project management (Helm chart rendered by Argo CD) + its own Postgres, Valkey, RabbitMQ and MinIO |
 | [pihole](apps/pihole) | `pihole` | Pi-hole DNS ad blocking, served on port 53 of every node |
 | [stirling-pdf](apps/stirling-pdf) | `stirling-pdf` | [Stirling PDF](https://www.stirlingpdf.com) — PDF toolbox (merge, split, convert, OCR), login required |
@@ -139,15 +137,13 @@ kubectl -n n8n create secret generic n8n-secret \
 | `gitlab-runner-secret` | `gitlab-runner` | Instance runner token (`runner-token`, plus empty `runner-registration-token`) |
 | `grafana-admin-creds` | `monitoring` | Grafana admin login |
 | `jotihunt-secret` | `jotihunt` | JWT secret, Traccar API token, Gemini key, VAPID keys, Telegram + Life360 session keys (+ optional Jotihunt site login, ORS key) |
-| `mysql-secret` | `mysql` | MySQL root password (`MYSQL_ROOT_PASSWORD`), only read on an empty volume |
 | `n8n-secret` | `n8n` | n8n encryption key |
-| `open-webui-secret` | `open-webui` | Session signing key (`WEBUI_SECRET_KEY`) |
+| `openclaw-secret` | `openclaw` | Gateway token (`OPENCLAW_GATEWAY_TOKEN`) + LLM provider keys |
 | `pihole-secret` | `pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
 | `portfolio-secret` | `portfolio` | Payload admin session signing key (`PAYLOAD_SECRET`) |
 | `plane-secret` | `plane` | Django/live signing keys, Postgres, RabbitMQ and MinIO credentials + connection URLs |
 | `stirling-pdf-secret` | `stirling-pdf` | First admin login (`SECURITY_INITIALLOGIN_USERNAME` / `_PASSWORD`), only read on an empty volume |
 | `twenty-secret` | `twenty` | Postgres URL/password, app secret, encryption key |
-| `hermes-secret` | `hermes` | LLM provider keys, dashboard basic auth, Signal account |
 | `windesheim-readers-secret` | `windesheim-readers` | Session/encryption key (`APP_SECRET`, never change it), Resend key + sender for sign-in emails |
 
 The exact keys each secret needs are documented in the header comment of the

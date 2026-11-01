@@ -1,0 +1,59 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: openclaw
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OpenClaw — self-hosted AI agent gateway with a web Control UI.
+#   Docs:  https://docs.openclaw.ai
+#   Repo:  https://github.com/openclaw/openclaw
+#   UI:    https://openclaw.<tailnet>.ts.net  (tailnet only)
+#
+# BEFORE this app can sync, create the secret (NOT committed to git):
+#
+#   kubectl create namespace openclaw
+#   kubectl -n openclaw create secret generic openclaw-secret \
+#     --from-literal=OPENCLAW_GATEWAY_TOKEN="$(openssl rand -hex 32)" \
+#     --from-literal=ANTHROPIC_API_KEY="sk-ant-..."
+#     # and/or OPENAI_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY
+#
+# Without it the pod stays in CreateContainerConfigError.
+#
+# FIRST LOGIN (once per browser profile):
+#
+#   1. Open https://openclaw.<tailnet>.ts.net and paste the gateway token:
+#        kubectl -n openclaw get secret openclaw-secret \
+#          -o jsonpath='{.data.OPENCLAW_GATEWAY_TOKEN}' | base64 -d
+#   2. The page shows "pairing required". Approve the browser:
+#        kubectl -n openclaw exec deploy/openclaw -- openclaw devices list
+#        kubectl -n openclaw exec deploy/openclaw -- openclaw devices approve <requestId>
+#      The page connects by itself once approved. Private windows lose the
+#      device identity and need pairing again.
+#
+# Add or rotate a provider key later:
+#   kubectl -n openclaw patch secret openclaw-secret \
+#     -p '{"stringData":{"OPENAI_API_KEY":"sk-..."}}'
+#   kubectl -n openclaw rollout restart deploy/openclaw
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress-tailnet.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2

@@ -1,19 +1,14 @@
-# ── Argo CD Application — mysql ───────────────────────────────────────────────
-# A standalone MySQL 8.4 server for schoolwork, reachable over the tailnet at
-# mysql.<tailnet>.ts.net:3306 and nowhere else.
+# ── Argo CD Application — openclaw ───────────────────────────────────────────
+# OpenClaw AI agent gateway + Control UI, reachable over the tailnet at
+# https://openclaw.<tailnet>.ts.net and nowhere else.
 #
-# BEFORE this app can sync, create the Secret it reads on first boot:
-#
-#     kubectl create namespace mysql
-#     kubectl -n mysql create secret generic mysql-secret \
-#       --from-literal=MYSQL_ROOT_PASSWORD="..."
-#
-# Without it the pod stays in CreateContainerConfigError.
+# BEFORE this app can sync, create openclaw-secret — the command and the
+# first-login pairing steps are in apps/openclaw/kustomization.yaml.
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: mysql
+  name: openclaw
   namespace: argocd
   # Argo CD will delete its own Application resource if the file is removed
   # from Git. It will NOT delete the deployed resources unless prune: true
@@ -25,10 +20,10 @@ spec:
   source:
     repoURL: https://github.com/SilkePilon/homelab
     targetRevision: main
-    path: apps/mysql
+    path: apps/openclaw
   destination:
     server: https://kubernetes.default.svc
-    namespace: mysql
+    namespace: openclaw
   syncPolicy:
     automated:
       prune: true       # delete K8s resources removed from Git

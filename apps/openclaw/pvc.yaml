@@ -1,0 +1,17 @@
+# ── OpenClaw home PVC ────────────────────────────────────────────────────────
+# Mounted at /home/node/.openclaw: openclaw.json (owned by the PVC after first
+# boot), agent workspace, SQLite state, paired devices, session history.
+# Upstream says block storage with a local filesystem, never NFS/SMB — Longhorn
+# qualifies.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openclaw-home
+  namespace: openclaw
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi

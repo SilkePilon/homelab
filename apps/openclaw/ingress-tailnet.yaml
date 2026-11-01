@@ -1,0 +1,26 @@
+# ── OpenClaw Control UI on the tailnet ───────────────────────────────────────
+# Same pattern as apps/t3code/ingress.yaml: a Tailscale Ingress with a real
+# Let's Encrypt cert at https://openclaw.<tailnet>.ts.net. HTTPS matters:
+# remote device pairing and the mobile app need wss://, and the token would
+# otherwise cross the wire in plaintext.
+#
+# Deliberately NOT on the Cloudflare tunnel. The agent holds LLM API keys and
+# can run tools on your behalf.
+#
+# If you rename the host, update gateway.controlUi.allowedOrigins in
+# configmap.yaml (and reseed) to match.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openclaw
+  namespace: openclaw
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: openclaw
+      port:
+        name: http
+  tls:
+    - hosts:
+        - openclaw
