@@ -281,7 +281,7 @@ spec:
         # ── Byparr ───────────────────────────────────────────────────────────
         - name: byparr
           # Upstream tags carry no "v" prefix (3.0.4, not v3.0.4).
-          image: ghcr.io/thephaseless/byparr:3.0.4
+          image: ghcr.io/thephaseless/byparr:3.1.1
           imagePullPolicy: IfNotPresent
           env:
             - name: LOG_LEVEL
