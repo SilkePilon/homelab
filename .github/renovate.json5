@@ -55,6 +55,9 @@
       matchUpdateTypes: ["minor", "patch", "digest", "pin", "pinDigest"],
       automerge: true,
       automergeType: "branch",
+      // No CI runs on renovate/* branches (GitGuardian and cubic only run on
+      // PRs), so Renovate saw "pending" forever and never merged.
+      ignoreTests: true,
     },
     {
       description: "Pin digests for mutable tags so :latest is still tracked",
