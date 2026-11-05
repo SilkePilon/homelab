@@ -1,5 +1,19 @@
 ---
-# PostgreSQL data (records live here — this is the CRM's source of truth).
+# PostgreSQL 18 data (records live here — this is the CRM's source of truth).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: twenty-postgres18-data
+  namespace: twenty
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Old PostgreSQL 16 data, unused since the 2026-11-05 upgrade. Kept for
+# rollback; delete this and the PVC once 18 has run fine for a while.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

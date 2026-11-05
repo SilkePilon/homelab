@@ -10,7 +10,7 @@ namespace: twenty
 #
 # Topology:
 #   twenty        Deployment  server + worker (one pod, shared local storage)
-#   twenty-db     Deployment  PostgreSQL 16   (records / source of truth)
+#   twenty-db     Deployment  PostgreSQL 18   (records / source of truth)
 #   twenty-redis  Deployment  Redis 7         (BullMQ job queue + cache)
 #
 # BEFORE applying this stack — create the namespace + secret (NOT in git):

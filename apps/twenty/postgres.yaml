@@ -1,6 +1,6 @@
 ---
 # ─────────────────────────────────────────────────────────────────────────────
-# PostgreSQL 16 — Twenty's primary datastore.
+# PostgreSQL 18 — Twenty's primary datastore.
 # Service DNS: twenty-db.twenty.svc.cluster.local  (referenced as `twenty-db`
 # inside the namespace by PG_DATABASE_URL in the twenty-secret).
 # Database name is `default` to match Twenty's expected connection string.
@@ -25,11 +25,16 @@ spec:
       labels:
         app.kubernetes.io/name: twenty-db
     spec:
-      # postgres:16 starts as root then drops to the postgres user via its own
+      # postgres:18 starts as root then drops to the postgres user via its own
       # entrypoint (it chowns PGDATA itself), so no custom securityContext.
+      #
+      # Major upgrades: a new major can't open the old data dir. Dump, start the
+      # new major on a fresh PVC, restore, then switch claimName (16 -> 18 was
+      # done this way on 2026-11-05; twenty-postgres-data still holds the 16
+      # data for rollback).
       containers:
         - name: postgres
-          image: postgres:16
+          image: postgres:18
           imagePullPolicy: IfNotPresent
           ports:
             - name: postgres
@@ -44,12 +49,11 @@ spec:
                 secretKeyRef:
                   name: twenty-secret
                   key: PG_DATABASE_PASSWORD
-            # Keep data out of the volume root so lost+found never collides.
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
           volumeMounts:
+            # 18+ image: PGDATA is /var/lib/postgresql/18/docker, so mount the
+            # parent. The versioned subdir keeps lost+found out of the way.
             - name: data
-              mountPath: /var/lib/postgresql/data
+              mountPath: /var/lib/postgresql
           resources:
             requests:
               cpu: 100m
@@ -70,7 +74,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: twenty-postgres-data
+            claimName: twenty-postgres18-data
 ---
 apiVersion: v1
 kind: Service
