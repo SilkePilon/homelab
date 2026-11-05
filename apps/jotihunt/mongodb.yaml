@@ -4,7 +4,8 @@
 # Service DNS: mongodb.jotihunt.svc.cluster.local (MONGO_URI in server.env).
 #
 # No auth: only pods in this namespace may connect (networkpolicy.yaml).
-# Pinned to 8.3.x: the laptop data is FCV 8.3; keep it identical for the game.
+# MongoDB 9.0, FCV 9.0 (upgraded from 8.3 on 2026-11-05). Majors upgrade in
+# place: swap the image, check the app, then setFeatureCompatibilityVersion.
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
