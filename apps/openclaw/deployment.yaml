@@ -59,7 +59,7 @@ spec:
               mountPath: /config
       containers:
         - name: gateway
-          image: ghcr.io/openclaw/openclaw:2026.10.9-slim
+          image: ghcr.io/openclaw/openclaw:2026.11.1-slim
           imagePullPolicy: IfNotPresent
           command: ["node", "/app/dist/index.js", "gateway", "run"]
           ports:
