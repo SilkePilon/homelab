@@ -35,7 +35,7 @@ spec:
         kubernetes.io/arch: amd64
       containers:
         - name: traccar
-          image: traccar/traccar:6.16.0@sha256:03ebb7ed2b219d4f25c326873bd022f5062f80bcae622a9d9422846b51951eda
+          image: traccar/traccar:6.17.0@sha256:b32d9346adf46df7c33c58577e17ad60f6feadd1f3cd87c876041f6c79317ef1
           imagePullPolicy: IfNotPresent
           ports:
             - name: web
