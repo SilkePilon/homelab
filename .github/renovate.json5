@@ -12,7 +12,11 @@
   dependencyDashboardTitle: "Renovate Dashboard 🤖",
   commitMessageTopic: "{{depName}}",
   commitMessageExtra: "to {{newVersion}}",
-  prConcurrentLimit: 5,
+  // 0 = no cap. With a cap of 5, a few long-lived PRs (DB majors, jotihunt)
+  // took every slot and new updates sat "rate-limited" on the dashboard.
+  // Automerge keeps the open count low anyway.
+  prConcurrentLimit: 0,
+  branchConcurrentLimit: 0,
   prHourlyLimit: 0,
   ignorePaths: [
     "bootstrap/argocd/applications/_template.yaml.tpl",
@@ -47,9 +51,8 @@
       groupName: "grafana stack",
     },
     {
-      description: "Auto-merge digest pins and patch bumps",
-      matchDatasources: ["docker"],
-      matchUpdateTypes: ["digest", "patch"],
+      description: "Auto-merge everything below a major (images, npm, Dockerfile ARGs)",
+      matchUpdateTypes: ["minor", "patch", "digest", "pin", "pinDigest"],
       automerge: true,
       automergeType: "branch",
     },
@@ -69,11 +72,6 @@
       description: "t3code rollouts kill running agent turns; merge by hand when idle",
       matchDatasources: ["docker"],
       matchPackageNames: ["ghcr.io/silkepilon/t3code"],
-      automerge: false,
-    },
-    {
-      description: "Jotihunt: no automerge (a mongo/traccar rollout mid-game is an outage); merge by hand outside 17–18 Oct",
-      matchFileNames: ["apps/jotihunt/**"],
       automerge: false,
     },
   ],
