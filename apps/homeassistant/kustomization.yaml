@@ -7,13 +7,11 @@ namespace: homeassistant
 # ─────────────────────────────────────────────────────────────────────────────
 # BEFORE applying this stack:
 #
-#  1. Edit deployment.yaml → TZ to your local timezone (e.g. Europe/Amsterdam).
-#
-#  2. hostNetwork: true is required for local device discovery (mDNS, SSDP).
+#  1. hostNetwork: true is required for local device discovery (mDNS, SSDP).
 #     This means the pod binds port 8123 directly on the k3s node's IP.
 #     Access Home Assistant at http://<node-ip>:8123 after first boot.
 #
-#  3. (Optional) USB device passthrough for Zigbee/Z-Wave dongles:
+#  2. (Optional) USB device passthrough for Zigbee/Z-Wave dongles:
 #     Add to deployment.yaml under spec.template.spec.containers[0]:
 #       volumeMounts:
 #         - name: zigbee
@@ -24,7 +22,7 @@ namespace: homeassistant
 #           path: /dev/ttyUSB0
 #     Also add securityContext.privileged: true to the container.
 #
-#  4. Home Assistant Container does NOT support HA Add-ons.
+#  3. Home Assistant Container does NOT support HA Add-ons.
 #     Use integrations for Matter, Zigbee2MQTT, Z-Wave JS, etc.
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -34,6 +32,17 @@ resources:
   - service.yaml
   - deployment.yaml
   - ingress.yaml
+  - arr-aliases.yaml
+
+# HA "packages" (sensors, templates, automations) that live in git. Mounted at
+# /config/packages and loaded by `homeassistant: packages: !include_dir_named
+# packages` in the PVC's configuration.yaml. The name hash makes any change
+# roll the pod, which is what loads it. UI-made config stays on the PVC.
+configMapGenerator:
+  - name: homeassistant-packages
+    files:
+      - packages/homelab_cluster.yaml
+      - packages/homelab_alerts.yaml
 
 labels:
   - pairs:

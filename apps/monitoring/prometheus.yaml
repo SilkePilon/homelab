@@ -210,6 +210,16 @@ data:
           - target_label: cluster
             replacement: homelab
 
+      # ── Argo CD application controller (app sync/health status) ───────────
+      # argocd_app_info{name, sync_status, health_status} — read by the
+      # Home Assistant homelab dashboard (apps/homeassistant/packages/).
+      - job_name: argocd
+        static_configs:
+          - targets: ['argocd-metrics.argocd.svc.cluster.local:8082']
+        metric_relabel_configs:
+          - target_label: cluster
+            replacement: homelab
+
       - job_name: nut
         metrics_path: /nut
         static_configs:
