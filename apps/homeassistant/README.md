@@ -35,8 +35,10 @@ script's docstring (port-forward + a long-lived token).
 
 Since 2026.x HACS is part of core as the **Marketplace** integration — do not
 install the old `hacs/integration` on top of it. Installed through it:
-Bubble Card, Mushroom, card-mod, mini-graph-card, auto-entities, button-card
-(frontend) and Bambu Lab (integration, downloaded but not yet set up — it
+Bubble Card, Mushroom, card-mod, mini-graph-card, auto-entities, button-card,
+apexcharts-card, flex-horseshoe-card, ha-sankey-chart, clock-weather-card,
+horizon-card, hourly-weather, calendar-card-pro, mini-media-player,
+battery-state-card (frontend) and Bambu Lab (integration, downloaded but not yet set up — it
 needs the printer's access code). Downloads land in
 `/config/custom_components` and `/config/www/community` on the PVC.
 
