@@ -1,0 +1,38 @@
+# ── *arr aliases for Home Assistant ──────────────────────────────────────────
+# HA's Sonarr / Radarr / Lidarr integrations go through aiopyarr, which
+# mis-parses any hostname that contains a hyphen: "lidarr.arr-stack.svc..."
+# becomes the host "lidarr.arr-" and every request fails with
+# "Domain name not found". The arr-stack namespace name cannot be avoided in
+# a cluster DNS name, so HA used to point at raw ClusterIPs instead, which
+# break the moment a Service is recreated.
+#
+# These ExternalName Services give each app a hyphen-free name inside this
+# namespace — http://lidarr.homeassistant.svc.cluster.local:8686 — that
+# resolves (CNAME) to the real Service. Ports are not remapped by
+# ExternalName, so HA uses each app's own port.
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonarr
+  namespace: homeassistant
+spec:
+  type: ExternalName
+  externalName: sonarr.arr-stack.svc.cluster.local
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: radarr
+  namespace: homeassistant
+spec:
+  type: ExternalName
+  externalName: radarr.arr-stack.svc.cluster.local
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lidarr
+  namespace: homeassistant
+spec:
+  type: ExternalName
+  externalName: lidarr.arr-stack.svc.cluster.local

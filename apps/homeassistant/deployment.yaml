@@ -1,7 +1,6 @@
 ---
 # ─────────────────────────────────────────────────────────────────────────────
 # Home Assistant Deployment
-# Image: ghcr.io/home-assistant/home-assistant:2026.7.4
 # Port:  8123
 # Data:  /config  (PVC homeassistant-config)
 #
@@ -53,13 +52,18 @@ spec:
               hostPort: 8123
           env:
             - name: TZ
-              value: "Etc/UTC"
+              value: "Europe/Amsterdam"
           volumeMounts:
             - name: config
               mountPath: /config
             # Mount /etc/localtime from the host so timestamps match the node.
             - name: localtime
               mountPath: /etc/localtime
+              readOnly: true
+            # Git-managed packages (see kustomization.yaml). Read-only: edit
+            # apps/homeassistant/packages/ and push, never in the pod.
+            - name: packages
+              mountPath: /config/packages
               readOnly: true
             # BlueZ is reached over the host's D-Bus system bus. Without this
             # socket the bluetooth integration fails with
@@ -98,6 +102,9 @@ spec:
         - name: config
           persistentVolumeClaim:
             claimName: homeassistant-config
+        - name: packages
+          configMap:
+            name: homeassistant-packages
         - name: localtime
           hostPath:
             path: /etc/localtime

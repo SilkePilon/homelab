@@ -7,6 +7,49 @@ that. Config lives on the Longhorn PVC `homeassistant-config`, not in git.
 Reachable at `ha.silkepilon.dev` via Cloudflare Tunnel → Traefik → the
 ClusterIP Service.
 
+## What is in git and what is not
+
+| Lives in git (this directory) | Lives on the PVC (UI-managed) |
+| --- | --- |
+| `packages/*.yaml` — Prometheus-backed homelab sensors, roll-ups, phone alerts | integrations (config entries), dashboards, UI automations |
+| `arr-aliases.yaml` — hyphen-free names for the *arr apps | `configuration.yaml`, `.storage/`, Marketplace downloads |
+
+`packages/` is turned into the `homeassistant-packages` ConfigMap and mounted
+read-only at `/config/packages`; `configuration.yaml` loads it with
+`homeassistant: packages: !include_dir_named packages`. The ConfigMap name
+carries a content hash, so pushing a change rolls the pod and HA loads it.
+
+`packages/homelab_cluster.yaml` is generated — edit
+`generate-cluster-package.py` (node list, queries) and re-run it. It needs the
+`argocd` scrape job in `apps/monitoring/prometheus.yaml` for the Argo CD
+sensors.
+
+## Marketplace (built-in HACS)
+
+Since 2026.x HACS is part of core as the **Marketplace** integration — do not
+install the old `hacs/integration` on top of it. Installed through it:
+Bubble Card, Mushroom, card-mod, mini-graph-card, auto-entities, button-card
+(frontend) and Bambu Lab (integration, downloaded but not yet set up — it
+needs the printer's access code). Downloads land in
+`/config/custom_components` and `/config/www/community` on the PVC.
+
+## Integrations and the *arr hostname bug
+
+Sonarr, Radarr and Lidarr go through `aiopyarr`, which mangles any hostname
+containing a hyphen — `lidarr.arr-stack.svc.cluster.local` becomes the host
+`lidarr.arr-` and the config flow reports `cannot_connect`. HA therefore talks
+to `http://<app>.homeassistant.svc.cluster.local:<port>`, ExternalName aliases
+from `arr-aliases.yaml`. Never point them at a ClusterIP again; that is what
+the old Sonarr entry did. qBittorrent has no such bug and uses
+`qbittorrent.arr-stack.svc.cluster.local:8080` directly. API keys come from the
+`scraparr-api-keys` Secret in `arr-stack`.
+
+## Backups
+
+Automatic backups run daily at 04:30 to the `backup.local` agent and keep 7.
+That agent writes to `/config/backups` — the same Longhorn volume — so it
+protects against bad config, not against losing the volume.
+
 ## The reverse-proxy trap (NOT GitOps — read this)
 
 Since HA **2026.x the `http:` integration is configured in storage**, not in

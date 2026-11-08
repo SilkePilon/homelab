@@ -1,0 +1,130 @@
+# Roll-ups and phone notifications for the homelab.
+#
+# Infrastructure alerting already goes to Discord through Grafana
+# (apps/monitoring/alerting.yaml). These automations deliberately cover only
+# what is worth a push to the phone and is not paged there: the UPS switching
+# to battery, and a one-shot "something is wrong" summary from the dashboard
+# roll-up, so the two systems do not double-page.
+
+template:
+  - binary_sensor:
+      - name: Homelab problem
+        unique_id: homelab_problem
+        device_class: problem
+        icon: mdi:server-network-off
+        # Any node not Ready, crash-looping containers, a faulted/degraded
+        # Longhorn volume or an Argo CD app that is not Healthy.
+        state: >
+          {{ (states('sensor.homelab_nodes_ready') | int(0)) < (states('sensor.homelab_nodes_total') | int(0))
+             or (states('sensor.homelab_containers_crash_looping') | int(0)) > 0
+             or (states('sensor.homelab_longhorn_volumes_degraded') | int(0)) > 0
+             or (states('sensor.homelab_longhorn_volumes_faulted') | int(0)) > 0
+             or (states('sensor.homelab_argo_cd_apps_unhealthy') | int(0)) > 0 }}
+        availability: "{{ has_value('sensor.homelab_nodes_total') }}"
+        attributes:
+          summary: >
+            {% set p = namespace(l=[]) %}
+            {% set nr = states('sensor.homelab_nodes_ready') | int(0) %}
+            {% set nt = states('sensor.homelab_nodes_total') | int(0) %}
+            {% if nr < nt %}{% set p.l = p.l + [(nt - nr) ~ ' node(s) not ready'] %}{% endif %}
+            {% set c = states('sensor.homelab_containers_crash_looping') | int(0) %}
+            {% if c %}{% set p.l = p.l + [c ~ ' container(s) crash-looping'] %}{% endif %}
+            {% set d = states('sensor.homelab_longhorn_volumes_degraded') | int(0) %}
+            {% if d %}{% set p.l = p.l + [d ~ ' volume(s) degraded'] %}{% endif %}
+            {% set f = states('sensor.homelab_longhorn_volumes_faulted') | int(0) %}
+            {% if f %}{% set p.l = p.l + [f ~ ' volume(s) FAULTED'] %}{% endif %}
+            {% set a = states('sensor.homelab_argo_cd_apps_unhealthy') | int(0) %}
+            {% if a %}{% set p.l = p.l + [a ~ ' Argo CD app(s) unhealthy'] %}{% endif %}
+            {{ p.l | join(', ') if p.l else 'All systems normal' }}
+
+  - sensor:
+      - name: Homelab hottest node
+        unique_id: homelab_hottest_node
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        state: >
+          {{ states.sensor
+             | selectattr('entity_id', 'search', '^sensor\\.(elitedesk|pi_5)_.*_temperature$')
+             | map(attribute='state') | map('float', none) | reject('none') | max | default(none) }}
+
+automation:
+  - id: homelab_ups_on_battery
+    alias: "Homelab: UPS on battery"
+    description: Push to the phone when mains power drops and the cluster runs on the UPS.
+    mode: single
+    triggers:
+      - trigger: template
+        value_template: "{{ 'OB' in states('sensor.apc_status_data').split() }}"
+        for: "00:00:30"
+    actions:
+      - action: notify.mobile_app_sm_g980f
+        data:
+          title: "⚡ UPS on battery"
+          message: >
+            Mains power lost. Battery {{ states('sensor.apc_battery_charge') }}%,
+            load {{ states('sensor.apc_load') }}%,
+            runtime {{ (states('sensor.apc_battery_runtime') | int(0) / 60) | round(0) }} min.
+          data:
+            priority: high
+            ttl: 0
+            channel: homelab_critical
+            tag: ups_power
+
+  - id: homelab_ups_power_restored
+    alias: "Homelab: UPS power restored"
+    description: Clears the on-battery notification once mains power is back.
+    mode: single
+    triggers:
+      - trigger: template
+        value_template: "{{ 'OL' in states('sensor.apc_status_data').split() }}"
+        for: "00:01:00"
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.from_state is not none }}"
+    actions:
+      - action: notify.mobile_app_sm_g980f
+        data:
+          title: "🔌 Power restored"
+          message: "UPS back on mains, battery {{ states('sensor.apc_battery_charge') }}%."
+          data:
+            channel: homelab_critical
+            tag: ups_power
+
+  - id: homelab_problem_notify
+    alias: "Homelab: problem detected"
+    description: >
+      One push when the cluster roll-up has been unhealthy for 10 minutes, and
+      one when it recovers. Details stay in Grafana/Discord.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.homelab_problem
+        to: "on"
+        for: "00:10:00"
+        id: problem
+      - trigger: state
+        entity_id: binary_sensor.homelab_problem
+        from: "on"
+        to: "off"
+        id: recovered
+    actions:
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: problem
+            sequence:
+              - action: notify.mobile_app_sm_g980f
+                data:
+                  title: "🛠 Homelab needs attention"
+                  message: "{{ state_attr('binary_sensor.homelab_problem', 'summary') }}"
+                  data:
+                    channel: homelab
+                    tag: homelab_problem
+                    clickAction: /dashboard-homelab
+        default:
+          - action: notify.mobile_app_sm_g980f
+            data:
+              message: clear_notification
+              data:
+                tag: homelab_problem
