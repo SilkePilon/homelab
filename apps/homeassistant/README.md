@@ -24,6 +24,13 @@ carries a content hash, so pushing a change rolls the pod and HA loads it.
 `argocd` scrape job in `apps/monitoring/prometheus.yaml` for the Argo CD
 sensors.
 
+## Dashboards
+
+Home (the system default panel), Homelab and Library live in HA storage, but
+their source is `dashboards/build.py` — edit that and re-run it rather than
+editing in the UI, or the next run overwrites your UI changes. Usage is in the
+script's docstring (port-forward + a long-lived token).
+
 ## Marketplace (built-in HACS)
 
 Since 2026.x HACS is part of core as the **Marketplace** integration — do not

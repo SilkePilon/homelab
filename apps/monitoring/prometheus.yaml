@@ -294,6 +294,9 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
           volumeMounts:
+            # subPath mounts never receive ConfigMap updates, so /-/reload
+            # alone does NOT pick up a changed scrape config — after Argo CD
+            # syncs one, `kubectl -n monitoring rollout restart deploy/prometheus`.
             - name: config
               mountPath: /etc/prometheus/prometheus.yml
               subPath: prometheus.yml
