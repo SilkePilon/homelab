@@ -8,14 +8,19 @@ is their source. Edit it, then:
     HA_TOKEN=<long-lived token> python3 build.py            # push all
     python3 build.py --dump                                 # print JSON only
 
-Requires `pip install websockets`. Cards used: core + Mushroom, mini-graph-card,
-auto-entities, card-mod (all installed through the Marketplace).
+Requires `pip install websockets`. UI edits are overwritten by the next run.
+
+Cards (all installed through the Marketplace): apexcharts-card, mini-graph-card,
+flex-horseshoe-card, ha-sankey-chart, button-card, Bubble Card, Mushroom,
+mini-media-player, clock-weather-card, lovelace-horizon-card, hourly-weather,
+calendar-card-pro, battery-state-card, auto-entities, card-mod. Each section
+deliberately uses a different visual so the pages do not read as one grid of
+identical tiles.
 
 Dashboards:
-  - dashboard-home      - home: rooms, media, power, people, homelab summary
-                          (set as the system default panel)
-  - dashboard-homelab   - cluster, nodes, network, storage, power
-  - dashboard-media     - Library: downloads, library, calendar, Jellyfin
+  - dashboard-home      - Home (system default panel)
+  - dashboard-homelab   - Homelab: overview + per-node view, node pop-ups
+  - dashboard-media     - Library: downloads, collection, calendar, Jellyfin
 """
 
 import argparse
@@ -23,8 +28,8 @@ import asyncio
 import json
 import os
 
-# ── Nodes (must match generate-cluster-package.py) ──────────────────────────
-NODES = [
+# ── Shared constants ────────────────────────────────────────────────────────
+NODES = [  # must match generate-cluster-package.py
     ("elitedesk_g6_i7", "EliteDesk G6 i7", "mdi:desktop-tower"),
     ("elitedesk_g6_i5", "EliteDesk G6 i5", "mdi:desktop-tower"),
     ("elitedesk_g5_i7", "EliteDesk G5 i7", "mdi:desktop-tower"),
@@ -33,91 +38,241 @@ NODES = [
     ("pi_5_8gb_2", "Pi 5 8GB #2", "mdi:raspberry-pi"),
     ("pi_5_8gb_3", "Pi 5 8GB #3", "mdi:raspberry-pi"),
 ]
-PALETTE = ["#4f8cff", "#22c55e", "#f59e0b", "#ef4444", "#a855f7", "#14b8a6", "#ec4899"]
+BLUE, GREEN, AMBER, RED, PURPLE, TEAL, PINK = (
+    "#4f8cff", "#22c55e", "#f59e0b", "#ef4444", "#a855f7", "#14b8a6", "#ec4899")
+PALETTE = [BLUE, GREEN, AMBER, RED, PURPLE, TEAL, PINK]
+FULL = {"columns": "full"}
+HOMELAB_OK = "is_state('binary_sensor.homelab_problem', 'off')"
 
 
-# ── Small card helpers ──────────────────────────────────────────────────────
-def heading(text, icon=None, badges=None, nav=None):
-    c = {"type": "heading", "heading": text, "heading_style": "title"}
-    if icon:
-        c["icon"] = icon
-    if badges:
-        c["badges"] = badges
-    if nav:
-        c["tap_action"] = {"action": "navigate", "navigation_path": nav}
-    return c
-
-
-def hbadge(entity, **kw):
-    return {"type": "entity", "entity": entity, "show_state": True, "show_icon": True, **kw}
-
-
-def tile(entity, name=None, cols=6, features=None, **kw):
-    c = {"type": "tile", "entity": entity, "grid_options": {"columns": cols}, **kw}
-    if name:
-        c["name"] = name
-    if features:
-        c["features"] = features
-        c["features_position"] = "bottom"
-    return c
-
-
-def gauge(entity, name, cols=4, green=0, yellow=70, red=85, **kw):
-    return {
-        "type": "gauge", "entity": entity, "name": name, "needle": True,
-        "min": 0, "max": 100,
-        "severity": {"green": green, "yellow": yellow, "red": red},
-        "grid_options": {"columns": cols, "rows": 2}, **kw,
-    }
-
-
-def graph(entities, name=None, hours=24, cols="full", **kw):
-    c = {
-        "type": "custom:mini-graph-card",
-        "entities": entities,
-        "hours_to_show": hours,
-        "points_per_hour": 4,
-        "line_width": 2,
-        "smoothing": True,
-        "animate": True,
-        "show": {"labels": False, "points": False, "legend": len(entities) > 1,
-                 "fill": "fade" if len(entities) <= 2 else False},
-        "grid_options": {"columns": cols},
-        **kw,
-    }
-    if name:
-        c["name"] = name
-    return c
-
-
-def chip_tmpl(icon, content, color, nav=None, entity=None):
-    c = {"type": "template", "icon": icon, "content": content, "icon_color": color}
-    if entity:
-        c["entity"] = entity
-    if nav:
-        c["tap_action"] = {"action": "navigate", "navigation_path": nav}
-    return c
-
-
-def section(*cards, span=1):
+def sec(*cards, span=1):
     s = {"type": "grid", "cards": list(cards)}
     if span > 1:
         s["column_span"] = span
     return s
 
 
-def sections_view(title, path, icon, sections, badges=None, header=None, max_cols=4):
-    v = {"type": "sections", "title": title, "path": path, "icon": icon,
-         "max_columns": max_cols, "sections": sections, "dense_section_placement": True}
+def view(title, path, icon, sections, max_cols=4):
+    return {"type": "sections", "title": title, "path": path, "icon": icon,
+            "max_columns": max_cols, "dense_section_placement": True, "sections": sections}
+
+
+def heading(text, icon, badges=None):
+    c = {"type": "heading", "heading": text, "icon": icon, "heading_style": "title"}
     if badges:
-        v["badges"] = badges
-    if header:
-        v["header"] = {"card": header, "layout": "responsive", "badges_position": "bottom"}
-    return v
+        c["badges"] = badges
+    return c
 
 
-# Status colour of the homelab roll-up, reused on several dashboards.
-HOMELAB_OK = "is_state('binary_sensor.homelab_problem', 'off')"
+def hb(entity, **kw):
+    return {"type": "entity", "entity": entity, "show_state": True, "show_icon": True, **kw}
+
+
+def separator(name, icon):
+    """Bubble Card separator: a different section header style from `heading`."""
+    return {"type": "custom:bubble-card", "card_type": "separator", "name": name,
+            "icon": icon, "grid_options": FULL}
+
+
+def bubble(entity, name, icon, kind="switch", cols="full", **kw):
+    return {"type": "custom:bubble-card", "card_type": "button", "button_type": kind,
+            "entity": entity, "name": name, "icon": icon, "show_state": True,
+            "grid_options": {"columns": cols}, **kw}
+
+
+def tile(entity, name=None, cols=6, **kw):
+    c = {"type": "tile", "entity": entity, "grid_options": {"columns": cols}, **kw}
+    if name:
+        c["name"] = name
+    return c
+
+
+# ── ApexCharts helpers ──────────────────────────────────────────────────────
+def apex(series, title=None, span="24h", height=220, chart_type=None, states=False,
+         yaxis=None, apex_config=None, cols="full"):
+    c = {"type": "custom:apexcharts-card", "graph_span": span, "series": series,
+         "update_interval": "1min",
+         "header": {"show": bool(title), "title": title or "", "show_states": states,
+                    "colorize_states": True},
+         "apex_config": {"chart": {"height": height}, "legend": {"show": len(series) > 1},
+                         **(apex_config or {})},
+         "grid_options": {"columns": cols}}
+    if chart_type:
+        c["chart_type"] = chart_type
+    if yaxis:
+        c["yaxis"] = yaxis
+    return c
+
+
+def line(entity, name, color, kind="area", avg="10min", **kw):
+    return {"entity": entity, "name": name, "color": color, "type": kind,
+            "stroke_width": 2, "group_by": {"func": "avg", "duration": avg}, **kw}
+
+
+GRADIENT = {"type": "gradient", "gradient": {"opacityFrom": 0.45, "opacityTo": 0.03}}
+
+
+def radial(items, title=None, height=240, cols="full"):
+    """Concentric radial bars; items = (entity, name, color)."""
+    return apex(
+        [{"entity": e, "name": n, "color": col, "min": 0, "max": 100} for e, n, col in items],
+        title=title, chart_type="radialBar", height=height, cols=cols,
+        apex_config={"legend": {"show": True, "position": "bottom"},
+                     "plotOptions": {"radialBar": {"hollow": {"size": "35%"},
+                                                   "track": {"background": "rgba(127,127,127,.15)"}}}})
+
+
+def donut(series, title=None, height=240):
+    return apex(series, title=title, chart_type="donut", height=height,
+                apex_config={"legend": {"show": True, "position": "bottom"},
+                             "plotOptions": {"pie": {"donut": {"size": "68%"}}},
+                             "stroke": {"width": 0}})
+
+
+def now_columns(items, title=None, height=230, unit="", ymax=None):
+    """One column per entity with its latest value — a 'compare right now' bar chart."""
+    y = {"min": 0, "decimals": 0}
+    if ymax:
+        y["max"] = ymax
+    # data_generator emits one point (now, current state) per series, and the
+    # +30min offset puts "now" mid-window so the column group is not clipped.
+    return {"span": {"offset": "+30s"}} | apex(
+        [{"entity": e, "name": n, "color": col, "type": "column", "show": {"datalabels": True},
+          "data_generator": "return [[new Date().getTime(), parseFloat(entity.state) || 0]];"}
+         for e, n, col in items],
+        title=title, span="1min", height=height, yaxis=[y],
+        apex_config={"xaxis": {"labels": {"show": False}, "axisTicks": {"show": False}},
+                     "legend": {"show": True, "position": "bottom"},
+                     "plotOptions": {"bar": {"columnWidth": "90%", "borderRadius": 6}},
+                     "dataLabels": {"formatter": f"EVAL:function(v){{return v.toFixed(0)+'{unit}'}}",
+                                    "style": {"fontSize": "11px"}},
+                     "tooltip": {"x": {"show": False}}})
+
+
+def node_chart(nid, span="24h"):
+    """CPU/RAM (left axis) and temperature (right axis) for one node."""
+    return apex(
+        [line(f"sensor.{nid}_cpu", "CPU", BLUE, "area", "5min", yaxis_id="pct"),
+         line(f"sensor.{nid}_memory", "RAM", PURPLE, "line", "5min", yaxis_id="pct"),
+         line(f"sensor.{nid}_temperature", "Temp", AMBER, "line", "5min", yaxis_id="temp")],
+        span=span, height=200,
+        yaxis=[{"id": "pct", "min": 0, "max": 100, "decimals": 0, "apex_config": {"tickAmount": 4}},
+               {"id": "temp", "opposite": True, "decimals": 0, "apex_config": {"tickAmount": 4}}],
+        apex_config={"legend": {"show": True}, "stroke": {"curve": "smooth"}, "fill": GRADIENT})
+
+
+# ── Other custom-card helpers ───────────────────────────────────────────────
+def horseshoe(entity, name, unit="%", stops=None, cols=4):
+    stops = stops or {0: GREEN, 60: AMBER, 85: RED}
+    return {
+        "type": "custom:flex-horseshoe-card",
+        "entities": [{"entity": entity, "name": name, "unit": unit, "decimals": 0}],
+        "show": {"horseshoe_style": "lineargradient", "scale_tickmarks": True},
+        "layout": {
+            "states": [{"id": 0, "entity_index": 0, "xpos": 50, "ypos": 52,
+                        "styles": ["font-size: 2.4em;", "font-weight: 600;"]}],
+            "names": [{"id": 0, "entity_index": 0, "xpos": 50, "ypos": 95,
+                       "styles": ["font-size: 1.1em;", "opacity: 0.8;"]}],
+        },
+        "horseshoe_scale": {"min": 0, "max": 100, "width": 6},
+        "horseshoe_state": {"width": 12},
+        "color_stops": {str(k): v for k, v in stops.items()},
+        "grid_options": {"columns": cols},
+    }
+
+
+def big_stat(entity, name, icon, color, cols=8):
+    """button-card stat tile: gradient wash, large number."""
+    return {
+        "type": "custom:button-card", "entity": entity, "name": name, "icon": icon,
+        "show_state": True, "show_units": False,
+        "styles": {
+            "card": [{"padding": "16px"}, {"height": "118px"},
+                     {"background": f"linear-gradient(135deg, {color}40 0%, {color}08 70%)"},
+                     {"border": f"1px solid {color}55"}],
+            "grid": [{"grid-template-areas": '"i s" "n n"'}, {"grid-template-columns": "40px 1fr"},
+                     {"grid-template-rows": "1fr auto"}],
+            "icon": [{"width": "30px"}, {"color": color}],
+            "img_cell": [{"justify-content": "start"}, {"align-items": "start"}],
+            "state": [{"justify-self": "end"}, {"align-self": "start"}, {"font-size": "34px"},
+                      {"font-weight": "700"}, {"line-height": "1"}],
+            "name": [{"justify-self": "start"}, {"font-size": "13px"}, {"opacity": "0.75"},
+                     {"text-transform": "uppercase"}, {"letter-spacing": "0.06em"}],
+        },
+        "grid_options": {"columns": cols},
+    }
+
+
+def node_tile(nid, name, icon):
+    """button-card with a status dot and four inline usage bars; tap opens #node-<id>."""
+    bars = (
+        "[[[\n"
+        f"const g = (m) => {{ const s = states['sensor.{nid}_' + m]; return s ? (parseFloat(s.state) || 0) : 0; }};\n"
+        "const bar = (label, v, unit, max, warn, crit) => {\n"
+        "  const pct = Math.max(2, Math.min(100, v / max * 100));\n"
+        "  const col = v >= crit ? 'var(--error-color)' : v >= warn ? 'var(--warning-color)' : 'var(--success-color)';\n"
+        "  return `<div style=\"display:grid;grid-template-columns:38px 1fr 40px;align-items:center;gap:8px;font-size:11.5px;margin-top:5px\">`\n"
+        "    + `<span style=\"opacity:.65;text-align:left\">${label}</span>`\n"
+        "    + `<div style=\"height:6px;border-radius:3px;background:rgba(127,127,127,.22);overflow:hidden\">`\n"
+        "    + `<div style=\"width:${pct}%;height:100%;background:${col};border-radius:3px\"></div></div>`\n"
+        "    + `<span style=\"text-align:right;font-variant-numeric:tabular-nums\">${v.toFixed(0)}${unit}</span></div>`;\n"
+        "};\n"
+        "return bar('CPU', g('cpu'), '%', 100, 60, 85) + bar('RAM', g('memory'), '%', 100, 75, 90)\n"
+        "  + bar('Temp', g('temperature'), '°', 90, 65, 75) + bar('Disk', g('root_disk'), '%', 100, 75, 90);\n"
+        "]]]"
+    )
+    dot = (
+        "[[[\n"
+        f"const ok = states['sensor.{nid}_ready'] && states['sensor.{nid}_ready'].state === '1';\n"
+        "const c = ok ? 'var(--success-color)' : 'var(--error-color)';\n"
+        "return `<span style=\"display:inline-block;width:9px;height:9px;border-radius:50%;background:${c};box-shadow:0 0 8px ${c}\"></span>`;\n"
+        "]]]"
+    )
+    return {
+        "type": "custom:button-card", "entity": f"sensor.{nid}_cpu", "name": name, "icon": icon,
+        "show_state": False,
+        "custom_fields": {"dot": dot, "bars": bars},
+        "tap_action": {"action": "navigate", "navigation_path": f"#node-{nid}"},
+        "styles": {
+            "card": [{"padding": "14px 16px"}],
+            "grid": [{"grid-template-areas": '"i n dot" "bars bars bars"'},
+                     {"grid-template-columns": "28px 1fr 14px"}, {"grid-template-rows": "auto auto"},
+                     {"row-gap": "6px"}],
+            "img_cell": [{"justify-content": "start"}],
+            "icon": [{"width": "22px"}, {"color": "var(--primary-color)"}],
+            "name": [{"justify-self": "start"}, {"font-weight": "600"}, {"font-size": "14px"},
+                     {"padding-left": "6px"}],
+            "custom_fields": {"bars": [{"justify-self": "stretch"}], "dot": [{"justify-self": "end"}]},
+        },
+        "grid_options": {"columns": 8},
+    }
+
+
+def node_popup(nid, name, icon):
+    """Bubble Card standalone pop-up opened by #node-<id>: trend chart + live numbers."""
+    return {"type": "custom:bubble-card", "card_type": "pop-up", "hash": f"#node-{nid}",
+            "name": name, "icon": icon, "entity": f"sensor.{nid}_temperature", "show_state": True,
+            "cards": [
+        node_chart(nid, "12h"),
+        {"type": "glance", "columns": 4, "entities": [
+            {"entity": f"sensor.{nid}_cpu", "name": "CPU"},
+            {"entity": f"sensor.{nid}_memory", "name": "RAM"},
+            {"entity": f"sensor.{nid}_root_disk", "name": "Disk"},
+            {"entity": f"sensor.{nid}_network_in", "name": "Net in"}]},
+    ]}
+
+
+def jellyfin_players(else_card=None):
+    c = {"type": "custom:auto-entities", "show_empty": else_card is not None, "grid_options": FULL,
+         "card": {"type": "vertical-stack"}, "card_param": "cards",
+         "filter": {"include": [{"integration": "jellyfin", "domain": "media_player",
+                                 "state": "/playing|paused/",
+                                 "options": {"type": "custom:mini-media-player",
+                                             "artwork": "full-cover", "hide": {"power": True}}}]}}
+    if else_card:
+        c["else"] = else_card
+    return c
+
 
 HOMELAB_HERO = {
     "type": "custom:mushroom-template-card",
@@ -126,339 +281,328 @@ HOMELAB_HERO = {
     "secondary": (
         "{{ states('sensor.homelab_nodes_ready') }}/{{ states('sensor.homelab_nodes_total') }} nodes"
         " · {{ states('sensor.homelab_pods_running') }} pods"
-        " · CPU {{ states('sensor.homelab_cluster_cpu') | round(0) }}%"
-        " · RAM {{ states('sensor.homelab_cluster_memory') | round(0) }}%"
+        " · {{ states('sensor.homelab_argo_cd_apps') }} apps"
         "{% if not " + HOMELAB_OK + " %}\n{{ state_attr('binary_sensor.homelab_problem', 'summary') }}{% endif %}"
     ),
     "icon": "{{ 'mdi:check-decagram' if " + HOMELAB_OK + " else 'mdi:alert-decagram' }}",
     "icon_color": "{{ 'green' if " + HOMELAB_OK + " else 'red' }}",
-    "multiline_secondary": True,
-    "fill_container": True,
-    "grid_options": {"columns": "full"},
+    "multiline_secondary": True, "fill_container": True,
+    "grid_options": FULL,
     "tap_action": {"action": "navigate", "navigation_path": "/dashboard-homelab"},
+    "card_mod": {"style": "ha-card { background: linear-gradient(120deg, "
+                          "{{ 'rgba(34,197,94,.16)' if " + HOMELAB_OK + " else 'rgba(239,68,68,.2)' }}, "
+                          "transparent 70%) !important; }"},
 }
 
 
-# ── Overview (home) ─────────────────────────────────────────────────────────
+# ── Home ────────────────────────────────────────────────────────────────────
 def home_dashboard():
-    greeting = {
-        "type": "custom:mushroom-title-card",
-        "title": (
-            "{% set h = now().hour %}Good "
-            "{{ 'night' if h < 6 else 'morning' if h < 12 else 'afternoon' if h < 18 else 'evening' }}, "
-            "{{ user.split(' ')[0] }}"
-        ),
-        "subtitle": "{{ now().strftime('%A %-d %B') }} · {{ states('sensor.homelab_cluster_cpu') | round(0) }}% cluster load",
-        "alignment": "start",
-        "card_mod": {"style": ".title { font-size: 2rem !important; font-weight: 600 !important; }"},
-        "grid_options": {"columns": "full"},
-    }
-    chips = {
-        "type": "custom:mushroom-chips-card",
-        "alignment": "start",
-        "chips": [
-            {"type": "weather", "entity": "weather.forecast_home",
-             "show_conditions": True, "show_temperature": True},
+    clock = sec(
+        {"type": "custom:clock-weather-card", "entity": "weather.forecast_home",
+         "sun_entity": "sun.sun", "title": "Home", "forecast_rows": 5, "time_format": 24,
+         "date_pattern": "cccc d LLLL", "locale": "en-GB", "show_humidity": True,
+         "grid_options": FULL},
+        span=2,
+    )
+
+    status = sec(
+        {"type": "custom:mushroom-chips-card", "alignment": "center", "grid_options": FULL, "chips": [
             {"type": "entity", "entity": "person.silke_pilon", "use_entity_picture": True},
-            chip_tmpl("{{ 'mdi:server-network' if " + HOMELAB_OK + " else 'mdi:server-network-off' }}",
-                      "{{ 'Homelab OK' if " + HOMELAB_OK + " else 'Homelab issue' }}",
-                      "{{ 'green' if " + HOMELAB_OK + " else 'red' }}", nav="/dashboard-homelab"),
-            chip_tmpl("mdi:battery-charging-high",
-                      "UPS {{ states('sensor.apc_battery_charge') }}%",
-                      "{{ 'green' if 'OL' in states('sensor.apc_status_data') else 'orange' }}",
-                      entity="sensor.apc_status"),
-            chip_tmpl("mdi:download", "{{ states('sensor.qbittorrent_download_speed') }} MB/s",
-                      "{{ 'blue' if states('sensor.qbittorrent_download_speed') | float(0) > 0 else 'disabled' }}",
-                      nav="/dashboard-media"),
-        ],
-        "grid_options": {"columns": "full"},
-    }
-
-    welcome = section(greeting, chips,
-                      {"type": "weather-forecast", "entity": "weather.forecast_home",
-                       "forecast_type": "daily", "show_current": True, "show_forecast": True,
-                       "grid_options": {"columns": "full"}},
-                      span=2)
-
-    bedroom = section(
-        heading("Bedroom Silke", "mdi:bed", nav=None),
-        *[{
-            "type": "custom:mushroom-light-card", "entity": e, "name": n,
-            "show_brightness_control": True, "show_color_temp_control": True,
-            "use_light_color": True, "collapsible_controls": True,
-            "grid_options": {"columns": "full"},
-        } for e, n in [("light.wiz_tunable_white_2fd14e", "Ceiling"),
-                       ("light.wiz_tunable_white_335d6c", "Bedside")]],
-        tile("automation.bedroom_wake_light_at_dawn", "Wake light at dawn", cols="full",
-             icon="mdi:weather-sunset-up"),
-    )
-
-    media = section(
-        heading("Media", "mdi:speaker-multiple"),
-        {"type": "custom:mushroom-media-player-card", "entity": "media_player.streamer_woonkamer",
-         "name": "Living room", "use_media_info": True, "show_volume_level": True,
-         "media_controls": ["play_pause_toggle", "previous", "next"],
-         "volume_controls": ["volume_mute", "volume_set"], "collapsible_controls": True,
-         "grid_options": {"columns": "full"}},
-        {"type": "custom:mushroom-media-player-card", "entity": "media_player.grote_slaapkamer",
-         "name": "Master bedroom", "use_media_info": True,
-         "media_controls": ["play_pause_toggle"], "volume_controls": ["volume_set"],
-         "collapsible_controls": True, "grid_options": {"columns": "full"}},
-        # Anything currently playing on Jellyfin, any client.
-        {"type": "custom:auto-entities", "show_empty": False,
-         "card": {"type": "entities", "title": "Playing on Jellyfin", "state_color": True},
-         "filter": {"include": [{"integration": "jellyfin", "domain": "media_player",
-                                 "state": "/playing|paused/"}]},
-         "grid_options": {"columns": "full"}},
-    )
-
-    power = section(
-        heading("Power", "mdi:flash"),
-        gauge("sensor.apc_battery_charge", "UPS battery", cols=6, green=50, yellow=25, red=0),
-        gauge("sensor.apc_load", "UPS load", cols=6, yellow=60, red=80),
-        tile("sensor.electricity_maps_co2_intensity", "Grid CO₂", cols=6),
-        tile("sensor.electricity_maps_grid_fossil_fuel_percentage", "Fossil share", cols=6),
-        graph([{"entity": "sensor.electricity_maps_co2_intensity", "name": "CO₂ intensity",
-                "color": "#22c55e"}], hours=48, cols="full",
-              color_thresholds=[{"value": 0, "color": "#22c55e"}, {"value": 300, "color": "#f59e0b"},
-                                {"value": 450, "color": "#ef4444"}],
-              show={"labels": False, "points": False, "legend": False, "fill": "fade", "name": False,
-                    "icon": False}),
-    )
-
-    people = section(
-        heading("People", "mdi:account-group"),
-        tile("person.silke_pilon", cols="full"),
-        tile("sensor.sm_g980f_battery_level", "Phone", cols=6),
-        tile("sensor.pixel_watch_4_battery_level", "Watch", cols=6),
-    )
-
-    homelab = section(
-        heading("Homelab", "mdi:server", nav="/dashboard-homelab"),
+            {"type": "template", "entity": "switch.pi_hole", "icon": "mdi:shield-check",
+             "icon_color": "{{ 'green' if is_state('switch.pi_hole','on') else 'red' }}",
+             "content": "{{ states('sensor.pi_hole_ads_blocked') }} blocked"},
+            {"type": "template", "icon": "mdi:download",
+             "content": "{{ states('sensor.qbittorrent_download_speed') }} MB/s",
+             "icon_color": "{{ 'blue' if states('sensor.qbittorrent_download_speed') | float(0) > 0 else 'disabled' }}",
+             "tap_action": {"action": "navigate", "navigation_path": "/dashboard-media"}},
+        ]},
         HOMELAB_HERO,
-        tile("sensor.homelab_cluster_cpu", "Cluster CPU", cols=6, features=[{"type": "bar-gauge"}]),
-        tile("sensor.homelab_cluster_memory", "Cluster RAM", cols=6, features=[{"type": "bar-gauge"}]),
-        tile("switch.pi_hole", "Pi-hole blocking", cols=6),
-        tile("sensor.pi_hole_ads_blocked", "Ads blocked", cols=6),
+        radial([("sensor.homelab_cluster_cpu", "CPU", BLUE),
+                ("sensor.homelab_cluster_memory", "RAM", PURPLE),
+                ("sensor.homelab_longhorn_storage_used", "Storage", TEAL)], height=210),
     )
 
-    lists = section(
-        heading("Shopping list", "mdi:cart"),
-        {"type": "todo-list", "entity": "todo.shopping_list", "hide_create": False,
-         "grid_options": {"columns": "full"}},
+    sky = sec(
+        heading("Sky", "mdi:weather-sunset"),
+        {"type": "custom:horizon-card", "grid_options": FULL,
+         "fields": {"sunrise": True, "sunset": True, "dawn": True, "noon": True, "dusk": True,
+                    "azimuth": False, "elevation": True}},
+        {"type": "custom:hourly-weather", "entity": "weather.forecast_home", "num_segments": 12,
+         "label_spacing": 2, "show_precipitation_amounts": True, "grid_options": FULL},
     )
 
-    return {"title": "Home", "views": [
-        sections_view("Home", "home", "mdi:home",
-                      [welcome, homelab, bedroom, media, power, people, lists], max_cols=4),
-    ]}
+    bedroom = sec(
+        separator("Bedroom Silke", "mdi:bed"),
+        bubble("light.wiz_tunable_white_2fd14e", "Ceiling", "mdi:ceiling-light", "slider"),
+        bubble("light.wiz_tunable_white_335d6c", "Bedside", "mdi:lamp", "slider"),
+        bubble("automation.bedroom_wake_light_at_dawn", "Wake light at dawn", "mdi:weather-sunset-up"),
+    )
+
+    media = sec(
+        separator("Speakers", "mdi:speaker-multiple"),
+        *[{"type": "custom:mini-media-player", "entity": e, "name": n, "icon": i,
+           "artwork": "cover", "hide": {"source": True}, "grid_options": FULL}
+          for e, n, i in [("media_player.streamer_woonkamer", "Living room", "mdi:speaker"),
+                          ("media_player.grote_slaapkamer", "Master bedroom", "mdi:cast-audio")]],
+        jellyfin_players(),
+    )
+
+    energy = sec(
+        heading("Power & grid", "mdi:lightning-bolt",
+                badges=[hb("sensor.electricity_maps_grid_fossil_fuel_percentage", name="Fossil")]),
+        apex([line("sensor.electricity_maps_co2_intensity", "CO₂", GREEN, "area", "30min",
+                   color_threshold=[{"value": 0, "color": GREEN}, {"value": 300, "color": AMBER},
+                                    {"value": 450, "color": RED}])],
+             title="Grid CO₂ (48h)", span="48h", height=170, states=True,
+             yaxis=[{"min": 0, "decimals": 0}], apex_config={"fill": GRADIENT}),
+        horseshoe("sensor.apc_battery_charge", "UPS battery", cols=6, stops={0: RED, 25: AMBER, 50: GREEN}),
+        horseshoe("sensor.apc_load", "UPS load", cols=6, stops={0: GREEN, 60: AMBER, 80: RED}),
+        {"type": "statistic", "entity": "sensor.electricity_maps_co2_intensity", "name": "Avg CO₂ today",
+         "period": {"calendar": {"period": "day"}}, "stat_type": "mean", "grid_options": FULL},
+    )
+
+    people = sec(
+        heading("People", "mdi:account-group"),
+        {"type": "map", "entities": [{"entity": "person.silke_pilon"}, {"entity": "zone.home"}],
+         "hours_to_show": 24, "theme_mode": "auto", "grid_options": FULL},
+        {"type": "custom:battery-state-card", "sort": {"by": "state"}, "grid_options": FULL,
+         "colors": {"steps": [{"value": 20, "color": RED}, {"value": 50, "color": AMBER},
+                              {"value": 101, "color": GREEN}]},
+         "entities": [{"entity": "sensor.sm_g980f_battery_level", "name": "Phone"},
+                      {"entity": "sensor.pixel_watch_4_battery_level", "name": "Pixel Watch"},
+                      {"entity": "sensor.apc_battery_charge", "name": "UPS"}]},
+    )
+
+    lists = sec(
+        heading("Shopping list", "mdi:cart-outline"),
+        {"type": "todo-list", "entity": "todo.shopping_list", "grid_options": FULL},
+    )
+
+    activity = sec(
+        heading("Recent activity", "mdi:history"),
+        {"type": "logbook", "hours_to_show": 24, "grid_options": FULL, "target": {"entity_id": [
+            "person.silke_pilon", "binary_sensor.homelab_problem", "sensor.apc_status",
+            "light.wiz_tunable_white_2fd14e", "light.wiz_tunable_white_335d6c",
+            "automation.bedroom_wake_light_at_dawn", "switch.pi_hole"]}},
+    )
+
+    return {"title": "Home", "views": [view("Home", "home", "mdi:home", [
+        clock, status, sky, bedroom, media, energy, people, lists, activity])]}
 
 
 # ── Homelab ─────────────────────────────────────────────────────────────────
-def node_card(nid, name, icon):
-    s = lambda m: f"states('sensor.{nid}_{m}')"
-    ready = f"is_state('sensor.{nid}_ready', '1')"
-    return {
-        "type": "custom:mushroom-template-card",
-        "entity": f"sensor.{nid}_cpu",
-        "primary": name,
-        "secondary": (
-            "{% if not " + ready + " %}NOT READY · {% endif %}"
-            "CPU {{ " + s("cpu") + " | float(0) | round(0) }}% · RAM {{ " + s("memory") + " | float(0) | round(0) }}%\n"
-            "{{ " + s("temperature") + " | float(0) | round(0) }}°C · disk {{ " + s("root_disk") + " | float(0) | round(0) }}%"
-        ),
-        "multiline_secondary": True,
-        "icon": icon,
-        "icon_color": (
-            "{% set t = " + s("temperature") + " | float(0) %}"
-            "{{ 'red' if not " + ready + " or t >= 75 else 'orange' if t >= 65 "
-            "or " + s("memory") + " | float(0) >= 90 else 'green' }}"
-        ),
-        "badge_icon": "{{ 'mdi:close' if not " + ready + " else '' }}",
-        "badge_color": "red",
-        "fill_container": True,
-        "grid_options": {"columns": 8},
-        "tap_action": {"action": "navigate", "navigation_path": "/dashboard-homelab/nodes"},
-        "hold_action": {"action": "more-info"},
-    }
-
-
 def homelab_dashboard():
-    status = section(
-        heading("Status", "mdi:heart-pulse"),
+    status = sec(
         HOMELAB_HERO,
-        {"type": "custom:mushroom-chips-card", "chips": [
-            chip_tmpl("mdi:server", "{{ states('sensor.homelab_nodes_ready') }}/{{ states('sensor.homelab_nodes_total') }} nodes",
-                      "{{ 'green' if states('sensor.homelab_nodes_ready') == states('sensor.homelab_nodes_total') else 'red' }}"),
-            chip_tmpl("mdi:cube-outline", "{{ states('sensor.homelab_pods_running') }} pods",
-                      "{{ 'green' if states('sensor.homelab_pods_unhealthy') | int(0) == 0 else 'orange' }}"),
-            chip_tmpl("mdi:source-branch",
-                      "{{ states('sensor.homelab_argo_cd_apps') | int(0) - states('sensor.homelab_argo_cd_apps_out_of_sync') | int(0) }}/{{ states('sensor.homelab_argo_cd_apps') }} synced",
-                      "{{ 'green' if states('sensor.homelab_argo_cd_apps_out_of_sync') | int(0) == 0 else 'orange' }}"),
-            chip_tmpl("mdi:database", "{{ states('sensor.homelab_longhorn_volumes') }} volumes",
-                      "{{ 'red' if states('sensor.homelab_longhorn_volumes_faulted') | int(0) > 0 else 'orange' if states('sensor.homelab_longhorn_volumes_degraded') | int(0) > 0 else 'green' }}"),
-            chip_tmpl("mdi:restart", "{{ states('sensor.homelab_container_restarts_1h') }} restarts/h",
-                      "{{ 'orange' if states('sensor.homelab_container_restarts_1h') | int(0) > 5 else 'disabled' }}"),
-            chip_tmpl("mdi:thermometer", "{{ states('sensor.homelab_hottest_node') | float(0) | round(0) }}°C max",
-                      "{{ 'red' if states('sensor.homelab_hottest_node') | float(0) >= 75 else 'orange' if states('sensor.homelab_hottest_node') | float(0) >= 65 else 'green' }}"),
-        ], "grid_options": {"columns": "full"}},
+        {"type": "history-graph", "title": "Last 24 hours", "hours_to_show": 24, "grid_options": FULL,
+         "entities": [{"entity": "binary_sensor.homelab_problem", "name": "Problems"},
+                      {"entity": "sensor.apc_status", "name": "UPS"},
+                      {"entity": "binary_sensor.pi_hole_status", "name": "Pi-hole"}]},
         span=2,
     )
 
-    cluster = section(
-        heading("Cluster", "mdi:kubernetes"),
-        gauge("sensor.homelab_cluster_cpu", "CPU", yellow=60, red=85),
-        gauge("sensor.homelab_cluster_memory", "Memory", yellow=75, red=90),
-        gauge("sensor.homelab_longhorn_storage_used", "Longhorn", yellow=70, red=85),
-        graph([{"entity": "sensor.homelab_cluster_cpu", "name": "CPU", "color": PALETTE[0]},
-               {"entity": "sensor.homelab_cluster_memory", "name": "Memory", "color": PALETTE[4]}],
-              hours=24, cols=12, height=110),
+    gauges = sec(
+        heading("Cluster load", "mdi:gauge"),
+        horseshoe("sensor.homelab_cluster_cpu", "CPU", cols=8),
+        horseshoe("sensor.homelab_cluster_memory", "Memory", cols=8, stops={0: GREEN, 75: AMBER, 90: RED}),
+        horseshoe("sensor.homelab_longhorn_storage_used", "Longhorn", cols=8, stops={0: GREEN, 70: AMBER, 85: RED}),
         span=2,
     )
 
-    nodes = section(
-        heading("Nodes", "mdi:server", nav="/dashboard-homelab/nodes"),
-        *[node_card(*n) for n in NODES],
+    trend = sec(
+        apex([line("sensor.homelab_cluster_cpu", "CPU", BLUE),
+              line("sensor.homelab_cluster_memory", "Memory", PURPLE)],
+             title="Cluster utilisation", span="24h", height=230, states=True,
+             yaxis=[{"min": 0, "max": 100, "decimals": 0}],
+             apex_config={"stroke": {"curve": "smooth"}, "fill": GRADIENT}),
         span=2,
     )
 
-    temps = section(
-        heading("Temperatures", "mdi:thermometer"),
-        graph([{"entity": f"sensor.{nid}_temperature", "name": name, "color": PALETTE[i]}
-               for i, (nid, name, _) in enumerate(NODES)], hours=24,
-              show={"labels": True, "points": False, "legend": True, "fill": False}),
+    nodes = sec(
+        heading("Nodes", "mdi:server", badges=[hb("sensor.homelab_hottest_node", name="Hottest")]),
+        *[node_tile(*n) for n in NODES],
         span=2,
     )
 
-    gitops = section(
-        heading("Workloads", "mdi:source-branch"),
-        tile("sensor.homelab_argo_cd_apps", "Argo CD apps", cols=6, icon="mdi:source-branch"),
-        tile("sensor.homelab_argo_cd_apps_out_of_sync", "Out of sync", cols=6),
-        tile("sensor.homelab_argo_cd_apps_unhealthy", "Unhealthy", cols=6),
-        tile("sensor.homelab_pods_unhealthy", "Pods failing", cols=6),
-        tile("sensor.homelab_containers_crash_looping", "Crash-looping", cols=6),
-        tile("sensor.homelab_container_restarts_1h", "Restarts (1h)", cols=6),
+    compare = sec(
+        heading("Nodes right now", "mdi:chart-bar"),
+        now_columns([(f"sensor.{nid}_memory", name, PALETTE[i]) for i, (nid, name, _) in enumerate(NODES)],
+                    "Memory used", unit="%", ymax=100),
+        now_columns([(f"sensor.{nid}_cpu", name, PALETTE[i]) for i, (nid, name, _) in enumerate(NODES)],
+                    "CPU used", unit="%"),
+        span=2,
     )
 
-    storage = section(
-        heading("Storage", "mdi:harddisk"),
-        tile("sensor.homelab_longhorn_volumes", "Longhorn volumes", cols="full"),
-        tile("sensor.homelab_longhorn_volumes_degraded", "Degraded", cols=6),
-        tile("sensor.homelab_longhorn_volumes_faulted", "Faulted", cols=6),
-        tile("sensor.radarr_disk_space_movies", "Media disk", cols=6, icon="mdi:nas"),
-        tile("sensor.sonarr_disk_space", "TV disk", cols=6, icon="mdi:nas"),
+    temps = sec(
+        apex([line(f"sensor.{nid}_temperature", name, PALETTE[i], "line", "10min")
+              for i, (nid, name, _) in enumerate(NODES)],
+             title="Temperatures (24h)", span="24h", height=260,
+             yaxis=[{"decimals": 0, "apex_config": {"tickAmount": 4}}],
+             apex_config={"stroke": {"curve": "smooth", "width": 2},
+                          "legend": {"show": True, "position": "bottom"}}),
+        span=2,
     )
 
-    network = section(
-        heading("Network", "mdi:lan"),
-        tile("sensor.cloud_gateway_ultra_cloudflare_wan_latency", "Cloudflare", cols=6, icon="mdi:web-clock"),
-        tile("sensor.cloud_gateway_ultra_google_wan_latency", "Google", cols=6, icon="mdi:web-clock"),
-        tile("sensor.cloud_gateway_ultra_cpu_utilization", "Gateway CPU", cols=6),
-        tile("sensor.cloud_gateway_ultra_cpu_temperature", "Gateway temp", cols=6),
-        tile("sensor.usw_lite_16_poe_clients", "Switch clients", cols=6, icon="mdi:switch"),
-        tile("update.cloud_gateway_ultra_firmware", "Firmware", cols=6),
-        graph([{"entity": "sensor.cloud_gateway_ultra_cloudflare_wan_latency", "name": "Cloudflare", "color": PALETTE[2]},
-               {"entity": "sensor.cloud_gateway_ultra_google_wan_latency", "name": "Google", "color": PALETTE[0]}],
-              name="WAN latency", hours=24),
+    workloads = sec(
+        heading("Workloads", "mdi:kubernetes"),
+        {"type": "glance", "columns": 3, "state_color": True, "grid_options": FULL, "entities": [
+            {"entity": "sensor.homelab_argo_cd_apps", "name": "Apps"},
+            {"entity": "sensor.homelab_argo_cd_apps_out_of_sync", "name": "Out of sync"},
+            {"entity": "sensor.homelab_argo_cd_apps_unhealthy", "name": "Unhealthy"},
+            {"entity": "sensor.homelab_pods_running", "name": "Pods"},
+            {"entity": "sensor.homelab_pods_unhealthy", "name": "Failing"},
+            {"entity": "sensor.homelab_containers_crash_looping", "name": "Crash loops"}]},
+        {"type": "statistics-graph", "title": "Container restarts per hour",
+         "entities": ["sensor.homelab_container_restarts_1h"], "chart_type": "bar",
+         "period": "hour", "stat_types": ["max"], "days_to_show": 2, "hide_legend": True,
+         "grid_options": FULL},
     )
 
-    pihole = section(
-        heading("Pi-hole", "mdi:pi-hole", badges=[hbadge("binary_sensor.pi_hole_status")]),
-        tile("switch.pi_hole", "Blocking", cols="full"),
-        tile("sensor.pi_hole_dns_queries", "Queries today", cols=6),
-        tile("sensor.pi_hole_ads_blocked", "Blocked today", cols=6),
-        tile("sensor.pi_hole_ads_percentage_blocked", "Blocked %", cols=6),
-        tile("sensor.pi_hole_dns_unique_clients", "Clients", cols=6),
+    storage = sec(
+        heading("Storage", "mdi:harddisk", badges=[hb("sensor.homelab_longhorn_volumes", name="Volumes")]),
+        donut([{"entity": "sensor.homelab_longhorn_storage_used", "name": "Used", "color": TEAL},
+               {"entity": "sensor.homelab_longhorn_storage_used", "name": "Free",
+                "color": "#64748b", "transform": "return 100 - x;"}],
+              title="Longhorn capacity", height=220),
+        {"type": "entities", "state_color": True, "grid_options": FULL, "entities": [
+            {"entity": "sensor.homelab_longhorn_volumes_degraded", "name": "Degraded volumes"},
+            {"entity": "sensor.homelab_longhorn_volumes_faulted", "name": "Faulted volumes"},
+            {"type": "divider"},
+            {"entity": "sensor.radarr_disk_space_movies", "name": "NAS free (movies)", "icon": "mdi:nas"},
+            {"entity": "sensor.sonarr_disk_space", "name": "Disk free (TV)", "icon": "mdi:nas"}]},
     )
 
-    power = section(
-        heading("Power", "mdi:flash", badges=[hbadge("sensor.apc_status")]),
-        gauge("sensor.apc_battery_charge", "Battery", cols=6, green=50, yellow=25, red=0),
-        gauge("sensor.apc_load", "Load", cols=6, yellow=60, red=80),
-        tile("sensor.apc_battery_runtime", "Runtime", cols=6),
-        tile("sensor.apc_input_voltage", "Input", cols=6),
-        graph([{"entity": "sensor.apc_load", "name": "Load", "color": PALETTE[2]}], hours=24,
-              show={"labels": False, "points": False, "legend": False, "fill": "fade"}),
+    network = sec(
+        heading("Network", "mdi:lan", badges=[hb("sensor.usw_lite_16_poe_clients", name="Clients")]),
+        apex([line("sensor.cloud_gateway_ultra_cloudflare_wan_latency", "Cloudflare", AMBER, "line", "5min"),
+              line("sensor.cloud_gateway_ultra_google_wan_latency", "Google", BLUE, "line", "5min")],
+             title="WAN latency", span="12h", height=170, states=True,
+             yaxis=[{"min": 0, "decimals": 0}], apex_config={"stroke": {"curve": "smooth"}}),
+        tile("sensor.cloud_gateway_ultra_cpu_utilization", "Gateway CPU",
+             features=[{"type": "bar-gauge"}], features_position="bottom"),
+        tile("sensor.cloud_gateway_ultra_memory_utilization", "Gateway RAM",
+             features=[{"type": "bar-gauge"}], features_position="bottom"),
     )
 
-    overview = sections_view("Overview", "overview", "mdi:view-dashboard",
-                             [status, cluster, nodes, temps, gitops, storage, network, pihole, power],
-                             max_cols=4)
+    dns = sec(
+        heading("DNS · Pi-hole", "mdi:pi-hole", badges=[hb("binary_sensor.pi_hole_status")]),
+        {"type": "custom:sankey-chart", "show_names": True, "show_states": True, "height": 210,
+         "min_box_size": 6, "grid_options": FULL, "sections": [
+             {"entities": [{"entity_id": "sensor.pi_hole_dns_queries", "name": "Queries", "color": BLUE,
+                            "children": ["sensor.pi_hole_dns_queries_cached",
+                                         "sensor.pi_hole_dns_queries_forwarded",
+                                         "sensor.pi_hole_ads_blocked"]}]},
+             {"entities": [{"entity_id": "sensor.pi_hole_dns_queries_cached", "name": "Cached", "color": TEAL},
+                           {"entity_id": "sensor.pi_hole_dns_queries_forwarded", "name": "Forwarded", "color": PURPLE},
+                           {"entity_id": "sensor.pi_hole_ads_blocked", "name": "Blocked", "color": RED}]}]},
+        bubble("switch.pi_hole", "Ad blocking", "mdi:shield-check"),
+    )
 
-    node_sections = []
-    for i, (nid, name, icon) in enumerate(NODES):
-        node_sections.append(section(
-            heading(name, icon, badges=[hbadge(f"sensor.{nid}_temperature"),
-                                        hbadge(f"sensor.{nid}_root_disk", icon="mdi:harddisk")]),
-            graph([{"entity": f"sensor.{nid}_cpu", "name": "CPU", "color": PALETTE[0]},
-                   {"entity": f"sensor.{nid}_memory", "name": "Memory", "color": PALETTE[4]}],
-                  hours=12),
-            graph([{"entity": f"sensor.{nid}_network_in", "name": "Network in", "color": PALETTE[5]}],
-                  hours=12, show={"labels": False, "points": False, "legend": False, "fill": "fade",
-                                  "name": True, "icon": False}),
-        ))
-    nodes_view = sections_view("Nodes", "nodes", "mdi:server", node_sections, max_cols=4)
+    power = sec(
+        heading("UPS", "mdi:battery-charging", badges=[hb("sensor.apc_status")]),
+        radial([("sensor.apc_battery_charge", "Battery", GREEN), ("sensor.apc_load", "Load", AMBER)],
+               height=200),
+        {"type": "custom:mini-graph-card", "name": "Mains",
+         "entities": [{"entity": "sensor.apc_input_voltage", "color": PINK}],
+         "hours_to_show": 24, "points_per_hour": 4, "line_width": 2,
+         "show": {"labels": True, "fill": "fade"}, "grid_options": {"columns": 6}},
+        {"type": "sensor", "entity": "sensor.apc_battery_runtime", "name": "Runtime",
+         "graph": "line", "hours_to_show": 24, "grid_options": {"columns": 6}},
+    )
 
-    return {"title": "Homelab", "views": [overview, nodes_view]}
+    popups = sec(*[node_popup(*n) for n in NODES])
+
+    overview = view("Overview", "overview", "mdi:view-dashboard",
+                    [status, gauges, trend, nodes, compare, temps, workloads, storage,
+                     network, dns, power, popups])
+
+    detail = view("Nodes", "nodes", "mdi:server", [
+        sec(heading(name, icon, badges=[hb(f"sensor.{nid}_root_disk", name="Disk", icon="mdi:harddisk"),
+                                         hb(f"sensor.{nid}_temperature", name="Temp")]),
+            node_chart(nid, "24h"),
+            {"type": "custom:mini-graph-card", "name": "Network in",
+             "entities": [{"entity": f"sensor.{nid}_network_in", "color": TEAL}],
+             "hours_to_show": 24, "points_per_hour": 6, "height": 60, "line_width": 2,
+             "show": {"labels": False, "fill": "fade", "icon": False}, "grid_options": FULL})
+        for nid, name, icon in NODES])
+
+    return {"title": "Homelab", "views": [overview, detail]}
 
 
-# ── Media ───────────────────────────────────────────────────────────────────
+# ── Library ─────────────────────────────────────────────────────────────────
 def media_dashboard():
-    downloads = section(
-        heading("Downloads", "mdi:download", badges=[hbadge("sensor.qbittorrent_connection_status")]),
-        graph([{"entity": "sensor.qbittorrent_download_speed", "name": "Down", "color": PALETTE[0]},
-               {"entity": "sensor.qbittorrent_upload_speed", "name": "Up", "color": PALETTE[1]}],
-              hours=6, lower_bound=0, height=100),
-        tile("sensor.qbittorrent_status", "Status", cols=6, icon="mdi:download-circle"),
-        tile("sensor.qbittorrent_active_torrents", "Active", cols=6, icon="mdi:download"),
-        tile("sensor.qbittorrent_all_torrents", "Torrents", cols=6, icon="mdi:magnet"),
-        tile("sensor.qbittorrent_errored_torrents", "Errored", cols=6, icon="mdi:alert-circle-outline"),
-        tile("switch.qbittorrent_alternative_speed", "Slow mode", cols=6, icon="mdi:speedometer-slow"),
-        tile("sensor.qbittorrent_global_ratio", "Ratio", cols=6, icon="mdi:scale-balance"),
+    stats = sec(
+        big_stat("sensor.sonarr_shows", "Series", "mdi:television-classic", BLUE),
+        big_stat("sensor.radarr_movies", "Movies", "mdi:movie-open", PINK),
+        big_stat("sensor.lidarr_albums", "Albums", "mdi:album", TEAL),
+        big_stat("sensor.qbittorrent_active_torrents", "Active", "mdi:download", GREEN),
+        big_stat("sensor.sonarr_wanted", "Missing eps", "mdi:magnify", AMBER),
+        big_stat("sensor.qbittorrent_global_ratio", "Ratio", "mdi:scale-balance", PURPLE),
         span=2,
     )
 
-    library = section(
-        heading("Library", "mdi:filmstrip-box-multiple"),
-        tile("sensor.sonarr_shows", "Series", cols=4, icon="mdi:television-classic"),
-        tile("sensor.radarr_movies", "Movies", cols=4, icon="mdi:movie-open"),
-        tile("sensor.lidarr_albums", "Albums", cols=4, icon="mdi:album"),
-        tile("sensor.sonarr_wanted", "Missing eps", cols=6),
-        tile("sensor.lidarr_wanted", "Missing albums", cols=6),
-        tile("sensor.sonarr_queue", "Sonarr queue", cols=4),
-        tile("sensor.radarr_queue", "Radarr queue", cols=4),
-        tile("sensor.lidarr_queue", "Lidarr queue", cols=4),
-        tile("sensor.radarr_disk_space_movies", "Media disk", cols="full", icon="mdi:nas"),
+    absfmt = "EVAL:function(v){return Math.abs(v).toFixed(1)+' MB/s'}"
+    speed = sec(
+        heading("Bandwidth", "mdi:swap-vertical",
+                badges=[hb("sensor.qbittorrent_connection_status", name="Port")]),
+        apex([line("sensor.qbittorrent_download_speed", "Down", BLUE, "area", "2min"),
+              line("sensor.qbittorrent_upload_speed", "Up", GREEN, "area", "2min",
+                   transform="return -x;")],
+             span="6h", height=220,
+             yaxis=[{"decimals": 1, "apex_config": {"labels": {"formatter": absfmt}}}],
+             apex_config={"stroke": {"curve": "smooth"}, "fill": GRADIENT,
+                          "tooltip": {"y": {"formatter": absfmt}}}),
+        bubble("switch.qbittorrent_alternative_speed", "Slow mode", "mdi:speedometer-slow", cols=6),
+        bubble("sensor.qbittorrent_status", "qBittorrent", "mdi:download-circle", "state", cols=6),
         span=2,
     )
 
-    upcoming = section(
+    torrents = sec(
+        heading("Torrents", "mdi:magnet"),
+        *[{"type": "entity", "entity": e, "name": n, "icon": i, "state_color": True,
+           "grid_options": {"columns": 6}}
+          for e, n, i in [("sensor.qbittorrent_all_torrents", "Total", "mdi:magnet"),
+                          ("sensor.qbittorrent_inactive_torrents", "Seeding idle", "mdi:sleep"),
+                          ("sensor.qbittorrent_paused_torrents", "Paused", "mdi:pause-circle"),
+                          ("sensor.qbittorrent_errored_torrents", "Errored", "mdi:alert-circle")]],
+        {"type": "entities", "grid_options": FULL, "entities": [
+            {"entity": "sensor.qbittorrent_all_time_download", "name": "All-time down", "icon": "mdi:arrow-down-bold"},
+            {"entity": "sensor.qbittorrent_all_time_upload", "name": "All-time up", "icon": "mdi:arrow-up-bold"}]},
+    )
+
+    backlog = sec(
+        heading("Queues & backlog", "mdi:tray-full"),
+        now_columns([("sensor.sonarr_queue", "Sonarr queue", BLUE),
+                     ("sensor.radarr_queue", "Radarr queue", PINK),
+                     ("sensor.lidarr_queue", "Lidarr queue", TEAL),
+                     ("sensor.lidarr_wanted", "Albums missing", AMBER)], height=210),
+        {"type": "custom:mini-graph-card", "name": "Missing episodes (7d)",
+         "entities": [{"entity": "sensor.sonarr_wanted", "color": AMBER}],
+         "hours_to_show": 168, "points_per_hour": 0.5, "line_width": 2, "height": 80,
+         "show": {"fill": "fade", "labels": False}, "grid_options": FULL},
+    )
+
+    calendar = sec(
         heading("Coming up", "mdi:calendar-star"),
-        {"type": "calendar", "entities": ["calendar.sonarr", "calendar.radarr"],
-         "initial_view": "listWeek", "grid_options": {"columns": "full"}},
+        {"type": "custom:calendar-card-pro", "days_to_show": 14, "show_location": False,
+         "entities": [{"entity": "calendar.sonarr", "color": BLUE, "label": "📺"},
+                      {"entity": "calendar.radarr", "color": PINK, "label": "🎬"}],
+         "grid_options": FULL},
         span=2,
     )
 
-    jellyfin = section(
-        heading("Jellyfin", "mdi:play-network", badges=[hbadge("sensor.music_active_clients")]),
-        {"type": "custom:auto-entities", "show_empty": True,
-         "card": {"type": "entities", "state_color": True},
-         "filter": {"include": [{"integration": "jellyfin", "domain": "media_player",
-                                 "state": "/playing|paused/"}]},
-         "else": {"type": "markdown", "content": "Nothing playing right now."},
-         "grid_options": {"columns": "full"}},
+    jellyfin = sec(
+        heading("Now playing", "mdi:play-network", badges=[hb("sensor.music_active_clients", name="Clients")]),
+        jellyfin_players({"type": "markdown", "content": "### Nothing playing\nJellyfin sessions show up here."}),
         span=2,
     )
 
-    return {"title": "Library", "views": [
-        sections_view("Library", "media", "mdi:play-box-multiple",
-                      [downloads, library, upcoming, jellyfin], max_cols=4),
-    ]}
+    return {"title": "Library", "views": [view("Library", "media", "mdi:filmstrip-box-multiple", [
+        stats, speed, torrents, backlog, calendar, jellyfin])]}
 
 
 # ── Push ────────────────────────────────────────────────────────────────────
 DASHBOARDS = [
-    # (url_path, title, icon, builder)
     ("dashboard-home", "Home", "mdi:home", home_dashboard),
     ("dashboard-homelab", "Homelab", "mdi:server", homelab_dashboard),
     ("dashboard-media", "Library", "mdi:filmstrip-box-multiple", media_dashboard),
@@ -487,7 +631,7 @@ async def push(url, token):
 
         existing = {d["url_path"] for d in await call({"type": "lovelace/dashboards/list"})}
         for url_path, title, icon, build in DASHBOARDS:
-            if url_path and url_path not in existing:
+            if url_path not in existing:
                 await call({"type": "lovelace/dashboards/create", "url_path": url_path,
                             "title": title, "icon": icon, "show_in_sidebar": True,
                             "require_admin": False, "mode": "storage"})
