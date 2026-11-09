@@ -161,10 +161,14 @@ spec:
               value: "10.2.0.2/32"
             - name: PORT_FORWARD_ONLY
               value: "on"
-            # Keeps the exit in the same country as the previous pinned server.
-            # Widen or drop this to give gluetun more servers to choose from.
+            # Nearby countries, not Netherlands alone. NL has only 5-6 Proton
+            # port-forward servers, and they fail together: on 2026-11-06 and
+            # 2026-11-08 the tunnel dropped and every reconnect to all six NL
+            # servers failed for hours ("TLS handshake: EOF", "i/o timeout"),
+            # so the liveness probe below restarted gluetun 57 times in 4 days.
+            # These five countries give ~40 port-forward servers.
             - name: SERVER_COUNTRIES
-              value: "Netherlands"
+              value: "Netherlands,Belgium,Germany,Switzerland,France"
             - name: WIREGUARD_PERSISTENT_KEEPALIVE_INTERVAL
               value: "25s"
             # Lower MTU fixes TCP MSS clamping issues (ICMP works but TCP times out)
