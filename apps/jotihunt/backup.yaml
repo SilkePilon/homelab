@@ -33,7 +33,7 @@ spec:
             kubernetes.io/arch: amd64
           containers:
             - name: mongodump
-              image: mongo:9.0.4@sha256:452bdaf2127b8ff851e31410a267809b9829eded219979f2210e7c7efb85a058
+              image: mongo:9.0.8@sha256:ff6cea7aa40c3ee44be503ed11f817928239d660b3927c79df4a1405e0923c1c
               imagePullPolicy: IfNotPresent
               command:
                 - sh
