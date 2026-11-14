@@ -34,7 +34,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: rustfs
-          image: rustfs/rustfs:1.0.4
+          image: rustfs/rustfs:1.0.5
           imagePullPolicy: IfNotPresent
           ports:
             - name: s3
