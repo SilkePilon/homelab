@@ -61,7 +61,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: ghcr.io/silkepilon/groepshike:latest@sha256:86b6b7af08e04329fcf01d07fce028939d8914a1b44116cf491676dd329c6962
+          image: ghcr.io/silkepilon/groepshike:latest@sha256:410e1bac2570c2473d23170dec04ab8323266eab28dae9f2b47adb2098fcdcb2
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
