@@ -41,8 +41,10 @@ namespace: groepshike
 #   1. Cloudflare Tunnel public hostname groepshike.nl (see ingress.yaml).
 #   2. Push to main; Argo CD syncs it. Migrations run when the web pods start.
 #   3. First deploy only: create the first admin and the content from a
-#      checkout of the groepshike repo, through port-forwards (the repo's
-#      deploy/k8s/README.md describes `pnpm create-admin` and `pnpm seed`).
+#      checkout of the groepshike repo, through port-forwards
+#      (`pnpm create-admin`, `pnpm seed`). The repo README's "Deploying"
+#      section has the exact commands, and `pnpm media:regenerate` for
+#      rebuilding the photo sizes after the image size settings change.
 # ─────────────────────────────────────────────────────────────────────────────
 
 resources:
