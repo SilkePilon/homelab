@@ -1,0 +1,27 @@
+# ── groepshike PVCs ───────────────────────────────────────────────────────────
+# Longhorn (3 replicas), so the database and the media store can move between
+# nodes. Postgres holds every text and setting; the S3 store holds the photos
+# and videos.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: groepshike-postgres-data
+  namespace: groepshike
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: groepshike-s3-data
+  namespace: groepshike
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 20Gi

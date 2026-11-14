@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: groepshike
+  namespace: groepshike
+  labels:
+    app.kubernetes.io/name: groepshike
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: groepshike
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

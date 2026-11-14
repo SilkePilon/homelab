@@ -1,0 +1,135 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# groepshike Deployment — https://github.com/SilkePilon/groepshike (private)
+# Image: ghcr.io/silkepilon/groepshike (public package; built by the repo's
+#        image.yml after CI passes on main). Next.js 16 + Payload CMS 3.
+# Port:  3000
+# Data:  none in the pod — Postgres (groepshike-db) and S3 (groepshike-s3).
+#
+# Pinned as latest@digest, so Renovate opens (and automerges) a digest bump for
+# every new build; Argo CD then rolls it out. Database migrations run on pod
+# start (Payload prodMigrations). The rollout starts one new pod at a time
+# (maxSurge 1, maxUnavailable 0), so migrations never run twice in parallel.
+#
+# The image is linux/amd64 only, so the pods stay on the amd64 nodes.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: groepshike
+  namespace: groepshike
+  labels:
+    app.kubernetes.io/name: groepshike
+    app.kubernetes.io/component: web
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: groepshike
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: groepshike
+        app.kubernetes.io/component: web
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      # Prefer the two replicas on different nodes, so a node drain (kured)
+      # leaves one serving. pdb.yaml keeps drains to one pod at a time.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: groepshike
+              app.kubernetes.io/component: web
+          matchLabelKeys:
+            - pod-template-hash
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: ghcr.io/silkepilon/groepshike:latest@sha256:86b6b7af08e04329fcf01d07fce028939d8914a1b44116cf491676dd329c6962
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+            # Kubernetes sets HOSTNAME to the pod name, which would make
+            # server.js bind to the pod IP only.
+            - name: HOSTNAME
+              value: 0.0.0.0
+          envFrom:
+            - configMapRef:
+                name: groepshike-config
+            - secretRef:
+                name: groepshike-secret
+          # /api/health answers 200 once Payload has started (prodMigrations
+          # included) and Postgres answers; ?live=1 skips Payload and the
+          # database, so a database outage takes pods out of the Service but
+          # never restarts them. Both stay open while SITE_PASSWORD is set.
+          startupProbe:
+            httpGet:
+              path: /api/health?live=1
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health?live=1
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 384Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            # The only paths the server writes to: the next/image cache and /tmp.
+            - name: next-cache
+              mountPath: /app/.next/cache
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: next-cache
+          emptyDir:
+            sizeLimit: 2Gi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi

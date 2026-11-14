@@ -54,6 +54,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | [arr-stack](apps/arr-stack) | `arr-stack` | Media automation: qBittorrent, Sonarr, Radarr, Lidarr, Scraparr, Byparr behind a Gluetun/ProtonVPN sidecar |
 | [cloudflared](apps/cloudflared) | `cloudflared` | Cloudflare Tunnel daemon (2 replicas) — the only way traffic gets in |
 | [gitlab](apps/gitlab) | `gitlab` | GitLab CE (Omnibus, one pod), HTTPS git only; CI via the `gitlab-runner` Helm app in `gitlab-runner` |
+| [groepshike](apps/groepshike) | `groepshike` | [groepshike.nl](https://groepshike.nl) — HIT Harderwijk Groepshike site: Next.js + Payload CMS, its own Postgres 17 and RustFS (S3) |
 | [homeassistant](apps/homeassistant) | `homeassistant` | Home Assistant |
 | [jotihunt](apps/jotihunt) | `jotihunt` | Jotihunt 2026 tracker: web app + API, MongoDB, Traccar (OsmAnd ingest public, UI tailnet-only) |
 | [monitoring](apps/monitoring) | `monitoring` | Prometheus, Grafana, Loki, Promtail, node-exporter, kube-state-metrics, NUT exporter |
@@ -135,6 +136,7 @@ kubectl -n n8n create secret generic n8n-secret \
 | `scraparr-api-keys` | `arr-stack` | Sonarr/Radarr/Lidarr API keys |
 | `gitlab-secret` | `gitlab` | GitLab root password (`GITLAB_ROOT_PASSWORD`), only read on an empty volume |
 | `gitlab-runner-secret` | `gitlab-runner` | Instance runner token (`runner-token`, plus empty `runner-registration-token`) |
+| `groepshike-secret` | `groepshike` | Postgres password + `DATABASE_URL`, `PAYLOAD_SECRET`, RustFS keys (`S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`), optional `SITE_PASSWORD` (whole site behind one password), SMTP login |
 | `grafana-admin-creds` | `monitoring` | Grafana admin login |
 | `jotihunt-secret` | `jotihunt` | JWT secret, Traccar API token, Gemini key, VAPID keys, Telegram + Life360 session keys (+ optional Jotihunt site login, ORS key) |
 | `n8n-secret` | `n8n` | n8n encryption key |

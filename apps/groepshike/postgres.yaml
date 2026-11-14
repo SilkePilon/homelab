@@ -1,0 +1,91 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# PostgreSQL 17 — groepshike's database (Payload CMS).
+# Service DNS: groepshike-db (inside the namespace), used by DATABASE_URL in
+# groepshike-secret. 17 matches the site's dev and CI databases.
+#
+# Major upgrades: a new major can't open the old data dir. Dump, start the new
+# major on a fresh PVC, restore, then switch claimName (as done for twenty).
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: groepshike-db
+  namespace: groepshike
+  labels:
+    app.kubernetes.io/name: groepshike-db
+spec:
+  replicas: 1
+  # ReadWriteOnce PVC — only one writer at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: groepshike-db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: groepshike-db
+    spec:
+      # The postgres image starts as root and drops to the postgres user itself
+      # (it chowns PGDATA), so no custom securityContext.
+      containers:
+        - name: postgres
+          image: postgres:17.12
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: groepshike
+            - name: POSTGRES_DB
+              value: groepshike
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: groepshike-secret
+                  key: POSTGRES_PASSWORD
+            # A subdirectory keeps the volume's lost+found out of the data dir.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "groepshike", "-d", "groepshike"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "groepshike", "-d", "groepshike"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: groepshike-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: groepshike-db
+  namespace: groepshike
+  labels:
+    app.kubernetes.io/name: groepshike-db
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: groepshike-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

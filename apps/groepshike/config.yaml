@@ -1,0 +1,23 @@
+# ── groepshike-config ─────────────────────────────────────────────────────────
+# Non-secret settings, read by the web pods (envFrom). Secrets live in
+# groepshike-secret (see kustomization.yaml).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: groepshike-config
+  namespace: groepshike
+data:
+  NODE_ENV: production
+  # Inlined into the image at build time; this copy is for runtime readers.
+  NEXT_PUBLIC_SERVER_URL: https://groepshike.nl
+  S3_BUCKET: groepshike-media
+  S3_ENDPOINT: http://groepshike-s3:9000
+  S3_REGION: us-east-1
+  S3_FORCE_PATH_STYLE: "true"
+  # Empty SMTP_HOST disables e-mail: contact-form notifications and password
+  # resets are logged by the pod instead of sent. Set SMTP_* (and SMTP_USER /
+  # SMTP_PASS in the secret) before handing out editor accounts.
+  SMTP_HOST: ""
+  SMTP_PORT: "587"
+  SMTP_FROM: Groepshike <noreply@groepshike.nl>
+  CONTACT_TO: ""

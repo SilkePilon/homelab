@@ -1,0 +1,41 @@
+# ── groepshike Ingress ────────────────────────────────────────────────────────
+# Cloudflare Tunnel → Traefik → groepshike Service → Pod.
+#
+# In CF Zero Trust → Networks → Tunnels → homelab → Public Hostnames:
+#   Subdomain: (none)  Domain: groepshike.nl
+#   Subdomain: www     Domain: groepshike.nl   (optional; the site answers www
+#                                               with a 308 to the apex)
+#   Service:   HTTP    http://traefik.kube-system.svc.cluster.local:80
+#
+# Cloudflare handles TLS. While SITE_PASSWORD is set in groepshike-secret,
+# everything except /toegang and /api/health asks for that password first.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: groepshike
+  namespace: groepshike
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: groepshike.nl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: groepshike
+                port:
+                  name: http
+    - host: www.groepshike.nl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: groepshike
+                port:
+                  name: http

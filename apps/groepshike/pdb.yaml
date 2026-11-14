@@ -1,0 +1,12 @@
+# At least one web pod stays up while kured drains a node.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: groepshike
+  namespace: groepshike
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: groepshike
+      app.kubernetes.io/component: web

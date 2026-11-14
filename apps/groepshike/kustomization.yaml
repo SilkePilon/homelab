@@ -1,0 +1,80 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: groepshike
+
+# ─────────────────────────────────────────────────────────────────────────────
+# groepshike — groepshike.nl, the HIT Harderwijk Groepshike site
+# (Next.js 16 + Payload CMS 3, https://github.com/SilkePilon/groepshike).
+#
+# Topology:
+#   groepshike     Deployment  web, 2 replicas (amd64), no state in the pod
+#   groepshike-db  Deployment  PostgreSQL 17     (texts, settings, users)
+#   groepshike-s3  Deployment  RustFS, S3 API    (photos and videos)
+#   groepshike-s3-bucket  PostSync Job: creates the bucket if it is missing
+#
+# BEFORE applying — create the namespace + secret (NOT in git):
+#
+#   kubectl create namespace groepshike
+#   PG_PASS="$(openssl rand -hex 24)"
+#   kubectl create secret generic groepshike-secret -n groepshike \
+#     --from-literal=POSTGRES_PASSWORD="$PG_PASS" \
+#     --from-literal=DATABASE_URL="postgres://groepshike:${PG_PASS}@groepshike-db:5432/groepshike" \
+#     --from-literal=PAYLOAD_SECRET="$(openssl rand -hex 32)" \
+#     --from-literal=S3_ACCESS_KEY_ID="groepshike-$(openssl rand -hex 6)" \
+#     --from-literal=S3_SECRET_ACCESS_KEY="$(openssl rand -hex 24)" \
+#     --from-literal=SITE_PASSWORD='<shared test password>' \
+#     --from-literal=SMTP_USER='' --from-literal=SMTP_PASS=''
+#
+#   SITE_PASSWORD puts the whole site (pages, admin, files, API) behind one
+#   password page. To open the site to everyone, remove the key and restart:
+#     kubectl -n groepshike patch secret groepshike-secret --type=json \
+#       -p='[{"op":"remove","path":"/data/SITE_PASSWORD"}]'
+#     kubectl -n groepshike rollout restart deployment/groepshike
+#
+#   PAYLOAD_SECRET signs admin sessions (changing it logs everyone out, no data
+#   lost). Back up the secret: without POSTGRES_PASSWORD / S3 keys the volumes
+#   are still readable, but you would have to reset the credentials.
+#
+# THEN:
+#   1. Cloudflare Tunnel public hostname groepshike.nl (see ingress.yaml).
+#   2. Push to main; Argo CD syncs it. Migrations run when the web pods start.
+#   3. First deploy only: create the first admin and the content from a
+#      checkout of the groepshike repo, through port-forwards (the repo's
+#      deploy/k8s/README.md describes `pnpm create-admin` and `pnpm seed`).
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - config.yaml
+  - postgres.yaml
+  - s3.yaml
+  - deployment.yaml
+  - service.yaml
+  - pdb.yaml
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
+
+# Keep only 2 old ReplicaSets/ControllerRevisions per workload instead of the
+# Kubernetes default of 10. Without this the cluster accumulates dozens of
+# empty ReplicaSets, and each retained revision pins its container image on the
+# node — costly on the Pis, which have 28-58Gi disks.
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2
+  - target:
+      kind: DaemonSet
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2
