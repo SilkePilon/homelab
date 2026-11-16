@@ -59,7 +59,6 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | [jotihunt](apps/jotihunt) | `jotihunt` | Jotihunt 2026 tracker: web app + API, MongoDB, Traccar (OsmAnd ingest public, UI tailnet-only) |
 | [monitoring](apps/monitoring) | `monitoring` | Prometheus, Grafana, Loki, Promtail, node-exporter, kube-state-metrics, NUT exporter |
 | [n8n](apps/n8n) | `n8n` | n8n workflow automation |
-| [openclaw](apps/openclaw) | `openclaw` | [OpenClaw](https://github.com/openclaw/openclaw) AI agent gateway + Control UI — tailnet-only at `openclaw.<tailnet>.ts.net` |
 | [plane](apps/plane) | `plane` | Plane project management (Helm chart rendered by Argo CD) + its own Postgres, Valkey, RabbitMQ and MinIO |
 | [pihole](apps/pihole) | `pihole` | Pi-hole DNS ad blocking, served on port 53 of every node |
 | [stirling-pdf](apps/stirling-pdf) | `stirling-pdf` | [Stirling PDF](https://www.stirlingpdf.com) — PDF toolbox (merge, split, convert, OCR), login required |
@@ -140,7 +139,6 @@ kubectl -n n8n create secret generic n8n-secret \
 | `grafana-admin-creds` | `monitoring` | Grafana admin login |
 | `jotihunt-secret` | `jotihunt` | JWT secret, Traccar API token, Gemini key, VAPID keys, Telegram + Life360 session keys (+ optional Jotihunt site login, ORS key) |
 | `n8n-secret` | `n8n` | n8n encryption key |
-| `openclaw-secret` | `openclaw` | Gateway token (`OPENCLAW_GATEWAY_TOKEN`) + LLM provider keys |
 | `pihole-secret` | `pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
 | `portfolio-secret` | `portfolio` | Payload admin session signing key (`PAYLOAD_SECRET`) |
 | `plane-secret` | `plane` | Django/live signing keys, Postgres, RabbitMQ and MinIO credentials + connection URLs |
