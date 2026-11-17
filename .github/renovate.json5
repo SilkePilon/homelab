@@ -1,80 +1,102 @@
 {
-  $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  // Mend hosted app defaults new repos to "silent" (scan only, no PRs).
-  mode: "full",
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  mode: 'full',
   extends: [
-    "config:recommended",
-    ":dependencyDashboard",
-    ":semanticCommits",
-    ":timezone(Europe/Amsterdam)",
-    "helpers:pinGitHubActionDigests",
+    'config:recommended',
+    ':dependencyDashboard',
+    ':semanticCommits',
+    ':timezone(Europe/Amsterdam)',
+    'helpers:pinGitHubActionDigests',
   ],
-  dependencyDashboardTitle: "Renovate Dashboard 🤖",
-  commitMessageTopic: "{{depName}}",
-  commitMessageExtra: "to {{newVersion}}",
-  // 0 = no cap. With a cap of 5, a few long-lived PRs (DB majors, jotihunt)
-  // took every slot and new updates sat "rate-limited" on the dashboard.
-  // Automerge keeps the open count low anyway.
+  dependencyDashboard: {
+    title: 'Renovate Dashboard 🤖',
+  },
+  commitMessageTopic: '{{depName}}',
+  commitMessageExtra: 'to {{newVersion}}',
   prConcurrentLimit: 0,
   branchConcurrentLimit: 0,
   prHourlyLimit: 0,
   ignorePaths: [
-    "bootstrap/argocd/applications/_template.yaml.tpl",
+    'bootstrap/argocd/applications/_template.yaml.tpl',
   ],
   kubernetes: {
     managerFilePatterns: [
-      "/^apps/.+\\.ya?ml$/",
-      "/^bootstrap/.+\\.ya?ml$/",
+      '/^apps/.+\\.ya?ml$/',
+      '/^bootstrap/.+\\.ya?ml$/',
     ],
   },
   customManagers: [
     {
-      description: "Version ARGs annotated with a `# renovate:` comment in image Dockerfiles",
-      customType: "regex",
-      managerFilePatterns: ["/^images/.+/Dockerfile$/"],
+      description: 'Version ARGs annotated with a `# renovate:` comment in image Dockerfiles',
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^images/.+/Dockerfile$/',
+      ],
       matchStrings: [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+ARG \\w+=(?<currentValue>\\S+)",
+        '# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+ARG \\w+=(?<currentValue>\\S+)',
       ],
     },
   ],
   packageRules: [
     {
-      description: "Group all linuxserver.io images",
-      matchDatasources: ["docker"],
-      matchPackageNames: ["lscr.io/linuxserver/**"],
-      groupName: "linuxserver.io",
+      description: 'Group all linuxserver.io images',
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'lscr.io/linuxserver/**',
+      ],
+      groupName: 'linuxserver.io',
     },
     {
-      description: "Group Grafana stack",
-      matchDatasources: ["docker"],
-      matchPackageNames: ["grafana/**"],
-      groupName: "grafana stack",
+      description: 'Group Grafana stack',
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'grafana/**',
+      ],
+      groupName: 'grafana stack',
     },
     {
-      description: "Auto-merge everything below a major (images, npm, Dockerfile ARGs)",
-      matchUpdateTypes: ["minor", "patch", "digest", "pin", "pinDigest"],
+      description: 'Auto-merge everything below a major (images, npm, Dockerfile ARGs)',
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+        'digest',
+        'pin',
+        'pinDigest',
+      ],
       automerge: true,
-      automergeType: "branch",
-      // No CI runs on renovate/* branches (GitGuardian and cubic only run on
-      // PRs), so Renovate saw "pending" forever and never merged.
+      automergeType: 'branch',
       ignoreTests: true,
     },
     {
-      description: "Pin digests for mutable tags so :latest is still tracked",
-      matchDatasources: ["docker"],
-      matchCurrentValue: "/^(latest|stable)$/",
+      description: 'Pin digests for mutable tags so :latest is still tracked',
+      matchDatasources: [
+        'docker',
+      ],
+      matchCurrentValue: '/^(latest|stable)$/',
       pinDigests: true,
     },
     {
-      description: "Never auto-merge major bumps",
-      matchUpdateTypes: ["major"],
+      description: 'Never auto-merge major bumps',
+      matchUpdateTypes: [
+        'major',
+      ],
       automerge: false,
-      labels: ["major-update"],
+      labels: [
+        'major-update',
+      ],
     },
     {
-      description: "t3code rollouts kill running agent turns; merge by hand when idle",
-      matchDatasources: ["docker"],
-      matchPackageNames: ["ghcr.io/silkepilon/t3code"],
+      description: 't3code rollouts kill running agent turns; merge by hand when idle',
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'ghcr.io/silkepilon/t3code',
+      ],
       automerge: false,
     },
   ],
