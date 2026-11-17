@@ -60,7 +60,6 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | [monitoring](apps/monitoring) | `monitoring` | Prometheus, Grafana, Loki, Promtail, node-exporter, kube-state-metrics, NUT exporter |
 | [n8n](apps/n8n) | `n8n` | n8n workflow automation |
 | [plane](apps/plane) | `plane` | Plane project management (Helm chart rendered by Argo CD) + its own Postgres, Valkey, RabbitMQ and MinIO |
-| [oxynote](apps/oxynote) | `oxynote` | [wiki.silkepilon.dev](https://wiki.silkepilon.dev) — [Oxynote](https://oxynote.io) engineering docs/wiki, all-in-one image with embedded Postgres |
 | [pihole](apps/pihole) | `pihole` | Pi-hole DNS ad blocking, served on port 53 of every node |
 | [stirling-pdf](apps/stirling-pdf) | `stirling-pdf` | [Stirling PDF](https://www.stirlingpdf.com) — PDF toolbox (merge, split, convert, OCR), login required |
 | [portfolio](apps/portfolio) | `portfolio` | [silkepilon.dev](https://silkepilon.dev) — Next.js + Payload CMS portfolio, SQLite on a Longhorn volume |
