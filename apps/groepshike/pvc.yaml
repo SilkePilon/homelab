@@ -25,3 +25,17 @@ spec:
   resources:
     requests:
       storage: 20Gi
+---
+# Postgres 18 data. Filled from a dump of groepshike-postgres-data (17) during
+# the 17 -> 18 upgrade; the old PVC stays for rollback until removed by hand.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: groepshike-postgres18-data
+  namespace: groepshike
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi
