@@ -10,7 +10,7 @@ namespace: groepshike
 #
 # Topology:
 #   groepshike     Deployment  web, 2 replicas (amd64), no state in the pod
-#   groepshike-db  Deployment  PostgreSQL 17     (texts, settings, users)
+#   groepshike-db  Deployment  PostgreSQL 18     (texts, settings, users)
 #   groepshike-s3  Deployment  RustFS, S3 API    (photos and videos)
 #   groepshike-s3-bucket  PostSync Job: creates the bucket if it is missing
 #
