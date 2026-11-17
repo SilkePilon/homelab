@@ -31,7 +31,7 @@ spec:
       # (it chowns PGDATA), so no custom securityContext.
       containers:
         - name: postgres
-          image: postgres:17.12
+          image: postgres:18.7
           imagePullPolicy: IfNotPresent
           ports:
             - name: postgres
