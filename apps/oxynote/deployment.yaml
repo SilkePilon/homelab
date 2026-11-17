@@ -1,0 +1,119 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Oxynote Deployment
+# Image: ghcr.io/oxynote/oxynote — all-in-one: Caddy (front door on 8080),
+#        Nuxt web, Go core, auth/realtime and an embedded PostgreSQL 18,
+#        supervised by a launcher under tini. Multi-arch (amd64 + arm64).
+# Port:  8080
+# Data:  /oxynote/data  (PVC oxynote-data)
+# Docs:  https://github.com/oxynote/oxynote/blob/main/docker/prod/README.md
+#
+# FIRST BOOT: the image seeds a workspace admin admin@example.com /
+# oxynote-admin-1234 and prints those credentials on the login page until
+# the password changes. Anyone reaching the site can sign in with them until
+# then, so change email + password (Settings → Profile) right after the
+# Cloudflare hostname goes live. Cookies are scoped to OXYNOTE_PUBLIC_URL,
+# so a localhost port-forward can't be used for this.
+#
+# No SMTP: no password reset, invitations are shared as copied links.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oxynote
+  namespace: oxynote
+  labels:
+    app.kubernetes.io/name: oxynote
+spec:
+  replicas: 1
+  # Recreate: PVC is ReadWriteOnce and the embedded Postgres must never run
+  # twice against the same data directory.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: oxynote
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: oxynote
+    spec:
+      # Upstream asks for a 60s stop timeout so open documents get saved
+      # and Postgres shuts down cleanly.
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        # The image's fixed uid; files on the volume are owned by it.
+        runAsUser: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: oxynote
+          image: ghcr.io/oxynote/oxynote:0.10.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+            # Scheme + host only; cookie domain, CORS and the MCP endpoint
+            # derive from it. https also switches the MCP server on.
+            - name: OXYNOTE_PUBLIC_URL
+              value: "https://wiki.silkepilon.dev"
+            # The built-in limiter buckets by client IP, but behind
+            # cloudflared + Traefik every request arrives from a pod IP, so
+            # all users would share one bucket. Cloudflare rate limits instead.
+            - name: OXYNOTE_RATE_LIMIT_DISABLED
+              value: "true"
+            # Official images ship Sentry DSNs; keep crash reports at home.
+            - name: OXYNOTE_CRASH_REPORTING_DISABLED
+              value: "true"
+          volumeMounts:
+            - name: data
+              mountPath: /oxynote/data
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            # Upstream supports a read-only root: it writes only to
+            # /oxynote/data and /tmp.
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 200m
+              memory: 768Mi
+            limits:
+              cpu: "2"
+              memory: 3Gi
+          # The image's own layered probe: core, auth-realtime, web and the
+          # Caddy front door must all answer 200.
+          startupProbe:
+            exec:
+              command: ["/usr/bin/node", "/oxynote/prod/healthcheck.mjs"]
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command: ["/usr/bin/node", "/oxynote/prod/healthcheck.mjs"]
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["/usr/bin/node", "/oxynote/prod/healthcheck.mjs"]
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: oxynote-data
+        # Postgres' unix socket (/tmp/postgresql) and Caddy's scratch dir.
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi

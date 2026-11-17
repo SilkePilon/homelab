@@ -1,0 +1,46 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Plain Kustomize base — consumed identically by Argo CD and Flux CD.
+namespace: oxynote
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Oxynote — engineering docs / wiki (pages with diagrams, live Prometheus and
+# Loki panels, per-change diffs). One container, embedded PostgreSQL, no
+# secrets to create: the launcher generates them onto the PVC.
+#
+#  1. Commit and push; Argo CD syncs it. Wait until the pod is Ready.
+#  2. Add a Cloudflare Tunnel public hostname entry:
+#       Subdomain: wiki   Domain: silkepilon.dev
+#       Service:   HTTP  http://traefik.kube-system.svc.cluster.local:80
+#  3. Immediately sign in as admin@example.com / oxynote-admin-1234 and
+#     change the email, password and workspace name. The login page shows
+#     those defaults to everyone until the password changes.
+#
+# Backup (embedded DB):
+#   kubectl -n oxynote exec deploy/oxynote -- sh -c \
+#     'PGPASSWORD="$(cat /oxynote/data/secrets/database-password)" \
+#      /usr/libexec/postgresql18/pg_dump -h /tmp/postgresql -U oxynote oxynote' > oxynote.sql
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - service.yaml
+  - deployment.yaml
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
+
+# Keep only 2 old ReplicaSets per workload (see stirling-pdf for the why:
+# retained revisions pin images on the small Pi disks).
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2

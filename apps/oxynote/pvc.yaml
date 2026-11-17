@@ -1,0 +1,17 @@
+# ── Oxynote PVC ───────────────────────────────────────────────────────────────
+# Everything lives here: the embedded PostgreSQL 18 (/oxynote/data/postgres,
+# so every document), uploaded images (object-storage/) and the secrets the
+# launcher generates on first boot (secrets/ — session signing, data-source
+# credential encryption, the DB password). Losing this volume signs everyone
+# out and orphans every stored data-source credential.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: oxynote-data
+  namespace: oxynote
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
