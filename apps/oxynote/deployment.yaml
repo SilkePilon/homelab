@@ -41,6 +41,10 @@ spec:
       # Upstream asks for a 60s stop timeout so open documents get saved
       # and Postgres shuts down cleanly.
       terminationGracePeriodSeconds: 60
+      # The Service is named oxynote, so Kubernetes would inject
+      # OXYNOTE_SERVICE_HOST, OXYNOTE_PORT, ... and the launcher refuses to
+      # boot on any OXYNOTE_* variable it does not know.
+      enableServiceLinks: false
       securityContext:
         # The image's fixed uid; files on the volume are owned by it.
         runAsUser: 65532
