@@ -10,11 +10,10 @@ kind: Application
 metadata:
   name: t3code
   namespace: argocd
-  # Argo CD will delete its own Application resource if the file is removed
-  # from Git. It will NOT delete the deployed resources unless prune: true
-  # is also set. Leave this in place for normal operation.
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  # Temporary, while the ApplicationSet takes this app over: no cascade
+  # delete, and the root app must not prune it when this file goes away.
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
 spec:
   project: default
   source:

@@ -3,8 +3,10 @@ kind: Application
 metadata:
   name: arr-stack
   namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  # Temporary, while the ApplicationSet takes this app over: no cascade
+  # delete, and the root app must not prune it when this file goes away.
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
 spec:
   project: default
   source:
