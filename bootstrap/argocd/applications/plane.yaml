@@ -72,33 +72,20 @@ spec:
             storageClass: longhorn
             volumeSize: 1Gi
           minio:
-            storageClass: longhorn
-            volumeSize: 10Gi
-            # MinIO stopped publishing images: docker.io/minio/minio and
-            # minio/mc are gone ("repository does not exist") and quay.io
-            # needs a login. The chart's minio/minio:latest only runs from the
-            # copy cached on raspberrypi-5-16gb-1 (arm64), so MinIO is pinned
-            # there. image-gc never removes an image a running container uses,
-            # but if this pod is down for more than ~6h the cache can be
-            # pruned. Moving to a maintained MinIO build is the real fix.
-            nodeSelector:
-              kubernetes.io/hostname: raspberrypi-5-16gb-1
-            # Only used by the bucket-creation Job (needs /bin/sh + /usr/bin/mc).
-            # Chainguard's -dev variant has both and is free to pull.
-            image_mc: cgr.dev/chainguard/minio-client:latest-dev
+            # Off: uploads live in RustFS (apps/plane/rustfs.yaml, Service
+            # plane-rustfs), because MinIO no longer publishes images. Plane
+            # still talks S3 the MinIO way (USE_MINIO=1 in plane-secret signs
+            # URLs for the public host); apps/plane/uploads-route.yaml sends
+            # /uploads to RustFS.
+            local_setup: false
             env:
               # Presigned upload URLs are built from request.scheme unless this
               # is set, and Django sees plain http behind Cloudflare, so the
               # browser blocked http://plane.silkepilon.dev/uploads as mixed
-              # content. Only changes the URL scheme; Traefik -> MinIO is still
-              # http in-cluster.
+              # content. Only changes the URL scheme; Traefik -> RustFS is
+              # still http in-cluster. Rendered into the chart's app env even
+              # with local_setup off.
               minio_endpoint_ssl: true
-            # The bucket-creation Job is named after .Release.Revision, which is
-            # always 1 under Argo CD, and Job specs are immutable. Force-replace
-            # lets a version bump delete and recreate it. The annotation also
-            # lands on the MinIO StatefulSet (PVC is kept).
-            annotations:
-              argocd.argoproj.io/sync-options: Replace=true,Force=true
 
           # Chart default pullPolicy is Always; the tags are immutable and the
           # Pis have small disks.

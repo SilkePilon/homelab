@@ -9,7 +9,8 @@
 # Plane signs upload/download URLs for the public host, and Traefik passes
 # them through unchanged.
 #
-# Credentials: RUSTFS_ACCESS_KEY / RUSTFS_SECRET_KEY in Infisical /plane.
+# Credentials: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in Infisical /plane,
+# the same pair Plane uses as its S3 client, so one rotation covers both.
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -62,12 +63,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: plane-secret
-                  key: RUSTFS_ACCESS_KEY
+                  key: AWS_ACCESS_KEY_ID
             - name: RUSTFS_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: plane-secret
-                  key: RUSTFS_SECRET_KEY
+                  key: AWS_SECRET_ACCESS_KEY
           volumeMounts:
             - name: data
               mountPath: /data
@@ -146,12 +147,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: plane-secret
-                  key: RUSTFS_ACCESS_KEY
+                  key: AWS_ACCESS_KEY_ID
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: plane-secret
-                  key: RUSTFS_SECRET_KEY
+                  key: AWS_SECRET_ACCESS_KEY
           command: ["/bin/sh", "-c"]
           args:
             - |

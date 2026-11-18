@@ -5,3 +5,4 @@ kind: Kustomization
 resources:
   - externalsecret.yaml
   - rustfs.yaml
+  - uploads-route.yaml
