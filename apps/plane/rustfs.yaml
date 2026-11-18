@@ -1,0 +1,167 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# RustFS — S3-compatible store for Plane's uploads (attachments, images,
+# avatars). Replaces the chart's MinIO: MinIO stopped publishing images, and
+# groepshike already runs RustFS.
+#
+# Service DNS: plane-rustfs:9000 (S3 API). Browsers reach the bucket through
+# plane.silkepilon.dev/uploads (see uploads-route.yaml): with USE_MINIO=1,
+# Plane signs upload/download URLs for the public host, and Traefik passes
+# them through unchanged.
+#
+# Credentials: RUSTFS_ACCESS_KEY / RUSTFS_SECRET_KEY in Infisical /plane.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plane-rustfs-data
+  namespace: plane
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plane-rustfs
+  namespace: plane
+  labels:
+    app.kubernetes.io/name: plane-rustfs
+spec:
+  replicas: 1
+  # ReadWriteOnce PVC — only one writer at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: plane-rustfs
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: plane-rustfs
+    spec:
+      # The image runs as rustfs (UID/GID 10001).
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        runAsNonRoot: true
+      containers:
+        - name: rustfs
+          image: rustfs/rustfs:1.0.6
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: s3
+              containerPort: 9000
+          env:
+            - name: RUSTFS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: plane-secret
+                  key: RUSTFS_ACCESS_KEY
+            - name: RUSTFS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: plane-secret
+                  key: RUSTFS_SECRET_KEY
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: logs
+              mountPath: /logs
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            tcpSocket:
+              port: s3
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: s3
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: plane-rustfs-data
+        - name: logs
+          emptyDir:
+            sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: plane-rustfs
+  namespace: plane
+  labels:
+    app.kubernetes.io/name: plane-rustfs
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: plane-rustfs
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: s3
+---
+# Creates the `uploads` bucket if it is missing and makes objects readable
+# without a signature, matching the old chart Job (`mc anonymous set download`).
+# Listing stays private. Argo CD PostSync hook: runs after every sync and is a
+# no-op once the bucket exists.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: plane-rustfs-bucket
+  namespace: plane
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: create-bucket
+          image: amazon/aws-cli:2.41.0
+          env:
+            - name: HOME
+              value: /tmp
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: plane-secret
+                  key: RUSTFS_ACCESS_KEY
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: plane-secret
+                  key: RUSTFS_SECRET_KEY
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              S3="aws --endpoint-url http://plane-rustfs:9000"
+              $S3 s3api head-bucket --bucket uploads || $S3 s3api create-bucket --bucket uploads
+              $S3 s3api put-bucket-policy --bucket uploads --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::uploads/*"]}]}'
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
