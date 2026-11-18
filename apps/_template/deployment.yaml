@@ -5,9 +5,7 @@
 # Port:  <PORT>
 # Data:  <MOUNT_PATH>           ← where the app stores state (PVC mount)
 #
-# BEFORE applying:
-#   1. Create the namespace and secret (see kustomization.yaml).
-#   2. Replace every <PLACEHOLDER> below.
+# Replace every <PLACEHOLDER> below (see kustomization.yaml).
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -18,7 +16,7 @@ metadata:
     app.kubernetes.io/name: <APP_NAME>
 spec:
   replicas: 1
-  # Recreate is required when the PVC is ReadWriteOnce (local-path default).
+  # Recreate is required when the PVC is ReadWriteOnce (Longhorn default).
   # Change to RollingUpdate only if the app supports multiple concurrent writers
   # OR if you are using a ReadWriteMany storage class.
   strategy:
@@ -52,7 +50,7 @@ spec:
             #   value: "some-value"
 
             # Secret values — pulled from the <APP_NAME>-secret Secret.
-            # Create the secret first (see kustomization.yaml).
+            # Synced from Infisical by externalsecret.yaml.
             # - name: SOME_KEY
             #   valueFrom:
             #     secretKeyRef:

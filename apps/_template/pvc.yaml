@@ -13,6 +13,9 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  # Replicated across nodes, so the pod can move. Use local-path only for
+  # scratch data you can lose.
+  storageClassName: longhorn
   resources:
     requests:
       storage: 5Gi

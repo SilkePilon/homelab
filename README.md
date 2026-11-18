@@ -5,209 +5,119 @@
 </h1>
 
 <p align="center">
-	<img alt="GitHub last commit" src="https://img.shields.io/github/last-commit/SilkePilon/homelab">
-	<img alt="GitHub repo size" src="https://img.shields.io/github/repo-size/SilkePilon/homelab">
-	<img alt="Static Badge" src="https://img.shields.io/badge/k3s-cluster-FFC61C?logo=k3s&logoColor=black">
-	<img alt="Static Badge" src="https://img.shields.io/badge/Argo%20CD-GitOps-EF7B4D?logo=argo&logoColor=white">
-	<img alt="Static Badge" src="https://img.shields.io/badge/config-Kustomize-326CE5?logo=kubernetes&logoColor=white">
+  <img alt="k3s" src="https://img.shields.io/badge/k3s-cluster-FFC61C?logo=k3s&logoColor=black">
+  <img alt="Argo CD" src="https://img.shields.io/badge/Argo%20CD-GitOps-EF7B4D?logo=argo&logoColor=white">
+  <img alt="Kustomize" src="https://img.shields.io/badge/config-Kustomize-326CE5?logo=kubernetes&logoColor=white">
+  <img alt="Infisical" src="https://img.shields.io/badge/secrets-Infisical-F5D90A">
+  <img alt="Last commit" src="https://img.shields.io/github/last-commit/SilkePilon/homelab">
 </p>
 
-<p align="center">
-  <a href="#how-it-works">How It Works</a> |
-  <a href="#apps">Apps</a> |
-  <a href="#repository-layout">Repository Layout</a> |
-  <a href="#bootstrap">Bootstrap</a> |
-  <a href="#adding-an-app">Adding an App</a> |
-  <a href="#secrets">Secrets</a> |
-  <a href="#storage--networking">Storage & Networking</a>
-</p>
+GitOps repo for my homelab: a 7-node [k3s](https://k3s.io) cluster (3 HP
+minis, 4 Raspberry Pi 5s). [Argo CD](https://argo-cd.readthedocs.io) keeps the
+cluster equal to `main`. **Change a YAML file, push, done.** Nothing is applied
+by hand.
 
----
+## How it works
 
-The GitOps source of truth for my homelab [k3s](https://k3s.io) cluster. Every
-workload that runs on it is a plain [Kustomize](https://kustomize.io) base in
-this repo, and [Argo CD](https://argo-cd.readthedocs.io) continuously
-reconciles the cluster to match `main`.
-
-Nothing is applied by hand. To change the cluster, you change a YAML file and
-push.
-
-## How It Works
-
-```text
-git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
-                 └─ watches bootstrap/argocd/applications/
-                      └─ one Argo CD Application per app
-                           └─ points at apps/<name>/  ──▶  cluster
+```mermaid
+flowchart LR
+  dev([git push]) --> repo[(this repo)]
+  repo --> root[root app]
+  root --> appset[ApplicationSet<br/>one app per folder]
+  root --> helm[Helm apps<br/>longhorn, plane, ...]
+  appset --> k3s{{k3s cluster}}
+  helm --> k3s
+  infisical[(Infisical)] -- External Secrets --> k3s
 ```
 
-- **`root.yaml`** is the only thing you apply manually — once. It watches the
-  `applications/` folder, so a new app is a new file in that folder.
-- Every Application syncs with `prune: true` and `selfHeal: true`. Deleting a
-  manifest deletes the resource; editing the cluster by hand gets reverted.
-- Apps use `CreateNamespace=true`, so each app owns its own namespace.
+- `bootstrap/argocd/root.yaml` is applied once. It watches
+  `bootstrap/argocd/applications/`.
+- The **ApplicationSet** there turns every folder `apps/<group>/<app>/` into an
+  Argo CD app named `<app>`, in namespace `<app>`.
+- **Helm apps** have their own Application file in the same folder, because
+  their chart values live there.
+- **Secrets** live in Infisical, not in git. See [Secrets](#secrets).
+
+## Traffic
+
+```mermaid
+flowchart LR
+  internet([Internet]) --> cf[Cloudflare] --> tunnel[cloudflared] --> traefik[Traefik] --> sites[public apps]
+  tailnet([Tailnet]) --> ts[Tailscale operator] --> admin[admin UIs<br/>Longhorn, Pi-hole, t3code]
+  lan([LAN]) --> dns[Pi-hole :53<br/>on every node]
+```
+
+No router ports are open. `cloudflared` dials out to Cloudflare. Admin UIs
+are reachable only over Tailscale. Storage is [Longhorn](apps/infra/longhorn)
+(3 replicas); the media library is an SMB share on the NAS.
 
 ## Apps
 
-| App | Namespace | What it is |
-| --- | --- | --- |
-| [arr-stack](apps/media/arr-stack) | `arr-stack` | Media automation: qBittorrent, Sonarr, Radarr, Lidarr, Scraparr, Byparr behind a Gluetun/ProtonVPN sidecar |
-| [cloudflared](apps/infra/cloudflared) | `cloudflared` | Cloudflare Tunnel daemon (2 replicas) — the only way traffic gets in |
-| [external-secrets](apps/infra/external-secrets) | `external-secrets` | External Secrets Operator (Helm) + the Infisical `ClusterSecretStore` all app secrets come from |
-| [gitlab](apps/tools/gitlab) | `gitlab` | GitLab CE (Omnibus, one pod), HTTPS git only; CI via the `gitlab-runner` Helm app in `gitlab-runner` |
-| [groepshike](apps/sites/groepshike) | `groepshike` | [groepshike.nl](https://groepshike.nl) — HIT Harderwijk Groepshike site: Next.js + Payload CMS, its own Postgres 17 and RustFS (S3) |
-| [homeassistant](apps/home/homeassistant) | `homeassistant` | Home Assistant |
-| [jotihunt](apps/sites/jotihunt) | `jotihunt` | Jotihunt 2026 tracker: web app + API, MongoDB, Traccar (OsmAnd ingest public, UI tailnet-only) |
-| [monitoring](apps/infra/monitoring) | `monitoring` | Prometheus, Grafana, Loki, Promtail, node-exporter, kube-state-metrics, NUT exporter |
-| [n8n](apps/tools/n8n) | `n8n` | n8n workflow automation |
-| [plane](apps/tools/plane) | `plane` | Plane project management (Helm chart rendered by Argo CD) + its own Postgres, Valkey, RabbitMQ and RustFS (S3) |
-| [pihole](apps/infra/pihole) | `pihole` | Pi-hole DNS ad blocking, served on port 53 of every node |
-| [stirling-pdf](apps/tools/stirling-pdf) | `stirling-pdf` | [Stirling PDF](https://www.stirlingpdf.com) — PDF toolbox (merge, split, convert, OCR), login required |
-| [portfolio](apps/sites/portfolio) | `portfolio` | [silkepilon.dev](https://silkepilon.dev) — Next.js + Payload CMS portfolio, SQLite on a Longhorn volume |
-| [t3code](apps/tools/t3code) | `t3code` | Headless [T3 Code](https://github.com/pingdotgg/t3code) server with Claude Code, so agents keep running while the desktop is off — tailnet only |
-| [twenty](apps/tools/twenty) | `twenty` | Twenty CRM + its own Postgres and Redis |
-| [windesheim-readers](apps/sites/windesheim-readers) | `windesheim-readers` | [learn.silkepilon.dev](https://learn.silkepilon.dev) — [Windesheim Readers](https://github.com/SilkePilon/windesheim-readers) study app (Bun + SQLite on a Longhorn volume) |
+| Group | Apps |
+| --- | --- |
+| **infra** | [cloudflared](apps/infra/cloudflared) · [external-secrets](apps/infra/external-secrets) · [kured](bootstrap/argocd/applications/kured.yaml) · [longhorn](apps/infra/longhorn) · [monitoring](apps/infra/monitoring) · [node-maintenance](apps/infra/node-maintenance) · [pihole](apps/infra/pihole) · [tailscale](apps/infra/tailscale) |
+| **media** | [arr-stack](apps/media/arr-stack): qBittorrent, Sonarr, Radarr, Lidarr behind a ProtonVPN sidecar |
+| **home** | [homeassistant](apps/home/homeassistant) |
+| **tools** | [gitlab](apps/tools/gitlab) + [gitlab-runner](apps/tools/gitlab-runner) · [n8n](apps/tools/n8n) · [plane](apps/tools/plane) · [stirling-pdf](apps/tools/stirling-pdf) · [t3code](apps/tools/t3code) · [twenty](apps/tools/twenty) |
+| **sites** | [groepshike](apps/sites/groepshike) · [jotihunt](apps/sites/jotihunt) · [portfolio](apps/sites/portfolio) · [windesheim-readers](apps/sites/windesheim-readers) |
 
-`apps/_template/` is a skeleton, not a deployed app.
+Apps with more moving parts have a `README.md` in their folder.
 
-## Repository Layout
+## Layout
 
 ```text
-apps/                        # one directory per app — plain Kustomize bases
-  <name>/kustomization.yaml  #   the real Kubernetes resources live here
-  _template/                 #   copy this to start a new app
-bootstrap/argocd/
-  root.yaml                  # app-of-apps — apply once, by hand
-  applications/              # one Argo CD Application per app
-    _template.yaml.tpl       #   .tpl so the root app never applies it
-images/<name>/Dockerfile     # custom images, built to ghcr.io by .github/workflows/
-docs/                        # design notes
-.github/media/               # README header + the script that regenerates it
+apps/<group>/<app>/        Kustomize base per app (+ README.md, externalsecret.yaml)
+apps/_template/            starting point for a new app
+bootstrap/argocd/          root app, the ApplicationSet, and the Helm apps
+docs/                      cluster notes: nodes, storage, HA, recoveries
+images/                    custom images, built by .github/workflows/
+scripts/                   one-off helpers (secret migration, restores)
 ```
 
-## Prerequisites
+## Add an app
 
-- A running **k3s** cluster — it ships Traefik and the `local-path` StorageClass,
-  both of which the manifests assume.
-- **Argo CD** installed in the cluster.
-- A **Cloudflare Tunnel** if you want anything reachable from outside the LAN.
-- The **SMB CSI driver** + `cifs-utils` on every node, only if you use the
-  arr-stack (it mounts a NAS share). See [apps/media/arr-stack/pvc.yaml](apps/media/arr-stack/pvc.yaml).
+1. `cp -r apps/_template apps/<group>/<app>` and fill in the manifests.
+   The folder name is the app name and namespace, and must be unique.
+2. Secrets: add a folder in Infisical and an `externalsecret.yaml`
+   ([how](apps/infra/external-secrets/README.md#using-it-in-an-app)).
+3. Push. The ApplicationSet picks it up.
 
-## Bootstrap
-
-```bash
-# 1. Install Argo CD (once)
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-
-# 2. Point Argo CD at this repo. It deploys everything under apps/ from here on.
-kubectl apply -f bootstrap/argocd/root.yaml
-```
-
-> [!NOTE]
-> If you fork this, change `repoURL` in `bootstrap/argocd/root.yaml` and in every
-> file under `bootstrap/argocd/applications/`, and replace the `host:` values in
-> each app's `ingress.yaml` with your own domain.
-
-## Adding an App
-
-1. `cp -r apps/_template apps/<name>` and fill in the manifests.
-2. `cp bootstrap/argocd/applications/_template.yaml.tpl bootstrap/argocd/applications/<name>.yaml`,
-   replace every `<PLACEHOLDER>` (the copy **must** end in `.yaml`).
-3. Commit and push. Argo CD picks it up on its own — no `kubectl apply`.
+Removing a folder does **not** delete the app (safety). Delete it in Argo CD
+once you mean it.
 
 ## Secrets
 
-Secret **values** live in [Infisical Cloud](https://eu.infisical.com) (project
-`homelab`, environment `prod`, one folder per Secret). The
-[External Secrets Operator](apps/infra/external-secrets/README.md) syncs each folder
-into a normal Kubernetes Secret through the `externalsecret.yaml` next to the
-app. Edit a value in the Infisical dashboard, never with `kubectl`.
-
-ESO picks up a change within the hour, but pods only read Secrets at start.
-To apply a change right away:
-
-1. Force the sync, then wait until the `ExternalSecret`'s refresh time moves
-   past the moment you annotated it:
-
-   ```bash
-   kubectl -n <ns> annotate externalsecret <secret> force-sync=$(date +%s) --overwrite
-   kubectl -n <ns> get externalsecret <secret> -o jsonpath='{.status.refreshTime}'
-   ```
-
-2. Restart every workload that mounts the Secret
-   (`grep -rn <secret> apps/<app>`). `plane-secret` feeds every Plane
-   workload, so restart them all. The two rows marked "not mounted" need no
-   restart.
-
-The only hand-made secret is the bootstrap credential ESO uses to log in to
-Infisical, `infisical-universal-auth` in `external-secrets`. Keep its client
-ID and secret in a password manager: on a rebuilt cluster it is the one thing
-you create by hand, and everything below comes back on its own. See
-[apps/infra/external-secrets/README.md](apps/infra/external-secrets/README.md).
-
-| Secret | Namespace | Infisical folder | Holds |
-| --- | --- | --- | --- |
-| `cloudflared-token` | `cloudflared` | `/cloudflared` | Tunnel token from the Cloudflare Zero Trust dashboard |
-| `smb-creds` | `arr-stack` | `/arr-stack/smb-creds` | NAS username/password for the SMB media volume |
-| `protonvpn-wg` | `arr-stack` | `/arr-stack/protonvpn-wg` | WireGuard key for the qbittorrent Gluetun sidecar |
-| `protonvpn-wg-byparr` | `arr-stack` | `/arr-stack/protonvpn-wg-byparr` | WireGuard key for the byparr Gluetun sidecar (separate key on purpose) |
-| `scraparr-api-keys` | `arr-stack` | `/arr-stack/scraparr-api-keys` | Sonarr/Radarr/Lidarr API keys |
-| `qbittorrent-creds` | `arr-stack` | `/arr-stack/qbittorrent-creds` | qBittorrent web UI login (not mounted, kept for reference) |
-| `gitlab-secret` | `gitlab` | `/gitlab` | GitLab root password (`GITLAB_ROOT_PASSWORD`), only read on an empty volume |
-| `gitlab-runner-secret` | `gitlab-runner` | `/gitlab-runner` | Instance runner token (`runner-token`, plus empty `runner-registration-token`) |
-| `grafana-admin-creds` | `monitoring` | `/monitoring/grafana-admin-creds` | Grafana admin login |
-| `groepshike-secret` | `groepshike` | `/groepshike` | Postgres + `DATABASE_URL`, `PAYLOAD_SECRET`, RustFS keys, optional `SITE_PASSWORD`, SMTP login |
-| `jotihunt-secret` | `jotihunt` | `/jotihunt/jotihunt-secret` | JWT secret, Traccar API token, VAPID keys, Telegram + Life360 + Jotiboard session keys, NS key, `SETTINGS_KEY` (encrypts the Gemini key and login saved in Beheer), optional `ORS_API_KEY` |
-| `jotihunt-traccar-admin` | `jotihunt` | `/jotihunt/jotihunt-traccar-admin` | Traccar admin login |
-| `jotihunt-admin-login` | `jotihunt` | `/jotihunt/jotihunt-admin-login` | Admin login (not mounted, kept for reference) |
-| `n8n-secret` | `n8n` | `/n8n` | `N8N_ENCRYPTION_KEY`, never change it |
-| `pihole-secret` | `pihole` | `/pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
-| `plane-secret` | `plane` | `/plane` | Django/live signing keys, Postgres, RabbitMQ and S3 (RustFS) credentials + connection URLs |
-| `portfolio-secret` | `portfolio` | `/portfolio` | Payload admin session signing key (`PAYLOAD_SECRET`) |
-| `stirling-pdf-secret` | `stirling-pdf` | `/stirling-pdf` | First admin login, only read on an empty volume |
-| `claude-oauth` | `t3code` | `/t3code` | `CLAUDE_CODE_OAUTH_TOKEN` |
-| `operator-oauth` | `tailscale` | `/tailscale` | OAuth client for the Tailscale operator (`tag:k8s-operator`) |
-| `twenty-secret` | `twenty` | `/twenty` | Postgres URL/password, app secret, encryption key |
-| `windesheim-readers-secret` | `windesheim-readers` | `/windesheim-readers` | Session/encryption key (`APP_SECRET`, never change it), Resend key + sender |
-
-Not in Infisical on purpose, because the software creates them itself: Argo
-CD's own secrets, the Tailscale operator state and `ts-*` device secrets, k3s
-node passwords and serving certs, and the Longhorn/ESO webhook certificates.
-
-## Storage & Networking
-
-**Storage.** App config uses `local-path` PVCs, so pods are pinned to whichever
-node first scheduled them. The arr-stack media library is the exception: a
-statically bound SMB `PersistentVolume` pointing at the NAS.
-
-**Networking.** Public apps get a Traefik `Ingress` (`ingressClassName: traefik`).
-Nothing is port-forwarded on the router — `cloudflared` dials out to Cloudflare's
-edge, and each public hostname in the tunnel config points back at
-`traefik.kube-system.svc.cluster.local:80`. TLS is terminated by Cloudflare.
-
-Two things deliberately skip that path. Admin UIs that control the whole
-cluster — Longhorn and Pi-hole — are exposed on the tailnet instead, via the
-Tailscale operator, and so is [t3code](apps/tools/t3code), whose agents run shell
-commands with GitHub and Claude logins. And [pihole](apps/infra/pihole) serves DNS on the LAN through a
-`LoadBalancer`, so k3s ServiceLB claims port 53 on every node and any node IP
-works as a resolver.
-
-## Header Image
-
-`.github/media/homelab-header.png` is generated, not hand-drawn:
-
-```bash
-./.github/media/generate-header.sh          # needs ImageMagick 7 + the Red Hat fonts
-TITLE="something else" ./.github/media/generate-header.sh
+```mermaid
+flowchart LR
+  ui[Infisical dashboard] --> inf[(Infisical<br/>homelab / prod)]
+  inf -- hourly --> eso[External Secrets Operator] --> sec[Kubernetes Secret] --> pod[pod]
 ```
 
-Adapted from [resend/n8n-nodes-resend](https://github.com/resend/n8n-nodes-resend/tree/main/.github/media).
+- Edit values in the [Infisical dashboard](https://eu.infisical.com), never
+  with `kubectl`.
+- One folder per Secret. The full list is in
+  [apps/infra/external-secrets](apps/infra/external-secrets/README.md#all-secrets).
+- The only secret made by hand is ESO's own Infisical login,
+  `infisical-universal-auth`. Keep a copy in a password manager.
 
-<p align="center">
-  <a href="https://github.com/SilkePilon/homelab">GitHub</a> |
-  <a href="https://github.com/SilkePilon/homelab/issues">Issues</a> |
-  <a href="https://argo-cd.readthedocs.io">Argo CD Docs</a> |
-  <a href="https://docs.k3s.io">k3s Docs</a>
-</p>
+## Bootstrap a new cluster
+
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl create namespace external-secrets
+kubectl -n external-secrets create secret generic infisical-universal-auth \
+  --from-literal=clientId='...' --from-literal=clientSecret='...'
+kubectl apply -f bootstrap/argocd/root.yaml
+```
+
+Node prep (Longhorn, SMB) is in [docs/](docs).
+
+## Docs
+
+- [High availability](docs/high-availability.md) · [Raspberry Pi 5 nodes](docs/raspberry-pi-5-nodes.md) · [Node storage](docs/node-storage.md)
+- [Longhorn prerequisites](docs/longhorn-prerequisites.md) · [Monitoring migration](docs/monitoring-migration.md)
+- Incidents: [pi52 recovery](docs/pi52-recovery.md) · [Pi decommission](docs/pi-decommission.md)
+
+<sub>Header image: `.github/media/generate-header.sh`, adapted from
+[resend/n8n-nodes-resend](https://github.com/resend/n8n-nodes-resend/tree/main/.github/media).</sub>

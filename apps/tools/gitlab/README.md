@@ -3,7 +3,6 @@
 [GitLab](https://about.gitlab.com) Community Edition, reachable at
 <https://gitlab.silkepilon.dev>. Git over **HTTPS only** — there is no SSH.
 
-Design notes: [docs/superpowers/specs/2026-10-22-gitlab-design.md](../../../docs/superpowers/specs/2026-10-22-gitlab-design.md).
 
 | Piece | Where | What |
 | --- | --- | --- |

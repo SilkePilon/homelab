@@ -103,8 +103,6 @@ Once everything else is on Longhorn:
 
 1. Set `persistence.defaultClass: true` here and remove the default annotation
    from `local-path` in the same change.
-2. Drop the `nodeSelector: kubernetes.io/hostname: hp-elitedesk-800-g5-i7` lines from
-   `apps/infra/monitoring/{prometheus,grafana,loki}.yaml`,
-   `apps/home/homeassistant/deployment.yaml`, `apps/tools/n8n/deployment.yaml`,
-   `apps/tools/twenty/{deployment,postgres}.yaml`.
+2. ~~Drop the `nodeSelector: kubernetes.io/hostname` pins from the apps~~ —
+   done; the only hostname pin left is t3code's, which is not storage related.
 3. Restore the `required` anti-affinity on `argocd-redis-ha-server`.
