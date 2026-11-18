@@ -5,13 +5,7 @@
 # Port:  5678
 # Data:  /home/node/.n8n  (PVC n8n-data)
 #
-# BEFORE applying:
-#   1. Create the namespace first:
-#        kubectl create namespace n8n
-#   2. Then create the encryption-key secret (NOT committed to git):
-#        kubectl create secret generic n8n-secret \
-#       --from-literal=N8N_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
-#       -n n8n
+# n8n-secret is synced from Infisical by externalsecret.yaml.
 #
 # The encryption key protects stored credentials. If it changes, previously
 # saved credentials can no longer be decrypted — back it up safely.
@@ -56,7 +50,7 @@ spec:
               value: "Etc/UTC"
             - name: GENERIC_TIMEZONE
               value: "Etc/UTC"
-            # Encryption key is loaded from the secret you created above.
+            # Encryption key comes from n8n-secret (Infisical, see externalsecret.yaml).
             - name: N8N_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:

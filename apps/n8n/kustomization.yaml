@@ -7,14 +7,10 @@ namespace: n8n
 # ─────────────────────────────────────────────────────────────────────────────
 # BEFORE applying this stack:
 #
-#  1. Create the namespace and the encryption-key secret (NOT committed to git):
-#       kubectl create namespace n8n
-#       kubectl create secret generic n8n-secret \
-#         --from-literal=N8N_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
-#         -n n8n
-#
-#     The encryption key protects stored credentials. Back it up — if it
-#     changes, all saved credentials become unreadable.
+#  1. n8n-secret comes from Infisical (folder /n8n) via externalsecret.yaml.
+#     For a fresh install, add N8N_ENCRYPTION_KEY there first
+#     (`openssl rand -hex 32`). Never change it afterwards — all saved
+#     credentials become unreadable.
 #
 #  2. Edit deployment.yaml → WEBHOOK_URL to point at your cluster's IP or
 #     hostname so external webhooks can reach n8n.
@@ -28,6 +24,7 @@ resources:
   - service.yaml
   - deployment.yaml
   - ingress.yaml
+  - externalsecret.yaml
 
 labels:
   - pairs:

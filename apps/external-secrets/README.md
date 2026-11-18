@@ -66,33 +66,21 @@ refresh interval. Pods only see the new value after a restart
 
 ## Migrating an existing hand-made Secret
 
-The existing Secret can push itself into Infisical with a one-off
-`PushSecret`, so nothing is copied by hand. Apply this with kubectl (do **not**
-commit it), check the folder in the dashboard, then delete it:
+`PushSecret` would be the clean way, but it is broken for Infisical in ESO
+2.15.0: the project lookup fails with `malformed HTTP response` against
+Infisical's HTTP/2 endpoint
+([external-secrets#7324](https://github.com/external-secrets/external-secrets/issues/7324)).
+Until that is fixed, copy the values with the Infisical API instead:
 
-```yaml
-apiVersion: external-secrets.io/v1alpha1
-kind: PushSecret
-metadata:
-  name: migrate
-  namespace: n8n
-spec:
-  refreshInterval: 0s           # push once
-  updatePolicy: IfNotExists     # never overwrite a value already in Infisical
-  deletionPolicy: None          # deleting this PushSecret leaves Infisical alone
-  secretStoreRefs:
-    - kind: ClusterSecretStore
-      name: infisical
-  selector:
-    secret:
-      name: n8n-secret
-  data:
-    - match:
-        secretKey: N8N_ENCRYPTION_KEY
-        remoteRef:
-          remoteKey: /n8n/N8N_ENCRYPTION_KEY
-```
+1. Create the folder (`/<app>`) in the dashboard, or via `POST /api/v1/folders`.
+2. For each key, `POST /api/v3/secrets/raw/<KEY>` with
+   `{"workspaceId", "environment": "prod", "secretPath": "/<app>", "secretValue"}`,
+   using a token from `POST /api/v1/auth/universal-auth/login`. Read it back
+   and compare with the value in the cluster.
+3. Test with a throwaway ExternalSecret that targets `<app>-secret-test` and
+   compare the two Secrets.
+4. Commit the app's ExternalSecret. Its target has the same name as the old
+   Secret, so ESO adopts it (`creationPolicy: Owner`) and the pods see the
+   same values.
 
-Then commit the app's ExternalSecret. Its target has the same name as the old
-Secret, so ESO takes it over (`creationPolicy: Owner` adopts it) and the pods
-see the same values.
+Ask Claude to "migrate <app> to Infisical" and it runs these steps.
