@@ -53,6 +53,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | --- | --- | --- |
 | [arr-stack](apps/arr-stack) | `arr-stack` | Media automation: qBittorrent, Sonarr, Radarr, Lidarr, Scraparr, Byparr behind a Gluetun/ProtonVPN sidecar |
 | [cloudflared](apps/cloudflared) | `cloudflared` | Cloudflare Tunnel daemon (2 replicas) — the only way traffic gets in |
+| [external-secrets](apps/external-secrets) | `external-secrets` | External Secrets Operator (Helm) + the Infisical `ClusterSecretStore` all app secrets come from |
 | [gitlab](apps/gitlab) | `gitlab` | GitLab CE (Omnibus, one pod), HTTPS git only; CI via the `gitlab-runner` Helm app in `gitlab-runner` |
 | [groepshike](apps/groepshike) | `groepshike` | [groepshike.nl](https://groepshike.nl) — HIT Harderwijk Groepshike site: Next.js + Payload CMS, its own Postgres 17 and RustFS (S3) |
 | [homeassistant](apps/homeassistant) | `homeassistant` | Home Assistant |
@@ -118,13 +119,18 @@ kubectl apply -f bootstrap/argocd/root.yaml
 
 ## Secrets
 
-Secrets are **not** in this repo. Each one is created once with `kubectl` and
-then referenced by name from the manifests:
+Secret **values** live in [Infisical Cloud](https://eu.infisical.com) (project
+`homelab`, environment `prod`, one folder per app). The
+[External Secrets Operator](apps/external-secrets/README.md) syncs each folder
+into a normal Kubernetes Secret through an `ExternalSecret` in the app's
+manifests. Edit a value in the Infisical dashboard, not with `kubectl`.
 
-```bash
-kubectl -n n8n create secret generic n8n-secret \
-  --from-literal=N8N_ENCRYPTION_KEY='...'
-```
+The only hand-made secret is the bootstrap credential ESO uses to log in to
+Infisical (`infisical-universal-auth` in `external-secrets`). See
+[apps/external-secrets/README.md](apps/external-secrets/README.md) for setup,
+usage and how to migrate the secrets below.
+
+Secrets still created by hand with `kubectl`, not yet migrated:
 
 | Secret | Namespace | Used by |
 | --- | --- | --- |
