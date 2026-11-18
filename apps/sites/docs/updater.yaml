@@ -1,0 +1,92 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Auto-deploy: every 5 minutes, compare the digest of
+# ghcr.io/silkepilon/docs:latest with what the pods run, and restart the
+# Deployment when it moved. GitHub cannot reach the cluster, and this needs
+# no credentials (the image is public). `rollout restart` only sets the
+# restartedAt annotation, which the ApplicationSet ignores, so Argo CD does
+# not see it as drift.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: docs-updater
+  namespace: docs
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: docs-updater
+  namespace: docs
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["docs"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: docs-updater
+  namespace: docs
+subjects:
+  - kind: ServiceAccount
+    name: docs-updater
+    namespace: docs
+roleRef:
+  kind: Role
+  name: docs-updater
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: docs-updater
+  namespace: docs
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          serviceAccountName: docs-updater
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+          containers:
+            - name: check
+              image: alpine/k8s:1.35.10
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  REPO=silkepilon/docs
+                  TOKEN=$(curl -fsS "https://ghcr.io/token?scope=repository:$REPO:pull" | jq -r .token)
+                  REMOTE=$(curl -fsSI -H "Authorization: Bearer $TOKEN" \
+                    -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json' \
+                    "https://ghcr.io/v2/$REPO/manifests/latest" \
+                    | tr -d '\r' | awk 'tolower($1)=="docker-content-digest:"{print $2}')
+                  [ -n "$REMOTE" ] || { echo "no digest from ghcr"; exit 1; }
+                  RUNNING=$(kubectl -n docs get pods -l app.kubernetes.io/name=docs \
+                    -o jsonpath='{range .items[*]}{.status.containerStatuses[0].imageID}{"\n"}{end}' \
+                    | sed 's/.*@//' | sort -u)
+                  echo "latest=$REMOTE running=$(echo $RUNNING)"
+                  if [ "$RUNNING" = "$REMOTE" ]; then echo "up to date"; exit 0; fi
+                  kubectl -n docs rollout restart deployment/docs
+                  echo "restarted for $REMOTE"
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 128Mi

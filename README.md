@@ -59,7 +59,7 @@ are reachable only over Tailscale. Storage is [Longhorn](apps/infra/longhorn)
 | **media** | [arr-stack](apps/media/arr-stack): qBittorrent, Sonarr, Radarr, Lidarr behind a ProtonVPN sidecar |
 | **home** | [homeassistant](apps/home/homeassistant) |
 | **tools** | [gitlab](apps/tools/gitlab) + [gitlab-runner](apps/tools/gitlab-runner) · [n8n](apps/tools/n8n) · [plane](apps/tools/plane) · [stirling-pdf](apps/tools/stirling-pdf) · [t3code](apps/tools/t3code) · [twenty](apps/tools/twenty) |
-| **sites** | [groepshike](apps/sites/groepshike) · [jotihunt](apps/sites/jotihunt) · [portfolio](apps/sites/portfolio) · [windesheim-readers](apps/sites/windesheim-readers) |
+| **sites** | [docs](apps/sites/docs) · [groepshike](apps/sites/groepshike) · [jotihunt](apps/sites/jotihunt) · [portfolio](apps/sites/portfolio) · [windesheim-readers](apps/sites/windesheim-readers) |
 
 Apps with more moving parts have a `README.md` in their folder.
 
