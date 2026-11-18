@@ -12,9 +12,9 @@ spec:
   # the Tailscale operator ships as a chart and carries its own CRDs
   # (Connector, ProxyClass, ProxyGroup, Recorder), so rendering it to static
   # manifests would mean re-rendering on every upgrade. Multi-source: the
-  # chart plus apps/tailscale, which holds the ExternalSecret.
+  # chart plus apps/infra/tailscale, which holds the ExternalSecret.
   #
-  # BEFORE this app can sync, see apps/tailscale/README.md. In short:
+  # BEFORE this app can sync, see apps/infra/tailscale/README.md. In short:
   #   1. Add tag:k8s-operator and tag:k8s to the tailnet ACLs.
   #   2. Create an OAuth client tagged tag:k8s-operator.
   #   3. Add its client_id and client_secret keys to the Infisical folder
@@ -48,7 +48,7 @@ spec:
     # Git side: the ExternalSecret (and anything else not in the chart).
     - repoURL: https://github.com/SilkePilon/homelab
       targetRevision: main
-      path: apps/tailscale
+      path: apps/infra/tailscale
   destination:
     server: https://kubernetes.default.svc
     namespace: tailscale

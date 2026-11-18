@@ -154,9 +154,9 @@ When a Pi rejoins with its NVMe, before it takes on any storage:
 - Install Longhorn and migrate the `local-path` PVCs to it. Once volumes are
   replicated, drop every `nodeSelector: kubernetes.io/hostname: server-1` in
   `apps/` — they exist only because `local-path` pins data to a node. They are
-  in `apps/monitoring/{prometheus,grafana,loki}.yaml`,
-  `apps/homeassistant/deployment.yaml`, `apps/n8n/deployment.yaml`,
-  `apps/twenty/{deployment,postgres}.yaml`.
+  in `apps/infra/monitoring/{prometheus,grafana,loki}.yaml`,
+  `apps/home/homeassistant/deployment.yaml`, `apps/tools/n8n/deployment.yaml`,
+  `apps/tools/twenty/{deployment,postgres}.yaml`.
 - Restore the `required` anti-affinity on `argocd-redis-ha-server`.
 - `arr-stack` is gated on the `arr-downloads=true` node label rather than a
   hostname, because it needs the node that holds the 500Gi download volume.

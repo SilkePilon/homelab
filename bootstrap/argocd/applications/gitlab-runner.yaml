@@ -8,16 +8,16 @@ metadata:
 spec:
   project: default
   # ───────────────────────────────────────────────────────────────────────────
-  # GitLab Runner for the in-cluster GitLab (apps/gitlab). Kubernetes
+  # GitLab Runner for the in-cluster GitLab (apps/tools/gitlab). Kubernetes
   # executor: every CI job is a pod in the `gitlab-runner` namespace.
   #
   # Helm-sourced, like tailscale/longhorn/plane: upstream ships the runner as
   # a chart with its own RBAC and entrypoint scripts.
   #
-  # Multi-source: the chart plus apps/gitlab-runner, which holds the
+  # Multi-source: the chart plus apps/tools/gitlab-runner, which holds the
   # ExternalSecret for gitlab-runner-secret.
   #
-  # BEFORE this app can sync cleanly, see apps/gitlab/README.md. In short:
+  # BEFORE this app can sync cleanly, see apps/tools/gitlab/README.md. In short:
   # create an instance runner in the GitLab UI (Admin → CI/CD → Runners →
   # New instance runner) and add its glrt-… token to the Infisical folder
   # /gitlab-runner as key runner-token, plus an empty
@@ -27,7 +27,7 @@ spec:
   sources:
     - repoURL: https://charts.gitlab.io
       chart: gitlab-runner
-      # Keep roughly in step with the GitLab image tag in apps/gitlab.
+      # Keep roughly in step with the GitLab image tag in apps/tools/gitlab.
       targetRevision: 0.94.0
       helm:
         releaseName: gitlab-runner
@@ -75,7 +75,7 @@ spec:
     # Git side: the ExternalSecret (and anything else not in the chart).
     - repoURL: https://github.com/SilkePilon/homelab
       targetRevision: main
-      path: apps/gitlab-runner
+      path: apps/tools/gitlab-runner
   destination:
     server: https://kubernetes.default.svc
     namespace: gitlab-runner

@@ -3,7 +3,7 @@
 # general dev toolchain, so agents can clone, build, test and open PRs.
 #
 # Built by .github/workflows/t3code-image.yaml on every push that touches this
-# directory. Deployed by apps/t3code/.
+# directory. Deployed by apps/tools/t3code/.
 #
 # $HOME (/home/node) is a Longhorn PVC at runtime, which hides anything the
 # image puts there. So every tool is installed system-wide, and only state

@@ -14,10 +14,10 @@ spec:
   # renders nine workloads plus Traefik IngressRoute CRs, so rendering it to
   # static manifests would mean re-rendering on every bump.
   #
-  # Multi-source: the chart plus apps/plane, which holds the ExternalSecret
+  # Multi-source: the chart plus apps/tools/plane, which holds the ExternalSecret
   # for `plane-secret`.
   #
-  # BEFORE this app can sync, see apps/plane/README.md. In short: fill the
+  # BEFORE this app can sync, see apps/tools/plane/README.md. In short: fill the
   # Infisical folder /plane (NOT committed to git), then add
   # plane.silkepilon.dev to the Cloudflare Tunnel public hostnames.
   # ───────────────────────────────────────────────────────────────────────────
@@ -72,10 +72,10 @@ spec:
             storageClass: longhorn
             volumeSize: 1Gi
           minio:
-            # Off: uploads live in RustFS (apps/plane/rustfs.yaml, Service
+            # Off: uploads live in RustFS (apps/tools/plane/rustfs.yaml, Service
             # plane-rustfs), because MinIO no longer publishes images. Plane
             # still talks S3 the MinIO way (USE_MINIO=1 in plane-secret signs
-            # URLs for the public host); apps/plane/uploads-route.yaml sends
+            # URLs for the public host); apps/tools/plane/uploads-route.yaml sends
             # /uploads to RustFS.
             local_setup: false
             env:
@@ -146,7 +146,7 @@ spec:
     # Git side: the ExternalSecret (and anything else not in the chart).
     - repoURL: https://github.com/SilkePilon/homelab
       targetRevision: main
-      path: apps/plane
+      path: apps/tools/plane
   destination:
     server: https://kubernetes.default.svc
     namespace: plane
