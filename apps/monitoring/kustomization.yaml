@@ -7,11 +7,8 @@ namespace: monitoring
 # ─────────────────────────────────────────────────────────────────────────────
 # BEFORE applying this stack:
 #
-#  1. Create the Grafana admin password secret (NOT committed to git):
-#       kubectl create secret generic grafana-admin-creds \
-#         --from-literal=admin-user=admin \
-#         --from-literal=admin-password='YOUR_SECURE_PASSWORD' \
-#         -n monitoring
+#  1. Grafana login (admin-user, admin-password) in Infisical, folder
+#     /monitoring/grafana-admin-creds; externalsecret.yaml syncs it.
 #
 #  2. Update grafana.yaml → Ingress spec.rules[0].host to your domain.
 #     Add the following to /etc/hosts on each client machine:
@@ -55,6 +52,7 @@ resources:
   - kube-state-metrics.yaml
   - nut-exporter.yaml
   - alerting.yaml
+  - externalsecret.yaml
 
 # Keep only 2 old ReplicaSets/ControllerRevisions per workload instead of the
 # Kubernetes default of 10. Without this the cluster accumulates dozens of

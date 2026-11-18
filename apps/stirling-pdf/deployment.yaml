@@ -6,13 +6,8 @@
 # Port:  8080
 # Data:  /configs, /customFiles, /pipeline, /storage  (PVC stirling-pdf-data)
 #
-# BEFORE applying:
-#   1. Create the namespace first:
-#        kubectl create namespace stirling-pdf
-#   2. Then create the first-admin secret (NOT committed to git):
-#        kubectl create secret generic stirling-pdf-secret -n stirling-pdf \
-#          --from-literal=SECURITY_INITIALLOGIN_USERNAME='admin' \
-#          --from-literal=SECURITY_INITIALLOGIN_PASSWORD="$(openssl rand -base64 24)"
+# stirling-pdf-secret (first-admin login) comes from Infisical
+# (/stirling-pdf) via externalsecret.yaml.
 #
 # The initial login is only seeded on an empty /configs. After that, users
 # live in the embedded H2 database on the PVC; change passwords in the UI.

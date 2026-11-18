@@ -5,14 +5,9 @@
 # Ports: 53/UDP + 53/TCP (DNS), 80/TCP (admin UI)
 # Data:  /etc/pihole  (PVC pihole-data)
 #
-# BEFORE applying, create the admin password secret (NOT committed to git):
-#   kubectl create namespace pihole
-#   kubectl -n pihole create secret generic pihole-secret \
-#     --from-literal=WEBPASSWORD="$(openssl rand -base64 18)"
-#
-# Read it back with:
-#   kubectl -n pihole get secret pihole-secret \
-#     -o jsonpath='{.data.WEBPASSWORD}' | base64 -d; echo
+# Admin password (WEBPASSWORD) lives in Infisical, folder /pihole, and is
+# synced into pihole-secret by externalsecret.yaml. Look it up in the
+# Infisical dashboard.
 #
 # This does NOT touch DNS on the cluster nodes or anywhere else. Point your
 # router at one of the node IPs when you are ready — see README.md.

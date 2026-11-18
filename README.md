@@ -134,7 +134,6 @@ Secrets still created by hand with `kubectl`, not yet migrated:
 
 | Secret | Namespace | Used by |
 | --- | --- | --- |
-| `cloudflared-token` | `cloudflared` | Tunnel token from the Cloudflare Zero Trust dashboard |
 | `smb-creds` | `arr-stack` | NAS username/password for the SMB media volume |
 | `protonvpn-wg` | `arr-stack` | WireGuard key for the qbittorrent Gluetun sidecar |
 | `protonvpn-wg-byparr` | `arr-stack` | WireGuard key for the byparr Gluetun sidecar |
@@ -142,12 +141,8 @@ Secrets still created by hand with `kubectl`, not yet migrated:
 | `gitlab-secret` | `gitlab` | GitLab root password (`GITLAB_ROOT_PASSWORD`), only read on an empty volume |
 | `gitlab-runner-secret` | `gitlab-runner` | Instance runner token (`runner-token`, plus empty `runner-registration-token`) |
 | `groepshike-secret` | `groepshike` | Postgres password + `DATABASE_URL`, `PAYLOAD_SECRET`, RustFS keys (`S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`), optional `SITE_PASSWORD` (whole site behind one password), SMTP login |
-| `grafana-admin-creds` | `monitoring` | Grafana admin login |
 | `jotihunt-secret` | `jotihunt` | JWT secret, Traccar API token, Gemini key, VAPID keys, Telegram + Life360 session keys (+ optional Jotihunt site login, ORS key) |
-| `pihole-secret` | `pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
-| `portfolio-secret` | `portfolio` | Payload admin session signing key (`PAYLOAD_SECRET`) |
 | `plane-secret` | `plane` | Django/live signing keys, Postgres, RabbitMQ and MinIO credentials + connection URLs |
-| `stirling-pdf-secret` | `stirling-pdf` | First admin login (`SECURITY_INITIALLOGIN_USERNAME` / `_PASSWORD`), only read on an empty volume |
 | `twenty-secret` | `twenty` | Postgres URL/password, app secret, encryption key |
 | `windesheim-readers-secret` | `windesheim-readers` | Session/encryption key (`APP_SECRET`, never change it), Resend key + sender for sign-in emails |
 

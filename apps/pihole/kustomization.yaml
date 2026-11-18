@@ -6,10 +6,8 @@ namespace: pihole
 # ─────────────────────────────────────────────────────────────────────────────
 # BEFORE applying this stack:
 #
-#  1. Create the namespace and the admin password secret (NOT committed):
-#       kubectl create namespace pihole
-#       kubectl -n pihole create secret generic pihole-secret \
-#         --from-literal=WEBPASSWORD="$(openssl rand -base64 18)"
+#  1. The WEBPASSWORD key lives in Infisical (homelab / prod, folder
+#     /pihole); externalsecret.yaml syncs it into pihole-secret.
 #
 #  2. Only then point your router's DNS at a node IP. Deploying this does not
 #     change DNS for anything on its own — see README.md.
@@ -23,6 +21,7 @@ resources:
   - pvc.yaml
   - service.yaml
   - deployment.yaml
+  - externalsecret.yaml
 
 labels:
   - pairs:

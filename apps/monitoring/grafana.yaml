@@ -1,9 +1,5 @@
-# ── Grafana admin password secret — create before deploying: ──────────────────
-#
-#   kubectl create secret generic grafana-admin-creds \
-#     --from-literal=admin-user=admin \
-#     --from-literal=admin-password='YOUR_SECURE_PASSWORD' \
-#     -n monitoring
+# ── Grafana admin login: grafana-admin-creds, synced from Infisical ──────────
+#   (/monitoring/grafana-admin-creds) by externalsecret.yaml.
 #
 # ─────────────────────────────────────────────────────────────────────────────
 ---

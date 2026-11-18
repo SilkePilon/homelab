@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - deployment.yaml
+  - externalsecret.yaml
 
 # Keep only 2 old ReplicaSets/ControllerRevisions per workload instead of the
 # Kubernetes default of 10. Without this the cluster accumulates dozens of

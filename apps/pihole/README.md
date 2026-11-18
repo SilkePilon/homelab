@@ -115,15 +115,14 @@ kubectl -n pihole port-forward svc/pihole-web 8081:80
 
 ## Secret
 
-```bash
-kubectl -n pihole create secret generic pihole-secret \
-  --from-literal=WEBPASSWORD="$(openssl rand -base64 18)"
-```
-
-Read it back with:
+`WEBPASSWORD` lives in Infisical (homelab / prod / `/pihole`) and is synced
+into `pihole-secret` by `externalsecret.yaml`. Change it in the Infisical
+dashboard, then pull it in right away and restart (otherwise ESO picks it up
+within the hour and the pod keeps the old value until its next restart):
 
 ```bash
-kubectl -n pihole get secret pihole-secret -o jsonpath='{.data.WEBPASSWORD}' | base64 -d; echo
+kubectl -n pihole annotate externalsecret pihole-secret force-sync=$(date +%s) --overwrite
+kubectl -n pihole rollout restart deploy/pihole
 ```
 
 ## What is in git and what is not
