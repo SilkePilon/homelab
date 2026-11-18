@@ -61,8 +61,13 @@ spec:
 ```
 
 Change a value in the Infisical dashboard and the Secret updates within the
-refresh interval. Pods only see the new value after a restart
-(`kubectl -n n8n rollout restart deploy/n8n`).
+refresh interval (1h). Pods only see the new value after a restart, so to
+apply a change now, force the sync first and then restart:
+
+```bash
+kubectl -n n8n annotate externalsecret n8n-secret force-sync=$(date +%s) --overwrite
+kubectl -n n8n rollout restart deploy/n8n
+```
 
 ## Migrating an existing hand-made Secret
 

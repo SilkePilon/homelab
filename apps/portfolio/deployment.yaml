@@ -5,13 +5,9 @@
 # Port:  3000
 # Data:  /data  (PVC portfolio-data) — payload.db + media/
 #
-# BEFORE applying:
-#   1. Create the namespace:
-#        kubectl create namespace portfolio
-#   2. Create the secret (NOT committed to git). PAYLOAD_SECRET signs admin
-#      sessions; changing it logs everyone out but loses no data:
-#        kubectl create secret generic portfolio-secret -n portfolio \
-#          --from-literal=PAYLOAD_SECRET="$(openssl rand -hex 32)"
+# portfolio-secret comes from Infisical (/portfolio) via externalsecret.yaml.
+# PAYLOAD_SECRET signs admin sessions; changing it logs everyone out but
+# loses no data.
 #
 # The image is built for linux/amd64 only (see the repo's docker.yml
 # workflow), so the pod is restricted to the amd64 nodes. This is an

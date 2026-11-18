@@ -9,10 +9,8 @@ namespace: portfolio
 #
 # BEFORE applying this stack:
 #
-#  1. Create the namespace and the secret (NOT committed to git):
-#       kubectl create namespace portfolio
-#       kubectl create secret generic portfolio-secret -n portfolio \
-#         --from-literal=PAYLOAD_SECRET="$(openssl rand -hex 32)"
+#  1. PAYLOAD_SECRET in Infisical, folder /portfolio (`openssl rand -hex 32`).
+#     externalsecret.yaml syncs it into portfolio-secret.
 #
 #  2. Add the Cloudflare Tunnel public hostnames (see ingress.yaml):
 #       silkepilon.dev and www.silkepilon.dev
@@ -28,6 +26,7 @@ resources:
   - service.yaml
   - deployment.yaml
   - ingress.yaml
+  - externalsecret.yaml
 
 labels:
   - pairs:

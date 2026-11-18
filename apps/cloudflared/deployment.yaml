@@ -6,11 +6,8 @@
 #   1. Cloudflare Zero Trust dashboard → Networks → Tunnels → Create a tunnel
 #      Name it e.g. "homelab". Choose "Docker" install method.
 #   2. Copy the tunnel token shown in the install command.
-#   3. On your cluster, create the Secret (NOT committed to git):
-#
-#        kubectl create secret generic cloudflared-token \
-#          --namespace cloudflared \
-#          --from-literal=token=<PASTE_TOKEN_HERE>
+#   3. Store it in Infisical as homelab / prod / /cloudflared / token.
+#      externalsecret.yaml syncs it into the cloudflared-token Secret.
 #
 #   4. In the tunnel's "Public Hostnames" tab, add one entry per app:
 #        Subdomain: twenty   Domain: yourdomain.com
