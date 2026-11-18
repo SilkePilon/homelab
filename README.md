@@ -123,13 +123,23 @@ Secret **values** live in [Infisical Cloud](https://eu.infisical.com) (project
 `homelab`, environment `prod`, one folder per Secret). The
 [External Secrets Operator](apps/external-secrets/README.md) syncs each folder
 into a normal Kubernetes Secret through the `externalsecret.yaml` next to the
-app. Edit a value in the Infisical dashboard, never with `kubectl`. To apply
-a change right away, force a sync and restart:
+app. Edit a value in the Infisical dashboard, never with `kubectl`.
 
-```bash
-kubectl -n <ns> annotate externalsecret <secret> force-sync=$(date +%s) --overwrite
-kubectl -n <ns> rollout restart deploy/<app>
-```
+ESO picks up a change within the hour, but pods only read Secrets at start.
+To apply a change right away:
+
+1. Force the sync, then wait until the `ExternalSecret`'s refresh time moves
+   past the moment you annotated it:
+
+   ```bash
+   kubectl -n <ns> annotate externalsecret <secret> force-sync=$(date +%s) --overwrite
+   kubectl -n <ns> get externalsecret <secret> -o jsonpath='{.status.refreshTime}'
+   ```
+
+2. Restart every workload that mounts the Secret
+   (`grep -rn <secret> apps/<app>`). `plane-secret` feeds every Plane
+   workload, so restart them all. The two rows marked "not mounted" need no
+   restart.
 
 The only hand-made secret is the bootstrap credential ESO uses to log in to
 Infisical, `infisical-universal-auth` in `external-secrets`. Keep its client
@@ -149,7 +159,7 @@ you create by hand, and everything below comes back on its own. See
 | `gitlab-runner-secret` | `gitlab-runner` | `/gitlab-runner` | Instance runner token (`runner-token`, plus empty `runner-registration-token`) |
 | `grafana-admin-creds` | `monitoring` | `/monitoring/grafana-admin-creds` | Grafana admin login |
 | `groepshike-secret` | `groepshike` | `/groepshike` | Postgres + `DATABASE_URL`, `PAYLOAD_SECRET`, RustFS keys, optional `SITE_PASSWORD`, SMTP login |
-| `jotihunt-secret` | `jotihunt` | `/jotihunt/jotihunt-secret` | JWT secret, Traccar API token, VAPID keys, Telegram + Life360 + Jotiboard session keys, NS key |
+| `jotihunt-secret` | `jotihunt` | `/jotihunt/jotihunt-secret` | JWT secret, Traccar API token, VAPID keys, Telegram + Life360 + Jotiboard session keys, NS key, `SETTINGS_KEY` (encrypts the Gemini key and login saved in Beheer), optional `ORS_API_KEY` |
 | `jotihunt-traccar-admin` | `jotihunt` | `/jotihunt/jotihunt-traccar-admin` | Traccar admin login |
 | `jotihunt-admin-login` | `jotihunt` | `/jotihunt/jotihunt-admin-login` | Admin login (not mounted, kept for reference) |
 | `n8n-secret` | `n8n` | `/n8n` | `N8N_ENCRYPTION_KEY`, never change it |
