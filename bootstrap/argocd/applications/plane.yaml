@@ -74,6 +74,18 @@ spec:
           minio:
             storageClass: longhorn
             volumeSize: 10Gi
+            # MinIO stopped publishing images: docker.io/minio/minio and
+            # minio/mc are gone ("repository does not exist") and quay.io
+            # needs a login. The chart's minio/minio:latest only runs from the
+            # copy cached on raspberrypi-5-16gb-1 (arm64), so MinIO is pinned
+            # there. image-gc never removes an image a running container uses,
+            # but if this pod is down for more than ~6h the cache can be
+            # pruned. Moving to a maintained MinIO build is the real fix.
+            nodeSelector:
+              kubernetes.io/hostname: raspberrypi-5-16gb-1
+            # Only used by the bucket-creation Job (needs /bin/sh + /usr/bin/mc).
+            # Chainguard's -dev variant has both and is free to pull.
+            image_mc: cgr.dev/chainguard/minio-client:latest-dev
             env:
               # Presigned upload URLs are built from request.scheme unless this
               # is set, and Django sees plain http behind Cloudflare, so the
