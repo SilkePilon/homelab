@@ -70,17 +70,20 @@ refresh interval. Pods only see the new value after a restart
 2.15.0: the project lookup fails with `malformed HTTP response` against
 Infisical's HTTP/2 endpoint
 ([external-secrets#7324](https://github.com/external-secrets/external-secrets/issues/7324)).
-Until that is fixed, copy the values with the Infisical API instead:
+Until that is fixed, use the script instead:
 
-1. Create the folder (`/<app>`) in the dashboard, or via `POST /api/v1/folders`.
-2. For each key, `POST /api/v3/secrets/raw/<KEY>` with
-   `{"workspaceId", "environment": "prod", "secretPath": "/<app>", "secretValue"}`,
-   using a token from `POST /api/v1/auth/universal-auth/login`. Read it back
-   and compare with the value in the cluster.
-3. Test with a throwaway ExternalSecret that targets `<app>-secret-test` and
-   compare the two Secrets.
-4. Commit the app's ExternalSecret. Its target has the same name as the old
-   Secret, so ESO adopts it (`creationPolicy: Owner`) and the pods see the
-   same values.
+```bash
+scripts/infisical-migrate.sh <namespace> <secret> <infisical-folder>
+scripts/infisical-migrate.sh pihole pihole-secret /pihole
+```
 
-Ask Claude to "migrate <app> to Infisical" and it runs these steps.
+It logs in as ESO's own machine identity, creates the folder, writes every
+key, reads each one back and compares, then checks that a throwaway
+ExternalSecret produces a byte-identical Secret. Values go straight from the
+cluster to Infisical and are never printed, so run it from your own shell.
+Re-running is safe: keys that already exist are only compared.
+
+Then commit an `externalsecret.yaml` for the app (pattern above) with the
+same name as the old Secret. ESO adopts it (`creationPolicy: Owner`) and the
+pods see the same values. Add `SkipDryRunOnMissingResource=true` and the
+`retry` block to the app's Argo Application, see `n8n.yaml`.
