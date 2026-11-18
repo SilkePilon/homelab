@@ -119,7 +119,7 @@ kubectl apply -f bootstrap/argocd/root.yaml
 
 ## Secrets
 
-Secret **values** live in [Infisical Cloud](https://eu.infisical.com) (project
+Secret **values** live in [Infisical Cloud](https://app.infisical.com) (project
 `homelab`, environment `prod`, one folder per app). The
 [External Secrets Operator](apps/external-secrets/README.md) syncs each folder
 into a normal Kubernetes Secret through an `ExternalSecret` in the app's

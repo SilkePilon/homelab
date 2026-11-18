@@ -1,6 +1,6 @@
 # external-secrets
 
-Secrets live in **Infisical Cloud** (EU, project `homelab`, environment `prod`).
+Secrets live in **Infisical Cloud** (US region, project `homelab`, slug `homelab-qw0-k`, environment `prod`).
 External Secrets Operator (ESO) copies them into normal Kubernetes Secrets, so
 the app manifests keep referencing a Secret by name like before.
 
@@ -13,7 +13,7 @@ ExternalSecret n8n/n8n-secret  ──▶  Secret n8n/n8n-secret  ──▶  pod 
 
 ## One-time setup
 
-1. Sign up at <https://eu.infisical.com>, create project **homelab**. Check
+1. Sign up at <https://app.infisical.com>, create project **homelab**. Check
    that its slug is `homelab` (Project Settings); if Infisical added a suffix,
    update `projectSlug` in `cluster-secret-store.yaml`.
 2. Organization → Access Control → Identities → **Create identity**
