@@ -60,7 +60,7 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 | [jotihunt](apps/jotihunt) | `jotihunt` | Jotihunt 2026 tracker: web app + API, MongoDB, Traccar (OsmAnd ingest public, UI tailnet-only) |
 | [monitoring](apps/monitoring) | `monitoring` | Prometheus, Grafana, Loki, Promtail, node-exporter, kube-state-metrics, NUT exporter |
 | [n8n](apps/n8n) | `n8n` | n8n workflow automation |
-| [plane](apps/plane) | `plane` | Plane project management (Helm chart rendered by Argo CD) + its own Postgres, Valkey, RabbitMQ and MinIO |
+| [plane](apps/plane) | `plane` | Plane project management (Helm chart rendered by Argo CD) + its own Postgres, Valkey, RabbitMQ and RustFS (S3) |
 | [pihole](apps/pihole) | `pihole` | Pi-hole DNS ad blocking, served on port 53 of every node |
 | [stirling-pdf](apps/stirling-pdf) | `stirling-pdf` | [Stirling PDF](https://www.stirlingpdf.com) — PDF toolbox (merge, split, convert, OCR), login required |
 | [portfolio](apps/portfolio) | `portfolio` | [silkepilon.dev](https://silkepilon.dev) — Next.js + Payload CMS portfolio, SQLite on a Longhorn volume |
@@ -164,7 +164,7 @@ you create by hand, and everything below comes back on its own. See
 | `jotihunt-admin-login` | `jotihunt` | `/jotihunt/jotihunt-admin-login` | Admin login (not mounted, kept for reference) |
 | `n8n-secret` | `n8n` | `/n8n` | `N8N_ENCRYPTION_KEY`, never change it |
 | `pihole-secret` | `pihole` | `/pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
-| `plane-secret` | `plane` | `/plane` | Django/live signing keys, Postgres, RabbitMQ and MinIO credentials + connection URLs |
+| `plane-secret` | `plane` | `/plane` | Django/live signing keys, Postgres, RabbitMQ and S3 (RustFS) credentials + connection URLs |
 | `portfolio-secret` | `portfolio` | `/portfolio` | Payload admin session signing key (`PAYLOAD_SECRET`) |
 | `stirling-pdf-secret` | `stirling-pdf` | `/stirling-pdf` | First admin login, only read on an empty volume |
 | `claude-oauth` | `t3code` | `/t3code` | `CLAUDE_CODE_OAUTH_TOKEN` |

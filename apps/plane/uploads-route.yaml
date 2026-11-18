@@ -1,0 +1,22 @@
+---
+# Public path for Plane's uploads: plane.silkepilon.dev/uploads/* -> RustFS.
+# The chart only renders this route when its own MinIO is on
+# (minio.local_setup), so it lives here now. Same entrypoint and body-size
+# middleware as the chart's routes; Traefik keeps the Host header, which the
+# presigned signatures depend on.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: plane-uploads
+  namespace: plane
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`plane.silkepilon.dev`) && PathPrefix(`/uploads`)
+      services:
+        - name: plane-rustfs
+          port: 9000
+      middlewares:
+        - name: plane-body-limit

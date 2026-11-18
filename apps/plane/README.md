@@ -15,8 +15,9 @@ Design notes: [docs/superpowers/specs/2026-08-29-plane-design.md](../../docs/sup
 | `plane-web`, `plane-space`, `plane-admin` | Front-ends: app, public spaces, `/god-mode` |
 | `plane-api`, `plane-worker`, `plane-beat-worker` | Django API, Celery worker, scheduler |
 | `plane-live` | Collaborative-editing websocket server |
-| `plane-pgdb`, `plane-redis`, `plane-rabbitmq`, `plane-minio` | Postgres 15, Valkey, RabbitMQ, MinIO — all on Longhorn |
-| `plane-api-migrate-1`, `plane-minio-bucket-1` | One-shot Jobs: migrations, `uploads` bucket |
+| `plane-pgdb`, `plane-redis`, `plane-rabbitmq` | Postgres 15, Valkey, RabbitMQ — all on Longhorn |
+| `plane-rustfs` (git side, `rustfs.yaml`) | RustFS S3 store for uploads, on Longhorn; `/uploads` route in `uploads-route.yaml` |
+| `plane-api-migrate-1`, `plane-rustfs-bucket` | One-shot Jobs: migrations, `uploads` bucket (PostSync hook) |
 
 ## Setup
 
@@ -30,7 +31,7 @@ chart's `external_secrets.*_existingSecret` hooks all point at it.
 
 On a fresh install, add these keys to the Infisical folder `/plane`. Generate
 three values with `openssl rand -hex 24` and call them PG_PASS, MQ_PASS and
-MINIO_PASS:
+S3_PASS:
 
 | Key | Value |
 | --- | --- |
@@ -44,13 +45,11 @@ MINIO_PASS:
 | `RABBITMQ_DEFAULT_PASS` | MQ_PASS |
 | `AMQP_URL` | `amqp://plane:<MQ_PASS>@plane-rabbitmq.plane.svc.cluster.local:5672/` |
 | `REDIS_URL` | `redis://plane-redis.plane.svc.cluster.local:6379/` |
-| `USE_MINIO` | `1` |
-| `MINIO_ROOT_USER` | `plane` |
-| `MINIO_ROOT_PASSWORD` | MINIO_PASS |
-| `AWS_ACCESS_KEY_ID` | `plane` |
-| `AWS_SECRET_ACCESS_KEY` | MINIO_PASS |
+| `USE_MINIO` | `1` (Plane's "self-hosted S3" mode; RustFS behaves the same) |
+| `AWS_ACCESS_KEY_ID` | any name, e.g. `plane` plus random hex |
+| `AWS_SECRET_ACCESS_KEY` | S3_PASS (RustFS reads the same pair as its root login) |
 | `AWS_S3_BUCKET_NAME` | `uploads` |
-| `AWS_S3_ENDPOINT_URL` | `http://plane-minio.plane.svc.cluster.local:9000` |
+| `AWS_S3_ENDPOINT_URL` | `http://plane-rustfs.plane.svc.cluster.local:9000` |
 | `FILE_SIZE_LIMIT` | `20971520` |
 | `CELERY_WORKER_CONCURRENCY` | `4` |
 
@@ -103,11 +102,10 @@ The `plane-api-migrate-1` Job must reach `Completed` before the API answers.
   ignores that path (plus `RespectIgnoreDifferences=true`), otherwise every
   refresh would be OutOfSync and every sync would roll every pod.
 - Job names embed `.Release.Revision` (always `1` under Argo CD) and Job specs
-  are immutable, so `api` and `minio` carry
-  `argocd.argoproj.io/sync-options: Replace=true,Force=true`. A version bump
-  therefore deletes and recreates the migrate/bucket Jobs — and, as a side
-  effect, the `plane-api` Deployment and `plane-minio` StatefulSet. Expect about
-  a minute of API downtime per upgrade. PVCs are kept.
+  are immutable, so `api` carries
+  `argocd.argoproj.io/sync-options: Replace=true,Force=true`. Every sync
+  therefore deletes and recreates the migrate Job and, as a side effect, the
+  `plane-api` Deployment. Expect about a minute of API downtime per sync.
 
 - The admin image is stock nginx, so `GET /god-mode` without a trailing slash
   gets nginx's directory redirect, which includes the container port:
@@ -116,8 +114,8 @@ The `plane-api-migrate-1` Job must reach `Completed` before the API answers.
   `redirectRegex` route for that exact path so Traefik answers
   `/god-mode` → `/god-mode/` itself.
 
-- `minio.env.minio_endpoint_ssl: true` even though MinIO itself is plain
-  http: the API builds presigned upload URLs from `request.scheme` unless
+- `minio.env.minio_endpoint_ssl: true` even though RustFS is plain http
+  (the chart's MinIO is off, but this value still lands in the app env): the API builds presigned upload URLs from `request.scheme` unless
   this is set, and behind Cloudflare Django sees `http`, so browsers blocked
   `http://plane.silkepilon.dev/uploads` as mixed content. The setting only
   changes the URL scheme. ConfigMap changes do not restart pods (the chart's
@@ -133,6 +131,6 @@ with (`helm search repo plane/plane-ce --versions`). Renovate tracks both.
 ## Notes
 
 - Images are multi-arch, so pods schedule on the Pis too.
-- The MinIO console (`:9090`) and RabbitMQ management UI (`:15672`) are not
-  exposed. Port-forward if needed:
-  `kubectl -n plane port-forward svc/plane-minio 9090:9090`.
+- Uploads used to live in the chart's MinIO. MinIO stopped publishing images,
+  so on 2026-11-18 they moved to RustFS (byte-identical copy, verified). The
+  RabbitMQ management UI (`:15672`) is not exposed; port-forward if needed.
