@@ -31,3 +31,13 @@ spec:
     syncOptions:
       - CreateNamespace=true    # creates the namespace if it doesn't exist
       - ServerSideApply=true    # avoids annotation-size limits on large CRDs
+      # ExternalSecret's CRD comes from the external-secrets app. On a fresh
+      # cluster this app can sync first; skip the dry run and keep retrying
+      # until ESO is up instead of giving up.
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: -1
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

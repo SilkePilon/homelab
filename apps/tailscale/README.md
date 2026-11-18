@@ -51,14 +51,12 @@ credential with these scopes:
 
 Tag it `tag:k8s-operator`. Copy the Client ID and Client secret.
 
-### 3. Create the secret
+### 3. Store the credential in Infisical
 
-```bash
-kubectl create namespace tailscale
-kubectl create secret generic operator-oauth -n tailscale \
-  --from-literal=client_id='YOUR_CLIENT_ID' \
-  --from-literal=client_secret='YOUR_CLIENT_SECRET'
-```
+Add the keys `client_id` and `client_secret` to the Infisical folder
+`/tailscale` (project `homelab`, environment `prod`). `externalsecret.yaml`
+syncs them into the Secret `operator-oauth`; see
+[`apps/external-secrets/README.md`](../external-secrets/README.md).
 
 The chart's `oauth.clientId` / `oauth.clientSecret` values are left empty on
 purpose. Empty means the chart creates no Secret and mounts this one instead.

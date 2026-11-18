@@ -5,18 +5,16 @@
 # Port:  3000
 # Data:  /app/data  (PVC windesheim-readers-data) — app.db + uploads/
 #
-# BEFORE syncing, create the secret (NOT committed to git):
-#   kubectl create namespace windesheim-readers
-#   kubectl create secret generic windesheim-readers-secret -n windesheim-readers \
-#     --from-literal=APP_SECRET="$(openssl rand -base64 32)" \
-#     --from-literal=RESEND_API_KEY='re_...' \
-#     --from-literal=EMAIL_FROM='Windesheim Readers <noreply@your-verified-domain>'
+# Secret windesheim-readers-secret is synced from Infisical (folder
+# /windesheim-readers, NOT committed to git). On a fresh install add these keys:
 #
-#   APP_SECRET      signs sessions AND encrypts the AI keys stored in the DB.
+#   APP_SECRET      openssl rand -base64 32. Signs sessions AND encrypts the
+#                   AI keys stored in the DB.
 #                   Never change it: stored AI keys become unreadable.
-#   RESEND_API_KEY  sends the magic-link sign-in emails. Without it the links
-#                   only appear in the pod log.
-#   EMAIL_FROM      sender; must be on a domain verified in Resend.
+#   RESEND_API_KEY  re_... from Resend. Sends the magic-link sign-in emails.
+#                   Without it the links only appear in the pod log.
+#   EMAIL_FROM      sender, e.g. Windesheim Readers <noreply@your-verified-domain>;
+#                   must be on a domain verified in Resend.
 #
 # AI provider keys are entered in the app (Admin → AI settings), not here.
 # ─────────────────────────────────────────────────────────────────────────────

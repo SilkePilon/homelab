@@ -25,6 +25,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
+  - externalsecret.yaml
 
 labels:
   - pairs:
