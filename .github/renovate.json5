@@ -99,5 +99,15 @@
       ],
       automerge: false,
     },
+    {
+      description: 'docs site rolls out :latest itself (apps/sites/docs/updater.yaml); a pinned digest would undo every rollout',
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'ghcr.io/silkepilon/docs',
+      ],
+      enabled: false,
+    },
   ],
 }
