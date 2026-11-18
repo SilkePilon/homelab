@@ -19,12 +19,9 @@ namespace: arr-stack
 #  2. Edit pvc.yaml — set the SMB share URL in arr-stack-media-pv:
 #       volumeAttributes.source: "//YOUR_NAS_IP/YOUR_SHARE"
 #
-#  3. Create the SMB credentials secret (NOT committed to git):
-#       kubectl create secret generic smb-creds \
-#         --from-literal username=YOUR_USER \
-#         --from-literal password='YOUR_PASS' \
-#         -n arr-stack
-#     Then delete secret.yaml or replace stringData values with real creds.
+#  3. SMB credentials: Secret smb-creds is synced from Infisical (folder
+#     /arr-stack/smb-creds, see externalsecret.yaml). Add the keys username
+#     and password (the NAS share login) to that folder.
 #
 #  4. Adjust pvc.yaml → arr-downloads storage size to your available disk.
 #
@@ -66,6 +63,7 @@ resources:
   - gluetun-proxy.yaml
   - scraparr.yaml
   - ingress.yaml
+  - externalsecret.yaml
 
 labels:
   - pairs:

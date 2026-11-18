@@ -23,37 +23,36 @@ Design notes: [docs/superpowers/specs/2026-08-29-plane-design.md](../../docs/sup
 ### 1. Create the secret
 
 Every credential lives in one Secret, `plane-secret`, which is **never
-committed** — same rule as `twenty-secret`. The chart's
-`external_secrets.*_existingSecret` hooks all point at it.
+committed** — same rule as `twenty-secret`. It is synced from the Infisical
+folder `/plane` (project `homelab`, environment `prod`) by `externalsecret.yaml`;
+see [`apps/external-secrets/README.md`](../external-secrets/README.md). The
+chart's `external_secrets.*_existingSecret` hooks all point at it.
 
-```bash
-kubectl create namespace plane
+On a fresh install, add these keys to the Infisical folder `/plane`. Generate
+three values with `openssl rand -hex 24` and call them PG_PASS, MQ_PASS and
+MINIO_PASS:
 
-PG_PASS="$(openssl rand -hex 24)"
-MQ_PASS="$(openssl rand -hex 24)"
-MINIO_PASS="$(openssl rand -hex 24)"
-
-kubectl create secret generic plane-secret -n plane \
-  --from-literal=SECRET_KEY="$(openssl rand -hex 32)" \
-  --from-literal=LIVE_SERVER_SECRET_KEY="$(openssl rand -hex 32)" \
-  --from-literal=POSTGRES_USER=plane \
-  --from-literal=POSTGRES_PASSWORD="$PG_PASS" \
-  --from-literal=POSTGRES_DB=plane \
-  --from-literal=DATABASE_URL="postgresql://plane:${PG_PASS}@plane-pgdb.plane.svc.cluster.local:5432/plane" \
-  --from-literal=RABBITMQ_DEFAULT_USER=plane \
-  --from-literal=RABBITMQ_DEFAULT_PASS="$MQ_PASS" \
-  --from-literal=AMQP_URL="amqp://plane:${MQ_PASS}@plane-rabbitmq.plane.svc.cluster.local:5672/" \
-  --from-literal=REDIS_URL="redis://plane-redis.plane.svc.cluster.local:6379/" \
-  --from-literal=USE_MINIO=1 \
-  --from-literal=MINIO_ROOT_USER=plane \
-  --from-literal=MINIO_ROOT_PASSWORD="$MINIO_PASS" \
-  --from-literal=AWS_ACCESS_KEY_ID=plane \
-  --from-literal=AWS_SECRET_ACCESS_KEY="$MINIO_PASS" \
-  --from-literal=AWS_S3_BUCKET_NAME=uploads \
-  --from-literal=AWS_S3_ENDPOINT_URL="http://plane-minio.plane.svc.cluster.local:9000" \
-  --from-literal=FILE_SIZE_LIMIT=20971520 \
-  --from-literal=CELERY_WORKER_CONCURRENCY=4
-```
+| Key | Value |
+| --- | --- |
+| `SECRET_KEY` | `openssl rand -hex 32` |
+| `LIVE_SERVER_SECRET_KEY` | `openssl rand -hex 32` |
+| `POSTGRES_USER` | `plane` |
+| `POSTGRES_PASSWORD` | PG_PASS |
+| `POSTGRES_DB` | `plane` |
+| `DATABASE_URL` | `postgresql://plane:<PG_PASS>@plane-pgdb.plane.svc.cluster.local:5432/plane` |
+| `RABBITMQ_DEFAULT_USER` | `plane` |
+| `RABBITMQ_DEFAULT_PASS` | MQ_PASS |
+| `AMQP_URL` | `amqp://plane:<MQ_PASS>@plane-rabbitmq.plane.svc.cluster.local:5672/` |
+| `REDIS_URL` | `redis://plane-redis.plane.svc.cluster.local:6379/` |
+| `USE_MINIO` | `1` |
+| `MINIO_ROOT_USER` | `plane` |
+| `MINIO_ROOT_PASSWORD` | MINIO_PASS |
+| `AWS_ACCESS_KEY_ID` | `plane` |
+| `AWS_SECRET_ACCESS_KEY` | MINIO_PASS |
+| `AWS_S3_BUCKET_NAME` | `uploads` |
+| `AWS_S3_ENDPOINT_URL` | `http://plane-minio.plane.svc.cluster.local:9000` |
+| `FILE_SIZE_LIMIT` | `20971520` |
+| `CELERY_WORKER_CONCURRENCY` | `4` |
 
 `CELERY_WORKER_CONCURRENCY` is not a credential; it rides along in the Secret
 because the chart has no other hook for extra env. Without it Celery forks one

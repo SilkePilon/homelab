@@ -120,34 +120,61 @@ kubectl apply -f bootstrap/argocd/root.yaml
 ## Secrets
 
 Secret **values** live in [Infisical Cloud](https://eu.infisical.com) (project
-`homelab`, environment `prod`, one folder per app). The
+`homelab`, environment `prod`, one folder per Secret). The
 [External Secrets Operator](apps/external-secrets/README.md) syncs each folder
-into a normal Kubernetes Secret through an `ExternalSecret` in the app's
-manifests. Edit a value in the Infisical dashboard, not with `kubectl`.
+into a normal Kubernetes Secret through the `externalsecret.yaml` next to the
+app. Edit a value in the Infisical dashboard, never with `kubectl`.
+
+ESO picks up a change within the hour, but pods only read Secrets at start.
+To apply a change right away:
+
+1. Force the sync, then wait until the `ExternalSecret`'s refresh time moves
+   past the moment you annotated it:
+
+   ```bash
+   kubectl -n <ns> annotate externalsecret <secret> force-sync=$(date +%s) --overwrite
+   kubectl -n <ns> get externalsecret <secret> -o jsonpath='{.status.refreshTime}'
+   ```
+
+2. Restart every workload that mounts the Secret
+   (`grep -rn <secret> apps/<app>`). `plane-secret` feeds every Plane
+   workload, so restart them all. The two rows marked "not mounted" need no
+   restart.
 
 The only hand-made secret is the bootstrap credential ESO uses to log in to
-Infisical (`infisical-universal-auth` in `external-secrets`). See
-[apps/external-secrets/README.md](apps/external-secrets/README.md) for setup,
-usage and how to migrate the secrets below.
+Infisical, `infisical-universal-auth` in `external-secrets`. Keep its client
+ID and secret in a password manager: on a rebuilt cluster it is the one thing
+you create by hand, and everything below comes back on its own. See
+[apps/external-secrets/README.md](apps/external-secrets/README.md).
 
-Secrets still created by hand with `kubectl`, not yet migrated:
+| Secret | Namespace | Infisical folder | Holds |
+| --- | --- | --- | --- |
+| `cloudflared-token` | `cloudflared` | `/cloudflared` | Tunnel token from the Cloudflare Zero Trust dashboard |
+| `smb-creds` | `arr-stack` | `/arr-stack/smb-creds` | NAS username/password for the SMB media volume |
+| `protonvpn-wg` | `arr-stack` | `/arr-stack/protonvpn-wg` | WireGuard key for the qbittorrent Gluetun sidecar |
+| `protonvpn-wg-byparr` | `arr-stack` | `/arr-stack/protonvpn-wg-byparr` | WireGuard key for the byparr Gluetun sidecar (separate key on purpose) |
+| `scraparr-api-keys` | `arr-stack` | `/arr-stack/scraparr-api-keys` | Sonarr/Radarr/Lidarr API keys |
+| `qbittorrent-creds` | `arr-stack` | `/arr-stack/qbittorrent-creds` | qBittorrent web UI login (not mounted, kept for reference) |
+| `gitlab-secret` | `gitlab` | `/gitlab` | GitLab root password (`GITLAB_ROOT_PASSWORD`), only read on an empty volume |
+| `gitlab-runner-secret` | `gitlab-runner` | `/gitlab-runner` | Instance runner token (`runner-token`, plus empty `runner-registration-token`) |
+| `grafana-admin-creds` | `monitoring` | `/monitoring/grafana-admin-creds` | Grafana admin login |
+| `groepshike-secret` | `groepshike` | `/groepshike` | Postgres + `DATABASE_URL`, `PAYLOAD_SECRET`, RustFS keys, optional `SITE_PASSWORD`, SMTP login |
+| `jotihunt-secret` | `jotihunt` | `/jotihunt/jotihunt-secret` | JWT secret, Traccar API token, VAPID keys, Telegram + Life360 + Jotiboard session keys, NS key, `SETTINGS_KEY` (encrypts the Gemini key and login saved in Beheer), optional `ORS_API_KEY` |
+| `jotihunt-traccar-admin` | `jotihunt` | `/jotihunt/jotihunt-traccar-admin` | Traccar admin login |
+| `jotihunt-admin-login` | `jotihunt` | `/jotihunt/jotihunt-admin-login` | Admin login (not mounted, kept for reference) |
+| `n8n-secret` | `n8n` | `/n8n` | `N8N_ENCRYPTION_KEY`, never change it |
+| `pihole-secret` | `pihole` | `/pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
+| `plane-secret` | `plane` | `/plane` | Django/live signing keys, Postgres, RabbitMQ and MinIO credentials + connection URLs |
+| `portfolio-secret` | `portfolio` | `/portfolio` | Payload admin session signing key (`PAYLOAD_SECRET`) |
+| `stirling-pdf-secret` | `stirling-pdf` | `/stirling-pdf` | First admin login, only read on an empty volume |
+| `claude-oauth` | `t3code` | `/t3code` | `CLAUDE_CODE_OAUTH_TOKEN` |
+| `operator-oauth` | `tailscale` | `/tailscale` | OAuth client for the Tailscale operator (`tag:k8s-operator`) |
+| `twenty-secret` | `twenty` | `/twenty` | Postgres URL/password, app secret, encryption key |
+| `windesheim-readers-secret` | `windesheim-readers` | `/windesheim-readers` | Session/encryption key (`APP_SECRET`, never change it), Resend key + sender |
 
-| Secret | Namespace | Used by |
-| --- | --- | --- |
-| `smb-creds` | `arr-stack` | NAS username/password for the SMB media volume |
-| `protonvpn-wg` | `arr-stack` | WireGuard key for the qbittorrent Gluetun sidecar |
-| `protonvpn-wg-byparr` | `arr-stack` | WireGuard key for the byparr Gluetun sidecar |
-| `scraparr-api-keys` | `arr-stack` | Sonarr/Radarr/Lidarr API keys |
-| `gitlab-secret` | `gitlab` | GitLab root password (`GITLAB_ROOT_PASSWORD`), only read on an empty volume |
-| `gitlab-runner-secret` | `gitlab-runner` | Instance runner token (`runner-token`, plus empty `runner-registration-token`) |
-| `groepshike-secret` | `groepshike` | Postgres password + `DATABASE_URL`, `PAYLOAD_SECRET`, RustFS keys (`S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`), optional `SITE_PASSWORD` (whole site behind one password), SMTP login |
-| `jotihunt-secret` | `jotihunt` | JWT secret, Traccar API token, Gemini key, VAPID keys, Telegram + Life360 session keys (+ optional Jotihunt site login, ORS key) |
-| `plane-secret` | `plane` | Django/live signing keys, Postgres, RabbitMQ and MinIO credentials + connection URLs |
-| `twenty-secret` | `twenty` | Postgres URL/password, app secret, encryption key |
-| `windesheim-readers-secret` | `windesheim-readers` | Session/encryption key (`APP_SECRET`, never change it), Resend key + sender for sign-in emails |
-
-The exact keys each secret needs are documented in the header comment of the
-manifest that consumes it.
+Not in Infisical on purpose, because the software creates them itself: Argo
+CD's own secrets, the Tailscale operator state and `ts-*` device secrets, k3s
+node passwords and serving certs, and the Longhorn/ESO webhook certificates.
 
 ## Storage & Networking
 

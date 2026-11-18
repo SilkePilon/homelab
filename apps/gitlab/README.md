@@ -16,14 +16,13 @@ Off on purpose: container registry, Pages, KAS, SSH, the bundled Prometheus.
 
 ### 1. Secret
 
-```bash
-kubectl create namespace gitlab
-kubectl -n gitlab create secret generic gitlab-secret \
-  --from-literal=GITLAB_ROOT_PASSWORD="$(openssl rand -base64 24)"
-```
+`gitlab-secret` is synced from the Infisical folder `/gitlab` (see
+[`apps/external-secrets/README.md`](../external-secrets/README.md)). On a fresh
+install add the key `GITLAB_ROOT_PASSWORD` there, generated with
+`openssl rand -base64 24`.
 
 Read on first boot only (empty `/var/opt/gitlab`). Afterwards change the root
-password in the UI; editing the Secret does nothing.
+password in the UI; editing the value in Infisical does nothing.
 
 ### 2. Cloudflare Tunnel
 
@@ -57,14 +56,12 @@ Without SMTP there are no notification or password-reset emails.
 
 1. **Admin → CI/CD → Runners → New instance runner**. Tick *Run untagged
    jobs* (or set tags), create it, and copy the `glrt-…` token.
-2. Store it (never committed):
-
-   ```bash
-   kubectl create namespace gitlab-runner
-   kubectl -n gitlab-runner create secret generic gitlab-runner-secret \
-     --from-literal=runner-token='glrt-...' \
-     --from-literal=runner-registration-token=''
-   ```
+2. Store it in the Infisical folder `/gitlab-runner` (never committed): key
+   `runner-token` with the `glrt-…` token, plus an empty
+   `runner-registration-token` key. ESO syncs them into
+   `gitlab-runner-secret` (`apps/gitlab-runner/externalsecret.yaml`); to apply
+   a new token right away, force-sync it:
+   `kubectl -n gitlab-runner annotate externalsecret gitlab-runner-secret force-sync=$(date +%s) --overwrite`.
 
 3. Restart the runner if it was already crash-looping:
    `kubectl -n gitlab-runner rollout restart deploy/gitlab-runner`.

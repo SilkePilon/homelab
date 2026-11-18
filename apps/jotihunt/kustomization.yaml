@@ -18,8 +18,9 @@ namespace: jotihunt
 #
 # BEFORE server/traccar go to replicas: 1:
 #
-#  1. Create the namespace and the secret `jotihunt-secret` (NOT in git) —
-#     see the header of server.yaml for the keys and the command.
+#  1. Fill the Infisical folder /jotihunt/jotihunt-secret (NOT in git); ESO
+#     syncs it to Secret `jotihunt-secret`. See the header of server.yaml for
+#     the keys.
 #
 #  2. Add the two Cloudflare Tunnel public hostnames (see ingress.yaml).
 #     Cloudflare zone: Bot Fight Mode off; for both hostnames Browser
@@ -44,6 +45,7 @@ resources:
   - ingress-tailnet.yaml
   - backup.yaml
   - networkpolicy.yaml
+  - externalsecret.yaml
 
 # Hash-suffixed names, so an env change rolls the pods (Argo prunes the old
 # ConfigMap).

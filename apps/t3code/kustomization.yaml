@@ -8,8 +8,9 @@ namespace: t3code
 # t3code — a headless T3 Code server so Claude Code agents keep running while
 # the desktop is off. Tailnet only.
 #
-# No Secret to create. The logins live on the PVC and are made once, by hand,
-# after the first sync. See apps/t3code/README.md.
+# claude-oauth (CLAUDE_CODE_OAUTH_TOKEN) is synced from Infisical (/t3code) by
+# externalsecret.yaml. The other logins live on the PVC and are made once, by
+# hand, after the first sync. See apps/t3code/README.md.
 #
 #  1. Make sure the tailnet has HTTPS certificates enabled (DNS page of the
 #     Tailscale admin console) — the Ingress needs them.
@@ -25,6 +26,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
+  - externalsecret.yaml
 
 labels:
   - pairs:

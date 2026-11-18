@@ -11,11 +11,9 @@ namespace: gitlab
 #
 # BEFORE applying this stack:
 #
-#  1. Create the namespace and the secret (NOT committed to git). The password
-#     is read on first boot only:
-#       kubectl create namespace gitlab
-#       kubectl -n gitlab create secret generic gitlab-secret \
-#         --from-literal=GITLAB_ROOT_PASSWORD="$(openssl rand -base64 24)"
+#  1. Add the key GITLAB_ROOT_PASSWORD (openssl rand -base64 24) to the
+#     Infisical folder /gitlab (NOT committed to git); ESO syncs it to
+#     gitlab-secret. The root password is read on first boot only.
 #
 #  2. Add a Cloudflare Tunnel public hostname entry:
 #       Subdomain: gitlab   Domain: silkepilon.dev
@@ -31,6 +29,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
+  - externalsecret.yaml
 
 labels:
   - pairs:

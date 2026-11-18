@@ -8,7 +8,8 @@
 # Data:  /data (PVC jotihunt-server-data) — uploads/ + app-releases/
 #
 # Config: non-secret env in server.env (ConfigMap jotihunt-server-env, public
-# repo!), secrets from the hand-made Secret `jotihunt-secret` (NOT in git):
+# repo!), secrets from the Secret `jotihunt-secret` (NOT in git), synced from
+# Infisical folder /jotihunt/jotihunt-secret. It holds these keys:
 #   JWT_SECRET          signs web + device sessions
 #   SETTINGS_KEY        base64 of 32 random bytes; encrypts keys/passwords saved
 #                       in Beheer (Gemini key, Jotihunt login, Telegram app hash)
@@ -24,10 +25,8 @@
 #   optional: ORS_API_KEY (routing), NS_API_KEY (OV in the Intel chat)
 #   Gemini key + models, Jotihunt site login and Telegram app ID/hash are set in
 #   Beheer and stored encrypted in the database (SETTINGS_KEY).
-# Create it from the laptop .env without printing values:
-#   grep -E '^(JWT_SECRET|SETTINGS_KEY|TRACCAR_API_TOKEN|VAPID_PUBLIC_KEY|VAPID_PRIVATE_KEY|VAPID_SUBJECT|ORS_API_KEY)=.+' .env > /tmp/jh-secret.env
-#   kubectl -n jotihunt create secret generic jotihunt-secret --from-env-file=/tmp/jh-secret.env
-#   shred -u /tmp/jh-secret.env
+# To change a value, edit it in Infisical, then force-sync the ExternalSecret
+# and restart the server (see apps/external-secrets/README.md).
 #
 # Exactly ONE instance may run anywhere (the crons — Jotihunt API/scraper,
 # push, predictions — run in-process), hence replicas: 1 + Recreate. The

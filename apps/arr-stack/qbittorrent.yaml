@@ -4,13 +4,12 @@
 # VPN: gluetun sidecar routes all traffic through ProtonVPN WireGuard.
 # Port forwarding is handled automatically by gluetun via VPN_PORT_FORWARDING_UP_COMMAND.
 #
-# Required secrets (create out-of-band — NOT in git):
+# Required secrets (synced from Infisical, see externalsecret.yaml — NOT in git):
 #
-#   kubectl create secret generic protonvpn-wg -n arr-stack \
-#     --from-literal=privateKey=<PrivateKey>
+#   protonvpn-wg  ← Infisical folder /arr-stack/protonvpn-wg, key privateKey
 #   (Get PrivateKey from https://account.proton.me/vpn/wireguard → create WireGuard key → P2P config)
-#   byparr uses its own key (secret protonvpn-wg-byparr); never share one key
-#   between the two tunnels.
+#   byparr uses its own key (secret protonvpn-wg-byparr, folder
+#   /arr-stack/protonvpn-wg-byparr); never share one key between the two tunnels.
 #
 # After first login, enable in qBittorrent → Options → Web UI:
 #   "Bypass authentication for clients on localhost" — required for VPN_PORT_FORWARDING_UP_COMMAND

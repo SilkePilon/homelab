@@ -14,23 +14,22 @@ namespace: groepshike
 #   groepshike-s3  Deployment  RustFS, S3 API    (photos and videos)
 #   groepshike-s3-bucket  PostSync Job: creates the bucket if it is missing
 #
-# BEFORE applying — create the namespace + secret (NOT in git):
+# Secret groepshike-secret is synced from Infisical (folder /groepshike, NOT
+# in git). On a fresh install add these keys to that folder:
 #
-#   kubectl create namespace groepshike
-#   PG_PASS="$(openssl rand -hex 24)"
-#   kubectl create secret generic groepshike-secret -n groepshike \
-#     --from-literal=POSTGRES_PASSWORD="$PG_PASS" \
-#     --from-literal=DATABASE_URL="postgres://groepshike:${PG_PASS}@groepshike-db:5432/groepshike" \
-#     --from-literal=PAYLOAD_SECRET="$(openssl rand -hex 32)" \
-#     --from-literal=S3_ACCESS_KEY_ID="groepshike-$(openssl rand -hex 6)" \
-#     --from-literal=S3_SECRET_ACCESS_KEY="$(openssl rand -hex 24)" \
-#     --from-literal=SITE_PASSWORD='<shared test password>' \
-#     --from-literal=SMTP_USER='' --from-literal=SMTP_PASS=''
+#   POSTGRES_PASSWORD     openssl rand -hex 24  (call it PG_PASS)
+#   DATABASE_URL          postgres://groepshike:<PG_PASS>@groepshike-db:5432/groepshike
+#   PAYLOAD_SECRET        openssl rand -hex 32
+#   S3_ACCESS_KEY_ID      groepshike-<openssl rand -hex 6>
+#   S3_SECRET_ACCESS_KEY  openssl rand -hex 24
+#   SITE_PASSWORD         the shared test password
+#   SMTP_USER, SMTP_PASS  empty until SMTP is set up
 #
 #   SITE_PASSWORD puts the whole site (pages, admin, files, API) behind one
-#   password page. To open the site to everyone, remove the key and restart:
-#     kubectl -n groepshike patch secret groepshike-secret --type=json \
-#       -p='[{"op":"remove","path":"/data/SITE_PASSWORD"}]'
+#   password page. To open the site to everyone, delete the key in Infisical,
+#   force-sync and restart:
+#     kubectl -n groepshike annotate externalsecret groepshike-secret \
+#       force-sync=$(date +%s) --overwrite
 #     kubectl -n groepshike rollout restart deployment/groepshike
 #
 #   PAYLOAD_SECRET signs admin sessions (changing it logs everyone out, no data
@@ -57,6 +56,7 @@ resources:
   - service.yaml
   - pdb.yaml
   - ingress.yaml
+  - externalsecret.yaml
 
 labels:
   - pairs:

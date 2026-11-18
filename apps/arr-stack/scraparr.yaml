@@ -3,14 +3,10 @@
 # Scraparr reads each app's API and exposes Prometheus metrics on port 7100.
 # Dashboard: https://grafana.com/grafana/dashboards/22934
 #
-# BEFORE deploying, create the API keys secret (NOT committed to git).
-# Find each app's API key under Settings → General → Security:
-#
-#   kubectl create secret generic scraparr-api-keys \
-#     --from-literal=SONARR_API_KEY=<your-sonarr-api-key> \
-#     --from-literal=RADARR_API_KEY=<your-radarr-api-key> \
-#     --from-literal=LIDARR_API_KEY=<your-lidarr-api-key> \
-#     -n arr-stack
+# The API keys Secret scraparr-api-keys is synced from Infisical (folder
+# /arr-stack/scraparr-api-keys, NOT committed to git). It must contain the keys
+# SONARR_API_KEY, RADARR_API_KEY and LIDARR_API_KEY.
+# Find each app's API key under Settings → General → Security.
 #
 # ─────────────────────────────────────────────────────────────────────────────
 apiVersion: apps/v1
