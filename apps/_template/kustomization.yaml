@@ -7,24 +7,20 @@ namespace: <APP_NAME>
 # ─────────────────────────────────────────────────────────────────────────────
 # <APP_NAME> — one-line description of what this app does.
 #
-# BEFORE applying this stack:
+# To use this template:
 #
-#  1. Create the namespace:
-#       kubectl create namespace <APP_NAME>
+#  1. cp -r apps/_template apps/<group>/<APP_NAME>. The folder name becomes
+#     the Argo CD app and the namespace, so it must match <APP_NAME>.
 #
-#  2. Create the secret (NOT committed to git):
-#       kubectl create secret generic <APP_NAME>-secret -n <APP_NAME> \
-#         --from-literal=SOME_KEY="value"
+#  2. Replace every <PLACEHOLDER> in this folder.
 #
-#  3. Edit deployment.yaml and ingress.yaml — replace every <PLACEHOLDER>.
+#  3. Secrets: add the keys to Infisical (homelab / prod, folder /<APP_NAME>)
+#     and keep externalsecret.yaml. Drop it if the app has no secrets.
 #
-#  4. Add a Cloudflare Tunnel public hostname entry:
-#       Subdomain: <APP_NAME>   Domain: yourdomain.com
-#       Service:   HTTP         http://traefik.kube-system.svc.cluster.local:80
+#  4. Public app: add a Cloudflare Tunnel public hostname pointing at
+#       http://traefik.kube-system.svc.cluster.local:80
 #
-#  5. Apply:
-#       kubectl apply -k apps/<APP_NAME>/
-#     or let Argo CD sync automatically after merging to main.
+#  5. Push to main. The ApplicationSet creates and syncs the app.
 # ─────────────────────────────────────────────────────────────────────────────
 
 resources:
@@ -33,6 +29,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml    # remove if the app should not be exposed externally
+  - externalsecret.yaml  # remove if the app has no secrets
 
 labels:
   - pairs:

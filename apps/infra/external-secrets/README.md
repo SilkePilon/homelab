@@ -34,6 +34,38 @@ ExternalSecret n8n/n8n-secret  ──▶  Secret n8n/n8n-secret  ──▶  pod 
 Keep the client ID and secret in your password manager. On a rebuilt cluster
 this is the only secret you create by hand; everything else comes back.
 
+## All secrets
+
+| Secret | Namespace | Infisical folder | Holds |
+| --- | --- | --- | --- |
+| `cloudflared-token` | `cloudflared` | `/cloudflared` | Tunnel token from the Cloudflare Zero Trust dashboard |
+| `smb-creds` | `arr-stack` | `/arr-stack/smb-creds` | NAS username/password for the SMB media volume |
+| `protonvpn-wg` | `arr-stack` | `/arr-stack/protonvpn-wg` | WireGuard key for the qbittorrent Gluetun sidecar |
+| `protonvpn-wg-byparr` | `arr-stack` | `/arr-stack/protonvpn-wg-byparr` | WireGuard key for the byparr Gluetun sidecar (separate key on purpose) |
+| `scraparr-api-keys` | `arr-stack` | `/arr-stack/scraparr-api-keys` | Sonarr/Radarr/Lidarr API keys |
+| `qbittorrent-creds` | `arr-stack` | `/arr-stack/qbittorrent-creds` | qBittorrent web UI login (not mounted, kept for reference) |
+| `gitlab-secret` | `gitlab` | `/gitlab` | GitLab root password (`GITLAB_ROOT_PASSWORD`), only read on an empty volume |
+| `gitlab-runner-secret` | `gitlab-runner` | `/gitlab-runner` | Instance runner token (`runner-token`, plus empty `runner-registration-token`) |
+| `grafana-admin-creds` | `monitoring` | `/monitoring/grafana-admin-creds` | Grafana admin login |
+| `groepshike-secret` | `groepshike` | `/groepshike` | Postgres + `DATABASE_URL`, `PAYLOAD_SECRET`, RustFS keys, optional `SITE_PASSWORD`, SMTP login |
+| `jotihunt-secret` | `jotihunt` | `/jotihunt/jotihunt-secret` | JWT secret, Traccar API token, VAPID keys, Telegram + Life360 + Jotiboard session keys, NS key, `SETTINGS_KEY` (encrypts the Gemini key and login saved in Beheer), optional `ORS_API_KEY` |
+| `jotihunt-traccar-admin` | `jotihunt` | `/jotihunt/jotihunt-traccar-admin` | Traccar admin login |
+| `jotihunt-admin-login` | `jotihunt` | `/jotihunt/jotihunt-admin-login` | Admin login (not mounted, kept for reference) |
+| `n8n-secret` | `n8n` | `/n8n` | `N8N_ENCRYPTION_KEY`, never change it |
+| `pihole-secret` | `pihole` | `/pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
+| `plane-secret` | `plane` | `/plane` | Django/live signing keys, Postgres, RabbitMQ and S3 (RustFS) credentials + connection URLs |
+| `portfolio-secret` | `portfolio` | `/portfolio` | Payload admin session signing key (`PAYLOAD_SECRET`) |
+| `stirling-pdf-secret` | `stirling-pdf` | `/stirling-pdf` | First admin login, only read on an empty volume |
+| `claude-oauth` | `t3code` | `/t3code` | `CLAUDE_CODE_OAUTH_TOKEN` |
+| `operator-oauth` | `tailscale` | `/tailscale` | OAuth client for the Tailscale operator (`tag:k8s-operator`) |
+| `twenty-secret` | `twenty` | `/twenty` | Postgres URL/password, app secret, encryption key |
+| `windesheim-readers-secret` | `windesheim-readers` | `/windesheim-readers` | Session/encryption key (`APP_SECRET`, never change it), Resend key + sender |
+
+
+Not in Infisical on purpose, because the software creates them itself: Argo
+CD's own secrets, the Tailscale operator state and `ts-*` device secrets, k3s
+node passwords and serving certs, and the Longhorn/ESO webhook certificates.
+
 ## Using it in an app
 
 Put the keys in a folder named after the app, then add an `externalsecret.yaml`

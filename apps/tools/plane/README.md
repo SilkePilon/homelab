@@ -3,10 +3,9 @@
 [Plane](https://plane.so) Community Edition — issues, cycles, modules, pages.
 Reachable at <https://plane.silkepilon.dev>.
 
-Like `tailscale` and `longhorn` there is no Kustomize base: the upstream
-`plane-ce` chart is rendered directly by the Argo CD Application at
+The upstream `plane-ce` chart is rendered by the Argo CD Application at
 [`bootstrap/argocd/applications/plane.yaml`](../../../bootstrap/argocd/applications/plane.yaml).
-Design notes: [docs/superpowers/specs/2026-08-29-plane-design.md](../../../docs/superpowers/specs/2026-08-29-plane-design.md).
+This folder is its second source: the ExternalSecret and RustFS (uploads).
 
 ## What the chart runs
 
