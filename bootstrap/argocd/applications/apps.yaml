@@ -1,6 +1,8 @@
 # ── ApplicationSet: one Argo CD Application per folder in apps/<group>/ ──────
 # Every Kustomize app in apps/<group>/<app>/ becomes an Application named
 # <app>, deployed to namespace <app>. Adding an app = adding a folder.
+# Folder names must be unique across groups: the name is the folder's
+# basename, so apps/tools/foo and apps/sites/foo would be the same app.
 #
 # Helm apps are excluded below: their chart values live in their own
 # Application file in this folder, with apps/<group>/<app>/ as an optional
