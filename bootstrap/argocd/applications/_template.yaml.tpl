@@ -35,3 +35,12 @@ spec:
     syncOptions:
       - CreateNamespace=true    # creates the namespace if it doesn't exist
       - ServerSideApply=true    # avoids annotation-size limits on large CRDs
+      # Needed when the app has an ExternalSecret (all secrets come from
+      # Infisical): its CRD is installed by the external-secrets app.
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: -1
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

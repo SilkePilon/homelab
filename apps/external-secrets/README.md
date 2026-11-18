@@ -66,33 +66,24 @@ refresh interval. Pods only see the new value after a restart
 
 ## Migrating an existing hand-made Secret
 
-The existing Secret can push itself into Infisical with a one-off
-`PushSecret`, so nothing is copied by hand. Apply this with kubectl (do **not**
-commit it), check the folder in the dashboard, then delete it:
+`PushSecret` would be the clean way, but it is broken for Infisical in ESO
+2.15.0: the project lookup fails with `malformed HTTP response` against
+Infisical's HTTP/2 endpoint
+([external-secrets#7324](https://github.com/external-secrets/external-secrets/issues/7324)).
+Until that is fixed, use the script instead:
 
-```yaml
-apiVersion: external-secrets.io/v1alpha1
-kind: PushSecret
-metadata:
-  name: migrate
-  namespace: n8n
-spec:
-  refreshInterval: 0s           # push once
-  updatePolicy: IfNotExists     # never overwrite a value already in Infisical
-  deletionPolicy: None          # deleting this PushSecret leaves Infisical alone
-  secretStoreRefs:
-    - kind: ClusterSecretStore
-      name: infisical
-  selector:
-    secret:
-      name: n8n-secret
-  data:
-    - match:
-        secretKey: N8N_ENCRYPTION_KEY
-        remoteRef:
-          remoteKey: /n8n/N8N_ENCRYPTION_KEY
+```bash
+scripts/infisical-migrate.sh <namespace> <secret> <infisical-folder>
+scripts/infisical-migrate.sh pihole pihole-secret /pihole
 ```
 
-Then commit the app's ExternalSecret. Its target has the same name as the old
-Secret, so ESO takes it over (`creationPolicy: Owner` adopts it) and the pods
-see the same values.
+It logs in as ESO's own machine identity, creates the folder, writes every
+key, reads each one back and compares, then checks that a throwaway
+ExternalSecret produces a byte-identical Secret. Values go straight from the
+cluster to Infisical and are never printed, so run it from your own shell.
+Re-running is safe: keys that already exist are only compared.
+
+Then commit an `externalsecret.yaml` for the app (pattern above) with the
+same name as the old Secret. ESO adopts it (`creationPolicy: Owner`) and the
+pods see the same values. Add `SkipDryRunOnMissingResource=true` and the
+`retry` block to the app's Argo Application, see `n8n.yaml`.

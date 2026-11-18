@@ -144,7 +144,6 @@ Secrets still created by hand with `kubectl`, not yet migrated:
 | `groepshike-secret` | `groepshike` | Postgres password + `DATABASE_URL`, `PAYLOAD_SECRET`, RustFS keys (`S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`), optional `SITE_PASSWORD` (whole site behind one password), SMTP login |
 | `grafana-admin-creds` | `monitoring` | Grafana admin login |
 | `jotihunt-secret` | `jotihunt` | JWT secret, Traccar API token, Gemini key, VAPID keys, Telegram + Life360 session keys (+ optional Jotihunt site login, ORS key) |
-| `n8n-secret` | `n8n` | n8n encryption key |
 | `pihole-secret` | `pihole` | Pi-hole admin UI password (`WEBPASSWORD`) |
 | `portfolio-secret` | `portfolio` | Payload admin session signing key (`PAYLOAD_SECRET`) |
 | `plane-secret` | `plane` | Django/live signing keys, Postgres, RabbitMQ and MinIO credentials + connection URLs |
