@@ -51,22 +51,22 @@ git push  ──▶  bootstrap/argocd/root.yaml       (the "app-of-apps")
 
 | App | Namespace | What it is |
 | --- | --- | --- |
-| [arr-stack](apps/arr-stack) | `arr-stack` | Media automation: qBittorrent, Sonarr, Radarr, Lidarr, Scraparr, Byparr behind a Gluetun/ProtonVPN sidecar |
-| [cloudflared](apps/cloudflared) | `cloudflared` | Cloudflare Tunnel daemon (2 replicas) — the only way traffic gets in |
-| [external-secrets](apps/external-secrets) | `external-secrets` | External Secrets Operator (Helm) + the Infisical `ClusterSecretStore` all app secrets come from |
-| [gitlab](apps/gitlab) | `gitlab` | GitLab CE (Omnibus, one pod), HTTPS git only; CI via the `gitlab-runner` Helm app in `gitlab-runner` |
-| [groepshike](apps/groepshike) | `groepshike` | [groepshike.nl](https://groepshike.nl) — HIT Harderwijk Groepshike site: Next.js + Payload CMS, its own Postgres 17 and RustFS (S3) |
-| [homeassistant](apps/homeassistant) | `homeassistant` | Home Assistant |
-| [jotihunt](apps/jotihunt) | `jotihunt` | Jotihunt 2026 tracker: web app + API, MongoDB, Traccar (OsmAnd ingest public, UI tailnet-only) |
-| [monitoring](apps/monitoring) | `monitoring` | Prometheus, Grafana, Loki, Promtail, node-exporter, kube-state-metrics, NUT exporter |
-| [n8n](apps/n8n) | `n8n` | n8n workflow automation |
-| [plane](apps/plane) | `plane` | Plane project management (Helm chart rendered by Argo CD) + its own Postgres, Valkey, RabbitMQ and RustFS (S3) |
-| [pihole](apps/pihole) | `pihole` | Pi-hole DNS ad blocking, served on port 53 of every node |
-| [stirling-pdf](apps/stirling-pdf) | `stirling-pdf` | [Stirling PDF](https://www.stirlingpdf.com) — PDF toolbox (merge, split, convert, OCR), login required |
-| [portfolio](apps/portfolio) | `portfolio` | [silkepilon.dev](https://silkepilon.dev) — Next.js + Payload CMS portfolio, SQLite on a Longhorn volume |
-| [t3code](apps/t3code) | `t3code` | Headless [T3 Code](https://github.com/pingdotgg/t3code) server with Claude Code, so agents keep running while the desktop is off — tailnet only |
-| [twenty](apps/twenty) | `twenty` | Twenty CRM + its own Postgres and Redis |
-| [windesheim-readers](apps/windesheim-readers) | `windesheim-readers` | [learn.silkepilon.dev](https://learn.silkepilon.dev) — [Windesheim Readers](https://github.com/SilkePilon/windesheim-readers) study app (Bun + SQLite on a Longhorn volume) |
+| [arr-stack](apps/media/arr-stack) | `arr-stack` | Media automation: qBittorrent, Sonarr, Radarr, Lidarr, Scraparr, Byparr behind a Gluetun/ProtonVPN sidecar |
+| [cloudflared](apps/infra/cloudflared) | `cloudflared` | Cloudflare Tunnel daemon (2 replicas) — the only way traffic gets in |
+| [external-secrets](apps/infra/external-secrets) | `external-secrets` | External Secrets Operator (Helm) + the Infisical `ClusterSecretStore` all app secrets come from |
+| [gitlab](apps/tools/gitlab) | `gitlab` | GitLab CE (Omnibus, one pod), HTTPS git only; CI via the `gitlab-runner` Helm app in `gitlab-runner` |
+| [groepshike](apps/sites/groepshike) | `groepshike` | [groepshike.nl](https://groepshike.nl) — HIT Harderwijk Groepshike site: Next.js + Payload CMS, its own Postgres 17 and RustFS (S3) |
+| [homeassistant](apps/home/homeassistant) | `homeassistant` | Home Assistant |
+| [jotihunt](apps/sites/jotihunt) | `jotihunt` | Jotihunt 2026 tracker: web app + API, MongoDB, Traccar (OsmAnd ingest public, UI tailnet-only) |
+| [monitoring](apps/infra/monitoring) | `monitoring` | Prometheus, Grafana, Loki, Promtail, node-exporter, kube-state-metrics, NUT exporter |
+| [n8n](apps/tools/n8n) | `n8n` | n8n workflow automation |
+| [plane](apps/tools/plane) | `plane` | Plane project management (Helm chart rendered by Argo CD) + its own Postgres, Valkey, RabbitMQ and RustFS (S3) |
+| [pihole](apps/infra/pihole) | `pihole` | Pi-hole DNS ad blocking, served on port 53 of every node |
+| [stirling-pdf](apps/tools/stirling-pdf) | `stirling-pdf` | [Stirling PDF](https://www.stirlingpdf.com) — PDF toolbox (merge, split, convert, OCR), login required |
+| [portfolio](apps/sites/portfolio) | `portfolio` | [silkepilon.dev](https://silkepilon.dev) — Next.js + Payload CMS portfolio, SQLite on a Longhorn volume |
+| [t3code](apps/tools/t3code) | `t3code` | Headless [T3 Code](https://github.com/pingdotgg/t3code) server with Claude Code, so agents keep running while the desktop is off — tailnet only |
+| [twenty](apps/tools/twenty) | `twenty` | Twenty CRM + its own Postgres and Redis |
+| [windesheim-readers](apps/sites/windesheim-readers) | `windesheim-readers` | [learn.silkepilon.dev](https://learn.silkepilon.dev) — [Windesheim Readers](https://github.com/SilkePilon/windesheim-readers) study app (Bun + SQLite on a Longhorn volume) |
 
 `apps/_template/` is a skeleton, not a deployed app.
 
@@ -92,7 +92,7 @@ docs/                        # design notes
 - **Argo CD** installed in the cluster.
 - A **Cloudflare Tunnel** if you want anything reachable from outside the LAN.
 - The **SMB CSI driver** + `cifs-utils` on every node, only if you use the
-  arr-stack (it mounts a NAS share). See [apps/arr-stack/pvc.yaml](apps/arr-stack/pvc.yaml).
+  arr-stack (it mounts a NAS share). See [apps/media/arr-stack/pvc.yaml](apps/media/arr-stack/pvc.yaml).
 
 ## Bootstrap
 
@@ -121,7 +121,7 @@ kubectl apply -f bootstrap/argocd/root.yaml
 
 Secret **values** live in [Infisical Cloud](https://eu.infisical.com) (project
 `homelab`, environment `prod`, one folder per Secret). The
-[External Secrets Operator](apps/external-secrets/README.md) syncs each folder
+[External Secrets Operator](apps/infra/external-secrets/README.md) syncs each folder
 into a normal Kubernetes Secret through the `externalsecret.yaml` next to the
 app. Edit a value in the Infisical dashboard, never with `kubectl`.
 
@@ -145,7 +145,7 @@ The only hand-made secret is the bootstrap credential ESO uses to log in to
 Infisical, `infisical-universal-auth` in `external-secrets`. Keep its client
 ID and secret in a password manager: on a rebuilt cluster it is the one thing
 you create by hand, and everything below comes back on its own. See
-[apps/external-secrets/README.md](apps/external-secrets/README.md).
+[apps/infra/external-secrets/README.md](apps/infra/external-secrets/README.md).
 
 | Secret | Namespace | Infisical folder | Holds |
 | --- | --- | --- | --- |
@@ -189,8 +189,8 @@ edge, and each public hostname in the tunnel config points back at
 
 Two things deliberately skip that path. Admin UIs that control the whole
 cluster — Longhorn and Pi-hole — are exposed on the tailnet instead, via the
-Tailscale operator, and so is [t3code](apps/t3code), whose agents run shell
-commands with GitHub and Claude logins. And [pihole](apps/pihole) serves DNS on the LAN through a
+Tailscale operator, and so is [t3code](apps/tools/t3code), whose agents run shell
+commands with GitHub and Claude logins. And [pihole](apps/infra/pihole) serves DNS on the LAN through a
 `LoadBalancer`, so k3s ServiceLB claims port 53 on every node and any node IP
 works as a resolver.
 

@@ -36,7 +36,7 @@ on the node so kubelet will not reclaim it.
 
 ## 2. Scheduled image prune (GitOps)
 
-`apps/node-maintenance/image-gc.yaml` runs a DaemonSet that executes
+`apps/infra/node-maintenance/image-gc.yaml` runs a DaemonSet that executes
 `crictl rmi --prune` on every node every 6 hours. Images referenced by an
 existing container are never removed, so running workloads are unaffected.
 

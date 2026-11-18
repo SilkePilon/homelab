@@ -5,7 +5,7 @@
 ## What happened
 
 Grafana had been restarting for weeks with `database is locked (5) (SQLITE_BUSY)`.
-The probe and retry tuning in `apps/monitoring/grafana.yaml` treated the symptom.
+The probe and retry tuning in `apps/infra/monitoring/grafana.yaml` treated the symptom.
 The cause was pi52's storage.
 
 Measured from node-exporter on pi52, with all three monitoring writers already

@@ -1,0 +1,79 @@
+# ── ApplicationSet: one Argo CD Application per folder in apps/<group>/ ──────
+# Every Kustomize app in apps/<group>/<app>/ becomes an Application named
+# <app>, deployed to namespace <app>. Adding an app = adding a folder.
+#
+# Helm apps are excluded below: their chart values live in their own
+# Application file in this folder, with apps/<group>/<app>/ as an optional
+# second source for git-side extras (ExternalSecrets etc).
+#
+# Safety:
+#   - applicationsSync: create-update — removing a folder never deletes the
+#     Application; delete it by hand once you mean it.
+#   - preserveResourcesOnDeletion + no resources-finalizer — even deleting
+#     an Application (or this ApplicationSet) leaves the workloads and PVCs.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apps
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/SilkePilon/homelab
+        revision: main
+        directories:
+          - path: apps/*/*
+          # Helm apps — see their own Application file.
+          - path: apps/infra/external-secrets
+            exclude: true
+          - path: apps/infra/longhorn
+            exclude: true
+          - path: apps/infra/tailscale
+            exclude: true
+          - path: apps/tools/gitlab-runner
+            exclude: true
+          - path: apps/tools/plane
+            exclude: true
+  syncPolicy:
+    applicationsSync: create-update
+    preserveResourcesOnDeletion: true
+  template:
+    metadata:
+      name: '{{ .path.basename }}'
+      labels:
+        homelab/group: '{{ index .path.segments 1 }}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/SilkePilon/homelab
+        targetRevision: main
+        path: '{{ .path.path }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{ .path.basename }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          # ExternalSecret's CRD comes from the external-secrets app. On a
+          # fresh cluster an app can sync first; skip the dry run and retry.
+          - SkipDryRunOnMissingResource=true
+        retry:
+          limit: -1
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 10m
+      # `kubectl rollout restart` (by hand or by the gluetun-proxy job in
+      # arr-stack) is not drift.
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/template/metadata/annotations/kubectl.kubernetes.io~1restartedAt

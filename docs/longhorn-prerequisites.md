@@ -2,7 +2,7 @@
 
 Applied 2026-08-12 for Longhorn v1.12, ahead of replacing `local-path` (see
 [pi-decommission.md](pi-decommission.md#after-the-rebuild)). Longhorn is installed
-(see [`apps/longhorn/README.md`](../apps/longhorn/README.md)) and all stateful
+(see [`apps/infra/longhorn/README.md`](../apps/infra/longhorn/README.md)) and all stateful
 volumes were migrated onto it on 2026-08-12; see
 [high-availability.md](high-availability.md).
 

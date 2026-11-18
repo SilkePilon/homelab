@@ -198,7 +198,7 @@ What is in place now, on all three EliteDesks:
 
 - **kured lock never expires.** A node that does not come back keeps the lock,
   so no other node reboots until a human has looked at it.
-- **[hp-node-config](../apps/node-maintenance/hp-node-config.yaml)** (DaemonSet,
+- **[hp-node-config](../apps/infra/node-maintenance/hp-node-config.yaml)** (DaemonSet,
   amd64 nodes only) installs host config that keeps working with k3s down:
   - TSO/GSO offload off on the `e1000e` NIC (NetworkManager profile + live).
   - `nic-watchdog.timer`: hang logged + gateway unreachable means reload

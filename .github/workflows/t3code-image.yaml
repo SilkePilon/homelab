@@ -1,6 +1,6 @@
 # Builds images/t3code/ into ghcr.io/silkepilon/t3code.
 #
-# Tags: `latest` and the commit SHA. apps/t3code/deployment.yaml pins
+# Tags: `latest` and the commit SHA. apps/tools/t3code/deployment.yaml pins
 # `latest@sha256:...`; Renovate opens a PR when the digest moves. It does not
 # automerge it (see .github/renovate.json5) because a rollout kills any agent
 # turn that is running at that moment.

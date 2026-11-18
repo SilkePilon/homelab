@@ -1,0 +1,117 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Jotihunt tracker server — https://github.com/SilkePilon/jotihunt-tracker-server
+# Image: ghcr.io/silkepilon/jotihunt-tracker-server (bun; jotihunt.nl is read over
+#        plain HTTP since 0abc179; built by the repo's deploy-image.yml, amd64)
+# Port:  3000, public as https://jotihunt.silkepilon.dev/api (ingress.yaml
+#        strips the /api prefix)
+# Data:  /data (PVC jotihunt-server-data) — uploads/ + app-releases/
+#
+# Config: non-secret env in server.env (ConfigMap jotihunt-server-env, public
+# repo!), secrets from the Secret `jotihunt-secret` (NOT in git), synced from
+# Infisical folder /jotihunt/jotihunt-secret. It holds these keys:
+#   JWT_SECRET          signs web + device sessions
+#   SETTINGS_KEY        base64 of 32 random bytes; encrypts keys/passwords saved
+#                       in Beheer (Gemini key, Jotihunt login, Telegram app hash)
+#   TRACCAR_API_TOKEN   Traccar admin API token (POST /api/session/token as
+#                       the admin in Secret jotihunt-traccar-admin)
+#   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT   web push
+#   TELEGRAM_SESSION_KEY   encrypts the Telegram session (app ID/hash are set in Beheer)
+#   LIFE360_SESSION_KEY base64 of 32 random bytes; encrypts the Life360 token
+#                       (openssl rand -base64 32; without it Life360 is off)
+#   JOTIBOARD_SESSION_KEY base64 of 32 random bytes; encrypts the Jotiboard
+#                       refresh token (openssl rand -base64 32; without it the
+#                       Jotiboard sync is off)
+#   optional: ORS_API_KEY (routing), NS_API_KEY (OV in the Intel chat)
+#   Gemini key + models, Jotihunt site login and Telegram app ID/hash are set in
+#   Beheer and stored encrypted in the database (SETTINGS_KEY).
+# To change a value, edit it in Infisical, then force-sync the ExternalSecret
+# and restart the server (see apps/infra/external-secrets/README.md).
+#
+# Exactly ONE instance may run anywhere (the crons — Jotihunt API/scraper,
+# push, predictions — run in-process), hence replicas: 1 + Recreate. The
+# laptop server must stay stopped. Went live on a fresh database 2026-10-12.
+#
+# The image is built for linux/amd64 only, so the pod is restricted to the
+# amd64 nodes. Architecture constraint, not a host pin.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server
+  namespace: jotihunt
+  labels:
+    app.kubernetes.io/name: server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: server
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: server
+          image: ghcr.io/silkepilon/jotihunt-tracker-server:sha-804c675@sha256:eb3249adbac79c515b2c2e5c296f30ca98d871b81a7857855a58c04244af8311
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: jotihunt-server-env
+            - secretRef:
+                name: jotihunt-secret
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            # Headroom for the AI/photo work (no Chromium since 0abc179)
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          readinessProbe:
+            # Unauthenticated, answers without a database round trip
+            httpGet:
+              path: /push/vapid-key
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            # TCP, not HTTP: a running demo-mode switch holds HTTP requests
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 4
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: jotihunt-server-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: server
+  namespace: jotihunt
+  labels:
+    app.kubernetes.io/name: server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: server
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
