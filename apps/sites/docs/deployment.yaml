@@ -36,7 +36,7 @@ spec:
               app.kubernetes.io/name: docs
       containers:
         - name: nginx
-          image: ghcr.io/silkepilon/docs:latest
+          image: ghcr.io/silkepilon/docs:latest@sha256:eba3d911172f8ed6aec192850b873088b3a226f6bcc2c4d50969d5eb510c641d
           # :latest is moved by every push to SilkePilon/docs; the updater
           # restarts the Deployment, and Always makes the restart pull it.
           imagePullPolicy: Always
