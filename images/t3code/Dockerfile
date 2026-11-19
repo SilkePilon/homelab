@@ -19,7 +19,7 @@ ARG T3_VERSION=0.1.10
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
 ARG CLAUDE_CODE_VERSION=2.1.328
 # renovate: datasource=npm depName=bun
-ARG BUN_VERSION=1.4.4
+ARG BUN_VERSION=1.4.5
 
 # gh comes from GitHub's own apt repo; Debian's package lags by years.
 RUN set -eux; \
