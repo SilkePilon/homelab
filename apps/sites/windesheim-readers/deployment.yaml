@@ -47,7 +47,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: windesheim-readers
-          image: ghcr.io/silkepilon/windesheim-readers:latest@sha256:5abce9b276398ca187ba589f94bb88f8813401bb5e9c8d3b6235878f1ac0ce0e
+          image: ghcr.io/silkepilon/windesheim-readers:1.0.0@sha256:0c1774e6cccc5f4e5d7d5df0c26f7950f950fde1b98f27ecebde7fe363cf89ec
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
