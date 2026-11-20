@@ -34,7 +34,7 @@ spec:
       # data for rollback).
       containers:
         - name: postgres
-          image: postgres:18
+          image: postgres:19
           imagePullPolicy: IfNotPresent
           ports:
             - name: postgres
