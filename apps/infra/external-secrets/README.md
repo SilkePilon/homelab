@@ -59,7 +59,7 @@ this is the only secret you create by hand; everything else comes back.
 | `claude-oauth` | `t3code` | `/t3code` | `CLAUDE_CODE_OAUTH_TOKEN` |
 | `operator-oauth` | `tailscale` | `/tailscale` | OAuth client for the Tailscale operator (`tag:k8s-operator`) |
 | `twenty-secret` | `twenty` | `/twenty` | Postgres URL/password, app secret, encryption key |
-| `werkplekinspectie-secret` | `werkplekinspectie` | `/werkplekinspectie` | Recipient, Resend SMTP login, PDF header details (organisation, address, VGM contact), optional logo SVG |
+| `werkplekinspectie-secret` | `werkplekinspectie` | `/werkplekinspectie` | Recipient, Resend SMTP login, PDF header details (organisation, address, VGM contact), optional logo and app icon SVGs |
 | `windesheim-readers-secret` | `windesheim-readers` | `/windesheim-readers` | Session/encryption key (`APP_SECRET`, never change it), Resend key + sender |
 
 
