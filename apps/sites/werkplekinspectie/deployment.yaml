@@ -73,7 +73,7 @@ spec:
               value: "Europe/Amsterdam"
             # Public URL. Submissions with any other Origin are refused.
             - name: PUBLIC_ORIGIN
-              value: "https://werkplek.silkepilon.dev"
+              value: "https://werkplekinspectie.app"
             # Real visitor IP for the rate limits. CF-Connecting-IP is only
             # trusted from these peers; Traefik connects from the k3s pod CIDR.
             - name: TRUST_PROXY

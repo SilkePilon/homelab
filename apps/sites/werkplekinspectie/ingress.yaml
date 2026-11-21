@@ -2,7 +2,7 @@
 # Cloudflare Tunnel → Traefik → werkplekinspectie Service → Pod.
 #
 # In CF Zero Trust → Networks → Tunnels → homelab → Public Hostnames, add:
-#   Subdomain: werkplek   Domain: silkepilon.dev
+#   Subdomain: (empty)    Domain: werkplekinspectie.app
 #   Service:   HTTP       http://traefik.kube-system.svc.cluster.local:80
 #
 # One inspection is at most ~11 MB (photos + signature), well under Cloudflare's
@@ -14,6 +14,44 @@ metadata:
   namespace: werkplekinspectie
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: werkplekinspectie.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: werkplekinspectie
+                port:
+                  name: http
+---
+# The first address, werkplek.silkepilon.dev, only redirects to the new one.
+# Keep its Public Hostname in the tunnel until nobody uses the old link.
+# The app itself refuses submissions from any origin but PUBLIC_ORIGIN, so a
+# phone that still has the old address installed must open the new one.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: to-new-domain
+  namespace: werkplekinspectie
+spec:
+  redirectRegex:
+    regex: ^https?://werkplek\.silkepilon\.dev(.*)
+    replacement: https://werkplekinspectie.app${1}
+    permanent: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: werkplekinspectie-old-domain
+  namespace: werkplekinspectie
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    # <namespace>-<name>@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: werkplekinspectie-to-new-domain@kubernetescrd
 spec:
   ingressClassName: traefik
   rules:

@@ -5,7 +5,7 @@ kind: Kustomization
 namespace: werkplekinspectie
 
 # ─────────────────────────────────────────────────────────────────────────────
-# werkplekinspectie — werkplek.silkepilon.dev (PWA for field technicians: fill
+# werkplekinspectie — werkplekinspectie.app (PWA for field technicians: fill
 # in and sign the workplace inspection, mailed as a PDF; nothing is stored).
 #
 # BEFORE applying this stack:
@@ -14,7 +14,7 @@ namespace: werkplekinspectie
 #     deployment.yaml).
 #
 #  2. Add the Cloudflare Tunnel public hostname (see ingress.yaml):
-#       werkplek.silkepilon.dev → HTTP http://traefik.kube-system.svc.cluster.local:80
+#       werkplekinspectie.app → HTTP http://traefik.kube-system.svc.cluster.local:80
 #
 #  3. Push to main; Argo CD syncs it. Send one test inspection from a phone.
 # ─────────────────────────────────────────────────────────────────────────────
