@@ -1,0 +1,137 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# werkplekinspectie Deployment — https://github.com/SilkePilon/werkplekinspectie
+# Image: ghcr.io/silkepilon/werkplekinspectie  (Node + Fastify, amd64/arm64)
+# Port:  8080
+# Data:  none. Inspections are turned into a PDF, mailed, and dropped; nothing
+#        is stored, so there is no PVC.
+#
+# Secret werkplekinspectie-secret is synced from Infisical (folder
+# /werkplekinspectie, NOT committed to git). Keys:
+#
+#   MAIL_TO          the one recipient of every inspection
+#   MAIL_FROM        e.g. Werkplekinspectie <inspectie@your-verified-domain>;
+#                    must be on a domain verified in Resend
+#   SMTP_HOST        smtp.resend.com
+#   SMTP_PORT        465
+#   SMTP_SECURE      true
+#   SMTP_USER        resend
+#   SMTP_PASS        re_... Resend API key
+#   ORG_NAME         PDF header: organisation name
+#   ORG_ADDRESS      PDF header: address, lines separated by \n
+#   ORG_DEPARTMENT   PDF header: department (default "Customer Care")
+#   VGM_NAME         name of the safety (VGM) contact on the form
+#
+#   Optional logo in the PDF header — add BOTH or neither:
+#   LOGO_SVG         the logo's SVG source (mounted as /config/logo.svg)
+#   BRAND_LOGO_FILE  /config/logo.svg
+#   (BRAND_LOGO_FILE without LOGO_SVG stops the app at startup on purpose.)
+#
+# A missing required key makes the pod exit with one line per problem in its
+# log, e.g. `MAIL_TO: is verplicht`. Values are never logged.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: werkplekinspectie
+  namespace: werkplekinspectie
+  labels:
+    app.kubernetes.io/name: werkplekinspectie
+spec:
+  # One pod only: rate limits and the list of already-sent inspections are kept
+  # in memory. Recreate, not RollingUpdate: two pods side by side would each
+  # have their own list, so a retried send could produce a second mail.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: werkplekinspectie
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: werkplekinspectie
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # The image runs as the built-in "node" user (UID 1000).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: werkplekinspectie
+          image: ghcr.io/silkepilon/werkplekinspectie:latest@sha256:e93da57bdfdb3152893e6237554c824cc1b02d3117a3b03724ceca4d19caecf1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: TZ
+              value: "Europe/Amsterdam"
+            # Public URL. Submissions with any other Origin are refused.
+            - name: PUBLIC_ORIGIN
+              value: "https://werkplek.silkepilon.dev"
+            # Real visitor IP for the rate limits. CF-Connecting-IP is only
+            # trusted from these peers; Traefik connects from the k3s pod CIDR.
+            - name: TRUST_PROXY
+              value: "10.42.0.0/16"
+            # Abuse limits (these are the app defaults, spelled out).
+            - name: RATE_LIMIT_PER_IP
+              value: "5"
+            - name: RATE_LIMIT_WINDOW
+              value: "15 minutes"
+            - name: RATE_LIMIT_GLOBAL_PER_HOUR
+              value: "20"
+          envFrom:
+            - secretRef:
+                name: werkplekinspectie-secret
+          volumeMounts:
+            # Root filesystem is read-only; pdfkit/nodemailer may write here.
+            - name: tmp
+              mountPath: /tmp
+            - name: branding
+              mountPath: /config
+              readOnly: true
+          resources:
+            # One 11 MB inspection costs ~50 MB; the app handles at most 2 at
+            # a time (then 429), with headroom for pdfkit peaks.
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        # The logo from the same Secret. optional: no LOGO_SVG key → empty /config.
+        - name: branding
+          secret:
+            secretName: werkplekinspectie-secret
+            optional: true
+            items:
+              - key: LOGO_SVG
+                path: logo.svg
