@@ -109,5 +109,18 @@
       ],
       enabled: false,
     },
+    {
+      description: 'Postgres majors need a pg_upgrade of the data dir; a plain tag bump crash-loops the DB (#256). Upgrade by hand.',
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'postgres',
+      ],
+      matchUpdateTypes: [
+        'major',
+      ],
+      enabled: false,
+    },
   ],
 }
