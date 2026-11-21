@@ -116,7 +116,7 @@ spec:
         runAsUser: 1000
       containers:
         - name: create-bucket
-          image: amazon/aws-cli:2.41.2
+          image: amazon/aws-cli:2.42.0
           env:
             - name: HOME
               value: /tmp
