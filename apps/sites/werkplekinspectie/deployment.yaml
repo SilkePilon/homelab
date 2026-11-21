@@ -69,7 +69,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: werkplekinspectie
-          image: ghcr.io/silkepilon/werkplekinspectie:latest@sha256:5a1372a0b6e8ecfb3fb4e576b767f2950b4e0d77c2f074939beceb6add875b56
+          image: ghcr.io/silkepilon/werkplekinspectie:latest@sha256:af1d595b17128d708699005c1847749c974ec5953383d079b60414acf709d7c7
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
