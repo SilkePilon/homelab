@@ -61,7 +61,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: t3code
-          image: ghcr.io/silkepilon/t3code:latest@sha256:8fb992ef50b5ecd67abcb077838cc6cfb37f0605fab2c4ca62e71e41b178de04
+          image: ghcr.io/silkepilon/t3code:latest@sha256:edb2fabaab8c338ee3b7c5ebc3a6664d181796c1d2b464a6aa1146e74b1be116
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
