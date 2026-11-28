@@ -44,8 +44,9 @@ spec:
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "/etc/runner/start.sh"]
           env:
-            # In-cluster, so polling and log uploads never go out through
-            # Cloudflare. Jobs themselves clone from ROOT_URL.
+            # In-cluster, so nothing goes out through Cloudflare (and its
+            # 100 MB body limit). Jobs get this as github.server_url too, so
+            # actions/checkout clones from here as well.
             - name: FORGEJO_URL
               value: http://forgejo.forgejo.svc.cluster.local:3000/
             - name: DOCKER_HOST
