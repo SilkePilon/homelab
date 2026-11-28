@@ -1,0 +1,26 @@
+homelab: Forgejo's logo at 24px instead of 32px, centred in the same 32px
+slot so the navbar does not shift.
+
+diff --git a/styles/components/navbar.ts b/styles/components/navbar.ts
+index 29d59d2..30c25b7 100644
+--- a/styles/components/navbar.ts
++++ b/styles/components/navbar.ts
+@@ -113,13 +113,16 @@ const navbarRight = css`
+           min-height: 32px;
+           margin-left: 4px;
+           padding: 0;
++          align-items: center;
++          justify-content: center;
+           &:hover {
+             background: unset;
+             box-shadow: none;
+           }
++          /* homelab: Forgejo's mark at 24px in the 32px slot */
+           img {
+-            height: 32px;
+-            width: 32px;
++            height: 24px;
++            width: 24px;
+           }
+         }
+       }

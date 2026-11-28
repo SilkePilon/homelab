@@ -110,6 +110,14 @@
       enabled: false,
     },
     {
+      description: 'The Forgejo GitHub theme ships page layouts for one exact Forgejo release (images/forgejo-theme). Bump Forgejo and the theme together, by hand; a lone Forgejo bump drops the theme to CSS only.',
+      matchPackageNames: [
+        'codeberg.org/forgejo/forgejo',
+        'whereareiam/forgejo-github-theme',
+      ],
+      automerge: false,
+    },
+    {
       description: 'Postgres majors need a pg_upgrade of the data dir; a plain tag bump crash-loops the DB (#256). Upgrade by hand.',
       matchDatasources: [
         'docker',
