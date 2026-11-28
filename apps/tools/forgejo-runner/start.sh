@@ -16,4 +16,7 @@ server:
       token_url: file:/secrets/RUNNER_SECRET
 CONF
 until [ -S /run/dind/docker.sock ]; do echo "waiting for docker..."; sleep 2; done
+# The daemon exits if Forgejo is down; wait instead of crash-looping into
+# a long back-off after a cluster restart.
+until wget -q -O /dev/null "${FORGEJO_URL}api/healthz"; do echo "waiting for forgejo..."; sleep 5; done
 exec forgejo-runner daemon --config /data/config.yml
