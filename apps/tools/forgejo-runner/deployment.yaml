@@ -1,0 +1,119 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# forgejo-runner — polls Forgejo for jobs and runs each one as a container in
+# the `dind` sidecar (Docker-in-Docker). dind must be privileged; the runner
+# itself is not. Image cache and job data are emptyDirs: a restart re-pulls.
+#
+# dind listens on a unix socket in a shared emptyDir only. It is started with
+# an explicit `dockerd` so the image's entrypoint does not add its default
+# unauthenticated tcp://0.0.0.0:2375, which would hand every pod in the
+# cluster a root shell on this node.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forgejo-runner
+  namespace: forgejo-runner
+  labels:
+    app.kubernetes.io/name: forgejo-runner
+spec:
+  # One registration = one runner. Scale with `capacity` in config.yml.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: forgejo-runner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: forgejo-runner
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # Most CI images are amd64-first, and the Pis share a power supply that
+      # browns out under sustained load.
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      securityContext:
+        fsGroup: 1000
+      # Matches shutdown_timeout in config.yml, plus a margin.
+      terminationGracePeriodSeconds: 660
+      containers:
+        - name: runner
+          image: code.forgejo.org/forgejo/runner:13.2.2
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "/etc/runner/start.sh"]
+          env:
+            # In-cluster, so polling and log uploads never go out through
+            # Cloudflare. Jobs themselves clone from ROOT_URL.
+            - name: FORGEJO_URL
+              value: http://forgejo.forgejo.svc.cluster.local:3000/
+            - name: DOCKER_HOST
+              value: unix:///run/dind/docker.sock
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: config
+              mountPath: /etc/runner
+            - name: secret
+              mountPath: /secrets
+              readOnly: true
+            - name: runner-data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+            - name: dind-sock
+              mountPath: /run/dind
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 1Gi
+
+        - name: dind
+          image: docker:29.10.1-dind
+          imagePullPolicy: IfNotPresent
+          args:
+            - dockerd
+            - --host=unix:///run/dind/docker.sock
+            # Socket group = the runner's gid, so the non-root runner can use it.
+            - --group=1000
+            # Pod network MTU is 1450 (flannel VXLAN). Docker's default 1500
+            # makes TLS downloads inside jobs hang.
+            - --mtu=1450
+            - --default-network-opt=bridge=com.docker.network.driver.mtu=1450
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: dind-sock
+              mountPath: /run/dind
+            - name: docker-data
+              mountPath: /var/lib/docker
+          # Jobs run inside this container, so these are the jobs' limits.
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+      volumes:
+        - name: config
+          configMap:
+            name: forgejo-runner
+        - name: secret
+          secret:
+            secretName: forgejo-runner-secret
+        - name: runner-data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: dind-sock
+          emptyDir: {}
+        - name: docker-data
+          emptyDir: {}

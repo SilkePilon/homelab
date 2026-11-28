@@ -44,8 +44,8 @@ this is the only secret you create by hand; everything else comes back.
 | `protonvpn-wg-byparr` | `arr-stack` | `/arr-stack/protonvpn-wg-byparr` | WireGuard key for the byparr Gluetun sidecar (separate key on purpose) |
 | `scraparr-api-keys` | `arr-stack` | `/arr-stack/scraparr-api-keys` | Sonarr/Radarr/Lidarr API keys |
 | `qbittorrent-creds` | `arr-stack` | `/arr-stack/qbittorrent-creds` | qBittorrent web UI login (not mounted, kept for reference) |
-| `gitlab-secret` | `gitlab` | `/gitlab` | GitLab root password (`GITLAB_ROOT_PASSWORD`), only read on an empty volume |
-| `gitlab-runner-secret` | `gitlab-runner` | `/gitlab-runner` | Instance runner token (`runner-token`, plus empty `runner-registration-token`) |
+| `forgejo-secret` | `forgejo` | `/forgejo` | `SECRET_KEY`, first-login `ADMIN_PASSWORD`, `RUNNER_SECRET` |
+| `forgejo-runner-secret` | `forgejo-runner` | `/forgejo` | Only `RUNNER_SECRET` (same value, filtered by name) |
 | `grafana-admin-creds` | `monitoring` | `/monitoring/grafana-admin-creds` | Grafana admin login |
 | `groepshike-secret` | `groepshike` | `/groepshike` | Postgres + `DATABASE_URL`, `PAYLOAD_SECRET`, RustFS keys, optional `SITE_PASSWORD`, SMTP login |
 | `jotihunt-secret` | `jotihunt` | `/jotihunt/jotihunt-secret` | JWT secret, Traccar API token, VAPID keys, Telegram + Life360 + Jotiboard session keys, NS key, `SETTINGS_KEY` (encrypts the Gemini key and login saved in Beheer), optional `ORS_API_KEY` |

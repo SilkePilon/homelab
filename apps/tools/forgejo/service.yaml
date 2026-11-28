@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: forgejo
+  namespace: forgejo
+  labels:
+    app.kubernetes.io/name: forgejo
+spec:
+  # ClusterIP only. The web UI and HTTPS git go through the Ingress; the
+  # runner in `forgejo-runner` polls http://forgejo.forgejo.svc.cluster.local:3000.
+  # No SSH port — git over SSH is off.
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: forgejo
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

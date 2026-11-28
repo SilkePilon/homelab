@@ -1,0 +1,16 @@
+# ── Forgejo PVC ───────────────────────────────────────────────────────────────
+# /var/lib/gitea — everything: repositories, LFS, packages, Actions logs and
+# artifacts, the SQLite database, and custom/conf/app.ini (which holds the
+# generated INTERNAL_TOKEN and JWT secrets). Longhorn, so the pod is not tied
+# to one node and the volume can be expanded later.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: forgejo-data
+  namespace: forgejo
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 20Gi
