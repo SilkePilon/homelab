@@ -1,0 +1,361 @@
+Fixes from upstream lutinglt/gitea-github-theme (main @ 356b195, 2026-11-24)
+that whereareiam/forgejo-github-theme 1.6.0 does not have yet. The fork split
+off at upstream 1.27.0 (7c20142) and has since rewritten most pages for
+Forgejo's markup, so these are ported by hand, not cherry-picked. Upstream
+commits that target Gitea-only markup (Actions list, branch tabs, org RSS
+button, Gitea 1.25 adaptation) are left out: the fork has its own templates
+for those pages.
+
+  990ce72  pink: restore the primary button colour; dropdown menus above the diff box
+  44ba08e  pink: background and border contrast like GitHub
+  827d664  catppuccin: text, label and underline colours closer to GitHub
+  04468aa  snappier overlay animation (120ms, 6px); no slide-in per branch or log step;
+           PR branch label padding
+  7188497  tooltips placed above slide up; PR popup opens in 80ms
+  d3f5fbe
+  a94c604  high-contrast: outline on the repo name on hover
+  279db3c  small and tiny buttons 28px; settings header button padding
+  cc9eb94  admin settings buttons use the normal padding; code copy button 28x28
+  6be4719  pagination: background on hover instead of a border
+  0fe8140  the active-tab underline does not catch clicks
+
+Applied with `patch -p1 -F0` in ../Dockerfile, so any hunk that no longer
+matches fails the build instead of landing in the wrong place.
+diff --git a/src/core/theme.ts b/src/core/theme.ts
+index b0a7184..5ce7899 100644
+--- a/src/core/theme.ts
++++ b/src/core/theme.ts
+@@ -121,11 +121,11 @@ export function createTheme(theme: Theme): void {
+     "100%": { opacity: 1 },
+   });
+   globalKeyframes(selectors.overlayAppearDown, {
+-    "0%": { opacity: 0, transform: "translateY(-8px)" },
++    "0%": { opacity: 0, transform: "translateY(-6px)" },
+     "100%": { opacity: 1, transform: "translateY(0)" },
+   });
+   globalKeyframes(selectors.overlayAppearUp, {
+-    "0%": { opacity: 0, transform: "translateY(8px)" },
++    "0%": { opacity: 0, transform: "translateY(6px)" },
+     "100%": { opacity: 1, transform: "translateY(0)" },
+   });
+   // 代码高亮
+diff --git a/src/palette/catppuccin.ts b/src/palette/catppuccin.ts
+index b0eac60..a70591a 100644
+--- a/src/palette/catppuccin.ts
++++ b/src/palette/catppuccin.ts
+@@ -96,11 +96,11 @@ export function catppuccin2ThemeColor(flavor: CatppuccinFlavor): ThemeColor {
+       self: flavor.colors.text.hex,
+       light: {
+         self: flavor.colors.subtext1.hex,
+-        num1: flavor.colors.subtext1.hex,
+-        num2: flavor.colors.subtext1.hex,
+-        num3: flavor.colors.subtext1.hex,
++        num1: flavor.colors.subtext0.hex,
++        num2: flavor.colors.subtext0.hex,
++        num3: flavor.colors.subtext0.hex,
+       },
+-      dark: flavor.colors.subtext0.hex,
++      dark: flavor.colors.text.hex,
+     },
+     footer: flavor.colors.mantle.hex,
+     timeline: flavor.colors.surface0.hex,
+@@ -141,7 +141,7 @@ export function catppuccin2ThemeColor(flavor: CatppuccinFlavor): ThemeColor {
+     secondaryNavBg: themeVars.color.body,
+     label: {
+       text: flavor.colors.text.hex,
+-      bg: rgba(flavor.colors.surface0.hex, 0.4),
++      bg: rgba(flavor.colors.surface0.hex, 0.8),
+       hoverBg: rgba(flavor.colors.surface2.hex, 0.2),
+       activeBg: rgba(flavor.colors.overlay0.hex, 0.5),
+     },
+@@ -235,7 +235,7 @@ export function catppuccin2ThemeColor(flavor: CatppuccinFlavor): ThemeColor {
+         medium: `drop-shadow(0 1px 1px ${flavor.colors.crust.hex}) drop-shadow(0 3px 6px ${flavor.colors.crust.hex})`,
+       },
+     },
+-    underlineNav: { borderColor: { active: accentColor } },
++    underlineNav: { borderColor: { active: flavor.colors.peach.hex } },
+     contribution: {
+       default: {
+         bgColor: {
+diff --git a/src/palette/display.ts b/src/palette/display.ts
+index a8d17b8..551c4d4 100644
+--- a/src/palette/display.ts
++++ b/src/palette/display.ts
+@@ -19,7 +19,7 @@
+ 
+ import type { Primer } from "@lutinglt/gitea-github-theme/primer";
+ import { saturate } from "color2k";
+-import { scaleColorLight } from "../functions";
++import { rgba, scaleColorLight } from "../functions";
+ import { deepOverride } from "../utils";
+ import type { GitHubColor } from "./github";
+ 
+@@ -36,29 +36,11 @@ export function display2GitHubColor(
+     bgColor: {
+       accent: {
+         emphasis: soft ? saturate(scaleColorLight(displayColor[5], -2), -0.1) : displayColor[5],
+-        muted: soft ? displayColor[1] : displayColor[0],
++        muted: rgba(displayColor[5], 0.15),
+       },
+     },
+-    borderColor: { accent: { emphasis: soft ? displayColor[6] : displayColor[5] } },
++    borderColor: { accent: { emphasis: soft ? displayColor[6] : displayColor[5], muted: rgba(displayColor[5], 0.4) } },
+     button: {
+-      primary: {
+-        fgColor: {
+-          rest: baseGitHubColor.button.primary.fgColor.rest,
+-        },
+-        bgColor: {
+-          rest: soft ? saturate(scaleColorLight(displayColor[5], -2), -0.1) : displayColor[5],
+-          hover: soft
+-            ? saturate(scaleColorLight(displayColor[5], 4), -0.1)
+-            : baseGitHubColor.isDarkTheme
+-              ? scaleColorLight(displayColor[5], 7)
+-              : scaleColorLight(displayColor[5], -5),
+-          active: soft
+-            ? saturate(scaleColorLight(displayColor[5], 9), -0.1)
+-            : baseGitHubColor.isDarkTheme
+-              ? scaleColorLight(displayColor[5], 15)
+-              : scaleColorLight(displayColor[5], -10),
+-        },
+-      },
+       star: {
+         iconColor: soft ? scaleColorLight(displayColor[6], -2) : saturate(scaleColorLight(displayColor[6], -2), 0.1),
+       },
+@@ -80,6 +62,5 @@ export function display2GitHubColor(
+         borderColor: baseGitHubColor.contribution.default.borderColor,
+       },
+     },
+-    themeExtra: { button: { primary: { fgColor: { accent: soft ? displayColor[7] : displayColor[6] } } } },
+   });
+ }
+diff --git a/styles/common/animation.ts b/styles/common/animation.ts
+index c684b9f..401bef4 100644
+--- a/styles/common/animation.ts
++++ b/styles/common/animation.ts
+@@ -30,13 +30,13 @@ export const animation = cssStyle({
+ // 向下出现动画
+ export const animationDown = cssStyle({
+   animation: selectors.overlayAppearDown,
+-  animationDuration: "200ms",
++  animationDuration: "120ms",
+   animationTimingFunction: "cubic-bezier(0.33, 1, 0.68, 1)",
+ });
+ 
+ // 向上出现动画
+ export const animationUp = cssStyle({
+   animation: selectors.overlayAppearUp,
+-  animationDuration: "200ms",
++  animationDuration: "120ms",
+   animationTimingFunction: "cubic-bezier(0.33, 1, 0.68, 1)",
+ });
+diff --git a/styles/components/actions/workflow_steps.ts b/styles/components/actions/workflow_steps.ts
+index f30f1a4..f79effa 100644
+--- a/styles/components/actions/workflow_steps.ts
++++ b/styles/components/actions/workflow_steps.ts
+@@ -18,7 +18,6 @@
+  */
+ 
+ import { css, cssCombine, otherThemeVars, themeVars } from "@lutinglt/gitea-github-theme/core";
+-import { animationDown } from "@lutinglt/gitea-github-theme/styles/common";
+ 
+ const jobDetails = css`
+   .action-view-right {
+@@ -69,7 +68,6 @@ const jobDetails = css`
+           }
+         }
+         .job-step-logs {
+-          ${animationDown};
+           .job-log-line {
+             color: ${themeVars.color.console.fg.self};
+             .log-msg:hover {
+diff --git a/styles/components/issues/issue.ts b/styles/components/issues/issue.ts
+index b97113d..127a150 100644
+--- a/styles/components/issues/issue.ts
++++ b/styles/components/issues/issue.ts
+@@ -83,13 +83,13 @@ const prBranch = css`
+     border-radius: ${otherThemeVars.border.radius};
+     font-family: var(--fonts-monospace);
+     font-size: 12px;
+-    padding: 0 5px;
++    padding: 0 6px;
+     line-height: 18px;
+   }
+ 
+   .repository.view.issue .pull-desc code {
+-    padding-top: 3px;
+-    padding-bottom: 3px;
++    padding-top: 4px;
++    padding-bottom: 4px;
+     a:hover {
+       text-decoration-line: none;
+     }
+diff --git a/styles/components/repo/repo.ts b/styles/components/repo/repo.ts
+index 2159bfd..55bdb5b 100644
+--- a/styles/components/repo/repo.ts
++++ b/styles/components/repo/repo.ts
+@@ -45,6 +45,7 @@ const repoHeader = css`
+           margin-bottom: 8px;
+           &:hover {
+             background: ${themeVars.github.control.transparent.bgColor.hover};
++            box-shadow: inset 0 0 0 1px ${themeVars.github.control.transparent.borderColor.active};
+           }
+           &.muted:not(.tw-font-normal) {
+             font-weight: 600;
+diff --git a/styles/components/setting.ts b/styles/components/setting.ts
+index 81f6527..3524b56 100644
+--- a/styles/components/setting.ts
++++ b/styles/components/setting.ts
+@@ -60,9 +60,7 @@ const button = css`
+     .ui.attached.header > .ui.right {
+       .ui.primary.button.tiny {
+         ${primaryButtonStyle}
+-        padding: 3px 12px;
+-        min-height: 20px;
+-        line-height: 20px;
++        padding: 0 12px;
+         &:hover {
+           ${primaryButtonHoverStyle}
+         }
+@@ -76,8 +74,6 @@ const button = css`
+   .admin-setting-content {
+     .ui.primary.button {
+       ${tinyStyle}
+-      padding: 5px 16px;
+-      line-height: 22px;
+       box-shadow: none;
+       &:hover {
+         ${tinyHoverStyle}
+@@ -91,10 +87,6 @@ const button = css`
+         color: ${themeVars.github.button.primary.fgColor.rest};
+       }
+     }
+-    .ui.red.button {
+-      padding: 5px 16px;
+-      line-height: 22px;
+-    }
+     .button:is(.primary, .danger):not(.ui) {
+       gap: 8px;
+       line-height: 22px;
+diff --git a/styles/public/button.ts b/styles/public/button.ts
+index bab9230..1ad45f5 100644
+--- a/styles/public/button.ts
++++ b/styles/public/button.ts
+@@ -149,7 +149,7 @@ const fixButtonHeight = css`
+   /* 修复一些主色调或者其他小按钮的高度避免过高 */
+   .ui.small.buttons .button,
+   .ui.ui.ui.ui.small.button {
+-    min-height: 26px;
++    min-height: 28px;
+     height: 32px;
+   }
+   /* 修复仓库页仓库操作按钮高度对齐和修正 */
+@@ -169,7 +169,7 @@ const fixButtonHeight = css`
+   }
+   .ui.ui.ui.ui.small.button.compact .ui.tiny.buttons .button,
+   .ui.ui.ui.ui.tiny.button {
+-    min-height: 20px;
++    min-height: 28px;
+   }
+ `;
+ 
+@@ -180,8 +180,10 @@ const fixButton = css`
+   }
+   /* 代码复制按钮 */
+   .ui.button.code-copy {
+-    padding: 4px 6px;
++    padding: 0;
+     min-height: 28px;
++    height: 28px;
++    width: 28px;
+   }
+ `;
+ 
+diff --git a/styles/public/dropdown/branch_dropdown.ts b/styles/public/dropdown/branch_dropdown.ts
+index 8bb865c..adfd74e 100644
+--- a/styles/public/dropdown/branch_dropdown.ts
++++ b/styles/public/dropdown/branch_dropdown.ts
+@@ -18,7 +18,6 @@
+  */
+ 
+ import { css, cssCombine, customThemeVars, otherThemeVars, themeVars } from "@lutinglt/gitea-github-theme/core";
+-import { animationDown } from "@lutinglt/gitea-github-theme/styles/common";
+ import { fallbackVar } from "@vanilla-extract/css";
+ 
+ // 分支菜单
+@@ -27,7 +26,6 @@ const branchDropdown = css`
+     width: ${fallbackVar(customThemeVars.branchMenuWidth, "320px")};
+     max-width: 640px;
+     > .scrolling.menu > .item {
+-      ${animationDown};
+       height: 32px;
+     }
+     padding: 0;
+diff --git a/styles/public/menu/pagination_menu.ts b/styles/public/menu/pagination_menu.ts
+index 82f8c5f..8bc20ae 100644
+--- a/styles/public/menu/pagination_menu.ts
++++ b/styles/public/menu/pagination_menu.ts
+@@ -43,8 +43,7 @@ const paginationMenu = css`
+       &:not(.active) {
+         border: 1px solid #ffffff00;
+         &:hover {
+-          background: unset;
+-          border-color: ${themeVars.color.secondary.self};
++          background: ${themeVars.github.control.transparent.bgColor.hover};
+         }
+       }
+       &.navigation {
+diff --git a/styles/public/menu/secondary_menu.ts b/styles/public/menu/secondary_menu.ts
+index a267fe0..6de0ebe 100644
+--- a/styles/public/menu/secondary_menu.ts
++++ b/styles/public/menu/secondary_menu.ts
+@@ -70,6 +70,7 @@ const secondaryMenu = css`
+         border-radius: ${otherThemeVars.border.radius};
+         bottom: calc(50% - 1.8rem);
+         height: 2px;
++        pointer-events: none;
+         position: absolute;
+         right: 50%;
+         transform: translate(50%, -50%);
+diff --git a/styles/public/tippy.ts b/styles/public/tippy.ts
+index 59e5615..7dacf11 100644
+--- a/styles/public/tippy.ts
++++ b/styles/public/tippy.ts
+@@ -18,7 +18,7 @@
+  */
+ 
+ import { css, cssCombine, otherThemeVars, themeVars } from "@lutinglt/gitea-github-theme/core";
+-import { animation, animationDown } from "@lutinglt/gitea-github-theme/styles/common";
++import { animation, animationDown, animationUp } from "@lutinglt/gitea-github-theme/styles/common";
+ 
+ // 一些界面内的提示框, 比如克隆按钮, PR信息, Runner信息 等
+ const tippyBox = css`
+@@ -27,6 +27,13 @@ const tippyBox = css`
+     border-radius: ${otherThemeVars.border.radius};
+     overflow: hidden;
+     ${animationDown};
++    &[data-placement*="top"] {
++      ${animationUp};
++    }
++    /* PR 提示框 */
++    &[role="dialog"] {
++      animation-duration: 80ms;
++    }
+     /* 克隆菜单和PR提示框为 default */
+     &[data-theme="default"],
+     /* 带标题的提示框 (Runner信息) */
+diff --git a/styles/public/transition.ts b/styles/public/transition.ts
+index 5eda4d5..1ab2242 100644
+--- a/styles/public/transition.ts
++++ b/styles/public/transition.ts
+@@ -90,8 +90,9 @@ const transition = css`
+       transform: translateY(0.5px);
+     }
+     /* 下拉图标的过渡会导致在下移过程中出现的菜单被短暂遮挡 */
++    /* Above .repository .diff-detail-box, or that parent's stacking context hides the menu */
+     &.dropdown {
+-      z-index: 1;
++      z-index: 9;
+     }
+     /* A transformed button becomes the positioning parent of its own menu, so the menu
+        opened under the button and jumped once the press transition ended. */

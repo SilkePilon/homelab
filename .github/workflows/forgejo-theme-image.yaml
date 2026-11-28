@@ -1,0 +1,51 @@
+# Builds images/forgejo-theme/ into ghcr.io/silkepilon/forgejo-theme: the
+# GitHub theme for Forgejo with our patches, as a data-only image.
+#
+# Tags: `latest` and the commit SHA. apps/tools/forgejo/deployment.yaml pins
+# `latest@sha256:...`; Renovate bumps the digest when this rebuilds.
+name: Forgejo theme image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - images/forgejo-theme/**
+      - .github/workflows/forgejo-theme-image.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ghcr.io/silkepilon/forgejo-theme
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long,prefix=
+
+      # amd64 only: Forgejo is pinned to the EliteDesks.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: images/forgejo-theme
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
