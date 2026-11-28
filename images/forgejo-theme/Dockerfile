@@ -17,7 +17,7 @@
 # Built by .github/workflows/forgejo-theme-image.yaml on every push that
 # touches this directory.
 # ─────────────────────────────────────────────────────────────────────────────
-FROM oven/bun:1.4.0 AS build
+FROM oven/bun:1.4.5 AS build
 
 # A theme release supports exactly one Forgejo release (package.json
 # "forgejo"). Bump it together with the Forgejo image, and re-check
