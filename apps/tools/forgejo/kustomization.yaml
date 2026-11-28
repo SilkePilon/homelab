@@ -30,15 +30,6 @@ resources:
   - ingress.yaml
   - externalsecret.yaml
 
-# The homelab theme. Hashed name, so editing the CSS rolls the pod; binary
-# fonts land in binaryData automatically.
-configMapGenerator:
-  - name: forgejo-theme
-    files:
-      - theme/theme-homelab.css
-      - theme/inter-latin-wght-normal.woff2
-      - theme/jetbrains-mono-latin-wght-normal.woff2
-
 labels:
   - pairs:
       app.kubernetes.io/part-of: homelab

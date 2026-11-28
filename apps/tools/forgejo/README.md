@@ -90,31 +90,58 @@ CI. Do not enable Actions on repos that take pull requests from strangers.
 
 ## Theme
 
-The default theme is `homelab` ([theme/theme-homelab.css](theme/theme-homelab.css)):
+[GitHub theme for Forgejo](https://github.com/whereareiam/forgejo-github-theme)
+(Apache-2.0): GitHub's colours and also its page layouts, such as the repo
+home, PRs, diffs, Actions and settings. The default is `github-dark`; every
+variant (light, auto, soft dark, high contrast, colour blind, pink,
+catppuccin) can be picked under **Settings → Appearance**. Forgejo's own
+themes are not offered, because the GitHub layouts are only styled by the
+github-* themes.
 
-- The README's monochrome palette with GitHub-style components: 6px corners,
-  borderless filled buttons, counters as pills inside buttons, and segmented
-  controls.
-- Inter and JetBrains Mono are served from Forgejo itself
-  ([licence](theme/OFL.txt)).
-- The Forgejo logo is kept, slightly smaller.
+It is built from source in [`images/forgejo-theme`](../../../images/forgejo-theme)
+into `ghcr.io/silkepilon/forgejo-theme`, with the patches in
+[`patches/`](../../../images/forgejo-theme/patches) on top:
 
-It is CSS only and builds on `forgejo-dark`, with no template overrides, so an
-upgrade can at worst make a detail look stock again. The built-in
-`forgejo-auto/light/dark` stay selectable under **Settings → Appearance**.
+- `upstream-fixes.patch`: fixes from the theme's upstream,
+  [lutinglt/gitea-github-theme](https://github.com/lutinglt/gitea-github-theme),
+  that the Forgejo fork does not have yet. The patch header lists them.
+- `smaller-logo.patch`: Forgejo's logo at 24px instead of 32px.
 
-To change it, edit the CSS and push. The ConfigMap name is hashed, so the pod
-restarts and the `theme` init container copies the new files to
-`custom/public/assets`. A user's theme is stored per account: the default only
-applies to new accounts and logged-out visitors.
+Two init containers install it on every start. They replace
+`custom/templates` and `custom/public/assets` on the volume, so do not keep
+anything else there:
+
+1. `theme-files` copies the image's files out.
+2. `theme` runs in the Forgejo image and compares the running release with
+   the one the layouts were made for (`FORGEJO_VERSION` in the image). The
+   layouts are installed only when the two match. Otherwise the log says
+   `CSS only, layouts skipped`, and Forgejo runs with stock pages and GitHub
+   colours. A mismatched template could break pages or stop Forgejo from
+   starting.
+
+To change the theme, edit or add a patch and push. The workflow rebuilds the
+image and Renovate bumps the digest in [deployment.yaml](deployment.yaml).
+A patch that no longer applies fails the build.
 
 ## Upgrades
 
-Renovate bumps patch and minor releases of both images on its own. Forgejo
-majors come every ~3 months, run DB migrations and cannot be rolled back:
-read the [release notes](https://codeberg.org/forgejo/forgejo/releases),
-snapshot the `forgejo-data` Longhorn volume, then merge. Bump the server tag
-in both containers of [deployment.yaml](deployment.yaml).
+Renovate opens PRs for Forgejo and the theme but does not merge them: a
+theme release supports exactly one Forgejo release. To upgrade:
+
+1. Wait for a theme release for the new Forgejo version. Its release notes
+   name the version.
+2. Bump `THEME_VERSION` in
+   [`images/forgejo-theme/Dockerfile`](../../../images/forgejo-theme/Dockerfile).
+   Drop the hunks of `upstream-fixes.patch` the fork has picked up, and
+   rebuild.
+3. Bump the Forgejo tag in all three containers of
+   [deployment.yaml](deployment.yaml) (`theme`, `forgejo`, `setup`), along
+   with the new image digest.
+
+Forgejo majors come every ~3 months, run DB migrations and cannot be rolled
+back: read the [release notes](https://codeberg.org/forgejo/forgejo/releases)
+and snapshot the `forgejo-data` Longhorn volume first. The runner image still
+updates on its own.
 
 ## Backups
 
