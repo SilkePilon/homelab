@@ -42,5 +42,5 @@ RUN THEME_VERSION="${THEME_VERSION}+homelab" bun run bundle \
  && bun -e 'console.log(require("./package.json").forgejo)' > dist/forgejo/FORGEJO_VERSION \
  && cp LICENSE NOTICE dist/forgejo/
 
-FROM busybox:1.37
+FROM busybox:1.38
 COPY --from=build /src/dist/forgejo /theme
