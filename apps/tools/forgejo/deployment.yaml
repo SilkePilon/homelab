@@ -7,11 +7,15 @@
 # env wins over anything edited in that file. Cheat sheet:
 #   https://forgejo.org/docs/latest/admin/config-cheat-sheet/
 #
-# Theme: theme/ (see theme/theme-homelab.css), the `homelab` default.
+# Theme: the GitHub theme, ghcr.io/silkepilon/forgejo-theme (built from
+# images/forgejo-theme/), installed by the two `theme*` init containers.
 #
-# Upgrades: Renovate bumps patch/minor releases on its own. Majors (every ~3
-# months) run DB migrations and cannot be rolled back — read the release
-# notes and snapshot the Longhorn volume first. The tag appears three times
+# Upgrades: by hand (Renovate opens the PR but does not merge it), because the
+# theme's page layouts are made for one exact Forgejo release. Bump the theme
+# in images/forgejo-theme/Dockerfile to the release for the new Forgejo first;
+# a mismatch is not fatal, the theme then runs as CSS only. Majors (every ~3
+# months) run DB migrations and cannot be rolled back — read the release notes
+# and snapshot the Longhorn volume first. The Forgejo tag appears three times
 # below (theme, forgejo, setup); keep them equal.
 #
 # Secret: forgejo-secret (see externalsecret.yaml)
@@ -51,11 +55,30 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
       terminationGracePeriodSeconds: 60
       initContainers:
-        # Copies the theme (CSS + fonts) from the forgejo-theme ConfigMap to
-        # custom/public/assets on the volume, where Forgejo serves /assets/.
-        # Not a direct ConfigMap mount: on an empty volume that would make the
-        # kubelet create custom/ as root, and the image's setup script then
-        # fails to chmod it.
+        # ── theme ────────────────────────────────────────────────────────────
+        # 1. theme-files: the theme image is data only; copy it out.
+        - name: theme-files
+          image: ghcr.io/silkepilon/forgejo-theme:latest@sha256:206b5f15bc454607619f7d1393fb12445698212a367164fb7608507e4868f520
+          imagePullPolicy: IfNotPresent
+          command: ["cp", "-R", "/theme/.", "/staging/"]
+          volumeMounts:
+            - name: theme
+              mountPath: /staging
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+        # 2. theme: install it into custom/ on the volume, which this setup
+        #    owns: custom/templates and custom/public/assets are replaced on
+        #    every start. The page layouts (templates/) only when they were
+        #    made for this Forgejo release: a mismatched template can break
+        #    pages or stop Forgejo from starting. The CSS works either way.
+        #    Runs with the Forgejo image to ask the binary for its version.
+        #    Copied, not mounted: on an empty volume a mount would make the
+        #    kubelet create custom/ as root, and the image's setup script then
+        #    fails to chmod it.
         - name: theme
           image: codeberg.org/forgejo/forgejo:17.0.2-rootless
           imagePullPolicy: IfNotPresent
@@ -63,11 +86,18 @@ spec:
           args:
             - |
               set -eu
-              a=/var/lib/gitea/custom/public/assets
-              rm -rf "$a/css" "$a/fonts"
-              mkdir -p "$a/css" "$a/fonts"
-              cp /theme/*.css "$a/css/"
-              cp /theme/*.woff2 "$a/fonts/"
+              c=/var/lib/gitea/custom
+              want=$(cat /theme/FORGEJO_VERSION)
+              have=$(forgejo --version | sed -E 's/^forgejo version ([^ +]+).*/\1/')
+              rm -rf "$c/templates" "$c/public/assets"
+              mkdir -p "$c/public"
+              cp -R /theme/public/assets "$c/public/"
+              if [ "$want" = "$have" ]; then
+                cp -R /theme/templates "$c/"
+                echo "theme: installed, with the GitHub layouts for Forgejo $have"
+              else
+                echo "theme: built for Forgejo $want but this is $have; CSS only, layouts skipped"
+              fi
           volumeMounts:
             - name: data
               mountPath: /var/lib/gitea
@@ -136,13 +166,23 @@ spec:
             - name: FORGEJO__actions__ENABLED
               value: "true"
             # ── ui ──
-            # theme/theme-homelab.css, copied in by the `theme` init container.
-            # THEMES is the full list users can pick from (Settings →
-            # Appearance), so the built-ins stay as a fallback.
+            # The theme-github-*.css files from the `theme` init container.
+            # THEMES is what Settings → Appearance offers; Forgejo does not
+            # find custom themes by itself. Forgejo's built-ins are left out:
+            # the GitHub layouts are only styled by the github-* themes.
             - name: FORGEJO__ui__THEMES
-              value: homelab,forgejo-auto,forgejo-light,forgejo-dark
+              value: >-
+                github-auto, github-light, github-dark, github-soft-dark,
+                github-high-contrast-auto, github-high-contrast-light, github-high-contrast-dark, github-high-contrast-soft-dark,
+                github-colorblind-auto, github-colorblind-light, github-colorblind-dark,
+                github-high-contrast-colorblind-auto, github-high-contrast-colorblind-light, github-high-contrast-colorblind-dark,
+                github-tritanopia-auto, github-tritanopia-light, github-tritanopia-dark,
+                github-high-contrast-tritanopia-auto, github-high-contrast-tritanopia-light, github-high-contrast-tritanopia-dark,
+                github-pink-auto, github-pink-light, github-pink-dark, github-pink-soft-dark,
+                github-catppuccin-auto, github-catppuccin-latte, github-catppuccin-frappe, github-catppuccin-macchiato, github-catppuccin-mocha,
+                github-gitea-auto, github-gitea-light, github-gitea-dark
             - name: FORGEJO__ui__DEFAULT_THEME
-              value: homelab
+              value: github-dark
             # ── misc ──
             - name: FORGEJO__time__DEFAULT_UI_LOCATION
               value: Europe/Amsterdam
@@ -245,5 +285,4 @@ spec:
         - name: tmp
           emptyDir: {}
         - name: theme
-          configMap:
-            name: forgejo-theme
+          emptyDir: {}
