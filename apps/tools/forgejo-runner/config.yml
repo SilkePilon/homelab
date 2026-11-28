@@ -1,0 +1,31 @@
+# forgejo-runner config. start.sh appends the `server:` section (it needs the
+# runner UUID). Full reference: `forgejo-runner generate-config`, or
+# https://code.forgejo.org/forgejo/runner/src/branch/main/internal/pkg/config/config.example.yaml
+log:
+  level: info
+  job_level: info
+runner:
+  capacity: 2
+  timeout: 3h
+  # Lets running jobs finish when the pod is stopped, up to the pod's
+  # terminationGracePeriodSeconds.
+  shutdown_timeout: 10m
+  fetch_interval: 5s
+  # `runs-on:` value → image the job runs in. Renovate does not track these.
+  labels:
+    - docker:docker://data.forgejo.org/oci/node:24-trixie
+    - ubuntu-latest:docker://ghcr.io/catthehacker/ubuntu:act-24.04
+    - ubuntu-24.04:docker://ghcr.io/catthehacker/ubuntu:act-24.04
+cache:
+  enabled: true
+  dir: /data/cache
+container:
+  # A fresh bridge network per job.
+  network: ""
+  privileged: false
+  # The dind socket, mounted into job containers at /var/run/docker.sock so
+  # `docker build` / `docker run` work in jobs. A job with it controls the
+  # privileged dind daemon, i.e. root on the node: only run workflows from
+  # repos you trust.
+  docker_host: unix:///run/dind/docker.sock
+  valid_volumes: []

@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: forgejo-runner
+
+# ─────────────────────────────────────────────────────────────────────────────
+# forgejo-runner — Forgejo Actions runner for apps/tools/forgejo. Every job
+# is a container in a Docker-in-Docker sidecar on an amd64 node.
+#
+# Registration is automatic: the forgejo pod registers RUNNER_SECRET from the
+# Infisical folder /forgejo, and this pod connects with the same value. The
+# runner shows up under Site administration → Actions → Runners.
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - externalsecret.yaml
+
+# Hashed name, so a config change rolls the pod.
+configMapGenerator:
+  - name: forgejo-runner
+    files:
+      - config.yml
+      - start.sh
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+    includeSelectors: false
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 2

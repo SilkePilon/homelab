@@ -2,25 +2,24 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # Plain Kustomize base — consumed identically by Argo CD and Flux CD.
-namespace: gitlab
+namespace: forgejo
 
 # ─────────────────────────────────────────────────────────────────────────────
-# gitlab — GitLab Community Edition at https://gitlab.silkepilon.dev.
-# Git over HTTPS only. The CI runner is a separate Helm app:
-# bootstrap/argocd/applications/gitlab-runner.yaml.
+# forgejo — Forgejo at https://git.silkepilon.dev. Git over HTTPS only.
+# Forgejo Actions CI runs on forgejo-runner (apps/tools/forgejo-runner).
 #
 # BEFORE applying this stack:
 #
-#  1. Add the key GITLAB_ROOT_PASSWORD (openssl rand -base64 24) to the
-#     Infisical folder /gitlab (NOT committed to git); ESO syncs it to
-#     gitlab-secret. The root password is read on first boot only.
+#  1. Fill the Infisical folder /forgejo (NOT committed to git); ESO syncs it
+#     to forgejo-secret. Keys: SECRET_KEY, ADMIN_PASSWORD, RUNNER_SECRET.
+#     See externalsecret.yaml and README.md.
 #
 #  2. Add a Cloudflare Tunnel public hostname entry:
-#       Subdomain: gitlab   Domain: silkepilon.dev
-#       Service:   HTTP     http://traefik.kube-system.svc.cluster.local:80
+#       Subdomain: git   Domain: silkepilon.dev
+#       Service:   HTTP  http://traefik.kube-system.svc.cluster.local:80
 #
-#  3. Let Argo CD sync, then follow apps/tools/gitlab/README.md for first login,
-#     hardening and runner registration.
+# The admin user and the runner registration are created by the `setup`
+# container in deployment.yaml; nothing to click.
 # ─────────────────────────────────────────────────────────────────────────────
 
 resources:

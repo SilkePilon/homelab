@@ -1,6 +1,0 @@
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-# Git-side extras for the gitlab-runner Helm app (second source in its Argo
-# Application): only the ExternalSecret for now.
-resources:
-  - externalsecret.yaml

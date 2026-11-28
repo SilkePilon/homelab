@@ -35,8 +35,6 @@ spec:
             exclude: true
           - path: apps/infra/tailscale
             exclude: true
-          - path: apps/tools/gitlab-runner
-            exclude: true
           - path: apps/tools/plane
             exclude: true
   syncPolicy:
