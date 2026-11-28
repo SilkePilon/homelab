@@ -88,6 +88,26 @@ jobs:
 on the node. That is fine while signups are off and only your own repos run
 CI. Do not enable Actions on repos that take pull requests from strangers.
 
+## Theme
+
+The default theme is `homelab` ([theme/theme-homelab.css](theme/theme-homelab.css)):
+
+- The README's monochrome palette with GitHub-style components: 6px corners,
+  borderless filled buttons, counters as pills inside buttons, and segmented
+  controls.
+- Inter and JetBrains Mono are served from Forgejo itself
+  ([licence](theme/OFL.txt)).
+- The Forgejo logo is kept, slightly smaller.
+
+It is CSS only and builds on `forgejo-dark`, with no template overrides, so an
+upgrade can at worst make a detail look stock again. The built-in
+`forgejo-auto/light/dark` stay selectable under **Settings → Appearance**.
+
+To change it, edit the CSS and push. The ConfigMap name is hashed, so the pod
+restarts and the `theme` init container copies the new files to
+`custom/public/assets`. A user's theme is stored per account: the default only
+applies to new accounts and logged-out visitors.
+
 ## Upgrades
 
 Renovate bumps patch and minor releases of both images on its own. Forgejo
