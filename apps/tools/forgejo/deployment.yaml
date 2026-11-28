@@ -7,9 +7,12 @@
 # env wins over anything edited in that file. Cheat sheet:
 #   https://forgejo.org/docs/latest/admin/config-cheat-sheet/
 #
+# Theme: theme/ (see theme/theme-homelab.css), the `homelab` default.
+#
 # Upgrades: Renovate bumps patch/minor releases on its own. Majors (every ~3
 # months) run DB migrations and cannot be rolled back — read the release
-# notes and snapshot the Longhorn volume first.
+# notes and snapshot the Longhorn volume first. The tag appears three times
+# below (theme, forgejo, setup); keep them equal.
 #
 # Secret: forgejo-secret (see externalsecret.yaml)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -47,6 +50,36 @@ spec:
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch
       terminationGracePeriodSeconds: 60
+      initContainers:
+        # Copies the theme (CSS + fonts) from the forgejo-theme ConfigMap to
+        # custom/public/assets on the volume, where Forgejo serves /assets/.
+        # Not a direct ConfigMap mount: on an empty volume that would make the
+        # kubelet create custom/ as root, and the image's setup script then
+        # fails to chmod it.
+        - name: theme
+          image: codeberg.org/forgejo/forgejo:17.0.2-rootless
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              a=/var/lib/gitea/custom/public/assets
+              rm -rf "$a/css" "$a/fonts"
+              mkdir -p "$a/css" "$a/fonts"
+              cp /theme/*.css "$a/css/"
+              cp /theme/*.woff2 "$a/fonts/"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/gitea
+            - name: theme
+              mountPath: /theme
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
       containers:
         - name: forgejo
           image: codeberg.org/forgejo/forgejo:17.0.2-rootless
@@ -102,6 +135,14 @@ spec:
             # `uses: https://github.com/owner/action@v1` work too.
             - name: FORGEJO__actions__ENABLED
               value: "true"
+            # ── ui ──
+            # theme/theme-homelab.css, copied in by the `theme` init container.
+            # THEMES is the full list users can pick from (Settings →
+            # Appearance), so the built-ins stay as a fallback.
+            - name: FORGEJO__ui__THEMES
+              value: homelab,forgejo-auto,forgejo-light,forgejo-dark
+            - name: FORGEJO__ui__DEFAULT_THEME
+              value: homelab
             # ── misc ──
             - name: FORGEJO__time__DEFAULT_UI_LOCATION
               value: Europe/Amsterdam
@@ -203,3 +244,6 @@ spec:
             claimName: forgejo-data
         - name: tmp
           emptyDir: {}
+        - name: theme
+          configMap:
+            name: forgejo-theme
